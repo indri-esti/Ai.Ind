@@ -50,5 +50,81 @@
     {
         "kamu": "bisa buatin aku codingan login nggak",
         "ai": "Tentu saja! 🎉 Aku bisa membuatkan contoh kode login untukmu. Karena kamu belum menentukan bahasa atau framework yang ingin kamu gunakan, Aku akan memberikan beberapa contoh cepat dalam teknologi yang paling populer:\n\n| 🔹 Platform | 📄 Apa yang kamu dapatkan | 🛠️ Teknologi yang digunakan |\n|-----------|-------------------|----------------|\n| **Web statis** | Halaman login sederhana dengan JavaScript murni (no‑server) | HTML / CSS / vanilla JS |\n| **Aplikasi web** | Login backend dengan autentikasi sesi (Flask) + halaman frontend | Python + Flask + HTML/CSS/JS |\n| **Aplikasi web** | Login backend dengan token JWT (Node/Express) + halaman frontend | Node.js + Express + MongoDB (atau SQLite) |\n| **Spring Boot** | Proyek Java lengkap dengan keamanan Spring (sesi JDBC) | Java + Spring Boot + Thymeleaf |\n| **React** | Komponen login yang bisa digunakan kembali dengan React + Auth0 (opsional) | React + Auth0 / Firebase |\n\nSilakan pilih yang cocok dengan proyekmu, atau beri tahu aku jika kamu ingin contoh dengan framework tertentu atau punya bahasa pemrograman pilihan!\n\n---\n\n### 📦 Contoh: Login Sederhana Berbasis HTML/CSS/JS (No‑Server)\n\nBerikut snippet mandiri yang bisa kamu salin ke dalam file `index.html` dan buka di browser. Ini **tidak** melibatkan backend — sangat cocok untuk prototipe atau latihan UI.\n\n```html\n<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Halaman Login</title>\n  <style>\n    /* Gaya sederhana agar terlihat rapi */\n    body {\n      font-family: Arial, sans-serif;\n      background: #f0f2f5;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      height: 100vh;\n      margin: 0;\n    }\n    .login-card {\n      background: #fff;\n      padding: 2rem;\n      border-radius: 8px;\n      box-shadow: 0 4px 12px rgba(0,0,0,.1);\n      width: 300px;\n    }\n    h2 { margin-top: 0; text-align: center; }\n    label { display: block; margin-top: 1rem; }\n    input {\n      width: 100%;\n      padding: .5rem;\n      margin-top: .3rem;\n      border: 1px solid #ccc;\n      border-radius: 4px;\n    }\n    button {\n      margin-top: 1.5rem;\n      width: 100%;\n      padding: .7rem;\n      background: #007bff;\n      color: #fff;\n      border: none;\n      border-radius: 4px;\n      cursor: pointer;\n    }\n    button:hover { background: #0056b3; }\n    .msg {\n      margin-top: 1rem;\n      font-size: .9rem;\n      text-align: center;\n      color: red;\n      display: none;\n    }\n  </style>\n</head>\n<body>\n\n<div class=\"login-card\">\n  <h2>Login</h2>\n  <form id=\"loginForm\" autocomplete=\"off\">\n    <label for=\"username\">Nama pengguna</label>\n    <input type=\"text\" id=\"username\" name=\"username\" required>\n\n    <label for=\"password\">Kata sandi</label>\n    <input type=\"password\" id=\"password\" name=\"password\" required>\n\n    <button type=\"submit\">Masuk</button>\n    <div class=\"msg\" id=\"msgBox\"></div>\n  </form>\n</div>\n\n<script>\n  // ——————— Logika front‑end sederhana ———————\n  const validUsers = [\n    { user: \"alice\", pass: \"password123\" },\n    { user: \"bob\",   pass: \"bob2025\"   }\n    // ⬆️ Kamu bisa menambah atau mengubah pengguna di sini\n  ];\n\n  const form = document.getElementById('loginForm');\n  const msgBox = document.getElementById('msgBox');\n\n  form.addEventListener('submit', function (e) {\n    e.preventDefault(); // Mencegah pengiriman form ke server\n\n    const uname = document.getElementById('username').value.trim();\n    const pass = document.getElementById('password').value;\n\n    // Validasi sederhana\n    const found = validUsers.find(u => u.user === uname && u.pass === pass);\n    if (found) {\n      msgBox.style.color = 'green';\n      msgBox.textContent = `Selamat datang, ${uname}!`;\n      // Di sini kamu bisa redirect, simpan token, dll.\n      // window.location.href = '/dashboard.html';\n    } else {\n      msgBox.style.color = 'red';\n      msgBox.textContent = 'Nama pengguna atau kata sandi salah.';\n    }\n    msgBox.style.display = 'block';\n  });\n</script>\n\n</body>\n</html>\n```\n\n**Cara kerjanya**\n\n1. Pengguna memasukkan nama pengguna & kata sandi.\n2. JavaScript mencocokkannya terhadap daftar `validUsers` dalam‑memory.\n3. Jika cocok → tampilkan pesan selamat datang (atau kamu bisa redirect ke halaman lain, menyimpan `localStorage` token, dll.)\n4. Jika tidak cocok → tampilkan pesan kesalahan.\n\n*Jangan lupa*: Karena ini hanya frontend murni, kredensial disimpan secara lokal pada halaman ini. Untuk aplikasi nyata, kamu perlu backend yang aman (lihat contoh Flask atau Node di bawah) dan hindari menyimpan kata sandi dalam plain text.\n\n---\n\n### 🐍 Contoh: Login Backend dengan Python + Flask (dengan sesi)\n\nJika kamu ingin contoh lengkap yang bisa bertindak sebagai API, berikut adalah proyek minimal dengan:\n\n* Formulir login (halaman HTML terpisah `login.html`)\n* Rute `/login` yang memeriksa kredensial\n* Halaman sesi terproteksi `/dashboard`\n* Cookie sesi (Flask‑session)\n\n**File: `app.py`**\n\n```python\nfrom flask import Flask, render_template, request, redirect, url_for, session, escape\nfrom werkzeug.security import generate_password_hash, check_password_hash\n\napp = Flask(__name__)\napp.secret_key = 'kunci_rahasia_super_panjang_dan_acak_disini!'  # ganti dengan .env di produksi\n\n# Simulasi database pengguna (password sudah di-hash)\nusers_db = {\n    \"alice\": generate_password_hash(\"password123\"),\n    \"bob\": generate_password_hash(\"bob2025\")\n    # tambah pengguna lain di sini...\n}\n\n@app.route('/')\ndef index():\n    return redirect(url_for('login'))\n\n@app.route('/login', methods=['GET', 'POST'])\ndef login():\n    if request.method == 'POST':\n        username = request.form.get('username', '')\n        password = request.form.get('password', '')\n\n        # Validasi user\n        if username in users_db and check_password_hash(users_db[username], password):\n            session['user'] = username          # simpan di sesi\n            return redirect(url_for('dashboard'))\n\n        # Login gagal\n        return render_template('login.html', error='Nama pengguna atau kata sandi salah.')\n\n    # GET: tampilkan halaman login\n    return render_template('login.html', error=None)\n\n@app.route('/dashboard')\ndef dashboard():\n    if 'user' not in session:\n        return redirect(url_for('login'))\n    return f'Hello, <b>{escape(session[\"user\"])}</b>! <a href=\"/logout\">Logout</a>'\n\n@app.route('/logout')\ndef logout():\n    session.pop('user', None)\n    return redirect(url_for('login'))\n\nif __name__ == '__main__':\n    app.run(debug=True)\n```\n\n**File: `templates/login.html`** (mirip dengan contoh frontend tetapi berkomunikasi dengan backend Flask)\n\n```html\n<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Flask Login</title>\n  <style>\n    body { font-family: Arial; background:#f0f2f5; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }\n    .card { background:#fff; padding:2rem; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1); width:300px; }\n    label { display:block; margin-top:1rem; }\n    input { width:100%; padding:.5rem; margin-top:.3rem; }\n    button { margin-top:1.5rem; width:100%; padding:.7rem; background:#007bff; color:#fff; border:none; border-radius:4px; cursor:pointer; }\n    .error { color:red; margin-top:1rem; text-align:center; display:none; }\n  </style>\n</head>\n<body>\n<div class=\"card\">\n  <h2>Login</h2>\n  <form method=\"post\">\n    <label>Username\n      <input type=\"text\" name=\"username\" required>\n    </label>\n    <label>Password\n      <input type=\"password\" name=\"password\" required>\n    </label>\n    <button type=\"submit\">Masuk</button>\n  </form>\n  {% if error %}\n    <div class=\"error\">{{ error }}</div>\n  {% endif %}\n</div>\n</body>\n</html>\n```\n\n**Cara menjalankan**\n\n```bash\n# Buat virtual environment (opsional tapi disarankan)\npython -m venv venv\nsource venv/bin/activate   # di Windows: venv\\Scripts\\activate\n\npip install flask werkzeug\npython app.py\n```\n\nBuka `http://127.0.0.1:5000/login` di browser, coba:\n\n* `alice` / `password123`\n* `bob` / `bob2025`\n\nKamu akan di-redirect ke `/dashboard` setelah login. Klik \"Logout\" dan kamu akan keluar.\n\n---\n\n### 👉 Apa yang ingin kamu pilih?\n\n* Bahasa / framework favoritmu?\n* Kamu butuh fitur khusus (misalnya “ingat aku”, OTP, login Google/Facebook)?\n* Kamu punya tugas dari sekolah/universitas yang harus diikuti?\n\nBeritahu aku, dan aku bisa menyesuaikan contohnya sesuai kebutuhanmu atau menambahkan backend yang lebih lengkap (Node/Express, Spring Boot, React + Auth0, dll.)! 🚀"
+    },
+    {
+        "kamu": "hai ai perkenalkan diri mu ?",
+        "ai": "Halo! 👋 Senang berkenalan denganmu!\n\nPerkenalkan, aku adalah **AI assistant** yang siap membantumu dalam berbagai hal, seperti:\n\n- 💻 **Coding** — bantu nulis kode, debug, atau jelaskan konsep pemrograman (React, Spring Boot, Python, JavaScript, HTML, CSS, dll.)\n- 🐛 **Memperbaiki bug** — bantu cari dan perbaiki error di kode-mu\n- 💬 **Teman ngobrol** — kalau mau curhat atau ngobrol santai juga bisa kok\n- 📚 **Penjelasan konsep** — bantu pahamin topik apa pun yang kamu pertanyakan\n\nAku jawab dalam Bahasa Indonesia ya, kecuali kalau kamu minta bahasa lain 😊\n\nNah, ada yang bisa aku bantu hari ini?"
+    },
+    {
+        "kamu": "presiden indonesia yang ke 8 siapa?",
+        "ai": "Presiden Indonesia yang ke-8 adalah **Prabowo Subianto**. Beliau resmi menjabat pada tanggal 20 Oktober 2024, menggantikan Presiden ke-7, Joko Widodo (Jokowi)."
+    },
+    {
+        "kamu": "okey thank you ai ku",
+        "ai": "Sama-sama! 😊 Ada yang bisa saya bantu, baik itu såmbang coding, ngobrol santai, atau hal lain?"
+    },
+    {
+        "kamu": "hi",
+        "ai": "Halo! Bagaimana aku bisa membantu kamu hari ini? 😊\n"
+    },
+    {
+        "kamu": "hi",
+        "ai": "Halo! 👋 Ada yang bisa kubantu hari ini? Entah itu soal coding, React, Spring Boot, Python, atau hal lainnya—silakan tanya saja!"
+    },
+    {
+        "kamu": "hai",
+        "ai": "\n\nHai! Bagaimana Angela? 😊\n"
+    },
+    {
+        "kamu": "hai ai ku",
+        "ai": "Hai juga! 😊 Ada yang bisa aku bantu hari ini? Mau ngobrol, atau ada pertanyaan soal coding? Aku siap kok!"
+    },
+    {
+        "kamu": "aku mau nanya",
+        "ai": "Tentu! Silakan tanya apa saja. Aku siap membantu 😊"
+    },
+    {
+        "kamu": "kamu siapa",
+        "ai": "\n\nSaya adalah Kamu.shibang AI yang dikreasikan untuk membantuiscoba, 도움을 dengan programming, dan menjadi teman yang ramah. Saya bisa membantu coding di berbagai pemrograman seperti React, Spring Boot, Python, JavaScript, HTML, dan lainnya. Jika kamu punya pertanyaan atau membutuhkan bantuan, jangan ragu untuk bertanya! 😊\n"
+    },
+    {
+        "kamu": "hai ai",
+        "ai": "Hai! 👋 Ada yang bisa aku bantu hari ini?"
+    },
+    {
+        "kamu": "2+3 berapa",
+        "ai": "\n\nJawaban dari 2 + 3 adalah **5**! 😊  \nApakah ada yang lain yang bisa saya bantu?\n"
+    },
+    {
+        "kamu": "coba ketikannya bisa di percepat",
+        "ai": "Halo! Maksud kamu \"ketikannya bisa di percepat\" itu seperti apa ya? Ada beberapa konteks yang bisa saya bantu:\n\n1. **Jika kamu ingin mengautomasi mengetik** (misalnya untuk mengirim pesan atau membuat kode), aku bisa bantu dengan:\n   - Menggunakan **snippets** atau **text expansion** (misalnya mengetik `tgl` → berubah otomatis ke tanggal).\n   - Menggunakan **auto-complete** atau **IntelliSense** di editor kode (seperti VS Code, PyCharm, dll).\n   - Tools seperti **AutoHotkey** (untuk Windows) atau **Karabiner** (untuk Mac) untuk membuat shortcut khusus.\n\n2. **Jika kamu ingin mengetik lebih cepat secara alami**, berikut tipsnya:\n   - Pelajari **touch typing** (mengetik tanpa melihat papan ketik).\n   - Gunakan software latihan seperti **Keybr.com** atau **TypingClub**.\n   - Aktifkan fitur **predictive text** di perangkat atau aplikasi.\n\n3. **Jika sedang menulis kode** (React, Python, dll), aku bisa bantu dengan:\n   - **Snippets khusus** untuk framework tertentu (misalnya `console.log` di JavaScript).\n   - **Autocompletion** yang lebih pintar berdasarkan konteks.\n\n4. **Jika sedang menggunakan aplikasi atau tools tertentu** yang lambat, mungkin ada settingan yang bisa dioptimalkan (misalnya mematikan plugin yang tidak diperlukan).\n\nCoba kasih tahu lebih detail ya, biar aku bisa bantu tepat! 😊"
+    },
+    {
+        "kamu": "perkenalkan dirimu",
+        "ai": "Halo! Saya AI.Ind, sebuah asisten AI yang mencoba memberikan dukungan dalam berbagai hal. Saya dapat membantu Anda dengan:\n\n* **Pemrograman & Penyelesaian Bug** – kode dalam berbagai bahasa (JavaScript, Python, Java, Kotlin, SQL, Rust, Go, dll.) dan men-debug error atau masalah lain.\n* **Pengembangan Web** – membantu mengatur proyek React, membuat komponen, menulis HTML/CSS, atau mengintegrasikan layanan backend.\n* **Spring Boot** – menciptakan komponen, menyiapkan konfigurasi, memperbaiki API, dan menangani masalah pada layanan berbasis Java.\n* **Debugging & Optimasi** – mendiagnosis stack trace, kode yang tidak efisien, dan melakukan refactoring.\n* **Komunikasi & Pembelajaran** – menjawab pertanyaan, menjelaskan konsep, atau sekadar mengobrol.\n\nApa pun kebutuhan Anda – mulai dari memahami pelajaran, menulis cuplikan kode, hingga men-debug tugas penting – beri tahu saya dan saya akan segera membantu Anda! 🚀"
+    },
+    {
+        "kamu": "hai",
+        "ai": "Halo! Ada yang bisa saya bantu hari ini? Saya siap membantu dengan coding, debugging, proyek React/Spring Boot/Python/JavaScript, atau sekadar mengobrol. Apa yang Anda pikirkan?"
+    },
+    {
+        "kamu": "hai ai",
+        "ai": "Hai! Apa kabar? Ada yang bisa saya bantu hari ini?"
+    },
+    {
+        "kamu": "hai",
+        "ai": "Hai! Ada yang bisa saya bantu hari ini? 😊"
+    },
+    {
+        "kamu": "hai",
+        "ai": "Hai! Ada yang bisa saya bantu hari ini? 😊"
+    },
+    {
+        "kamu": "hai ai",
+        "ai": "Tidak dapat terhubung ke internet."
+    },
+    {
+        "kamu": "hai ai",
+        "ai": "Hai! 👋 Ada yang bisa aku bantu hari ini? Entah itu soal coding, React, Spring Boot, Python, atau hal lainnya—silakan tanya saja! 😊"
     }
 ]
