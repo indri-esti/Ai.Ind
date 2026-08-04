@@ -131,11 +131,11 @@ function Home() {
                 </h3>
 
                 <small style={{ color: "#8A9BB5" }}>
-                  Artificial Intelligence Indonesia
+                  Buatan Indonesia
                 </small>
               </div>
 
-              <FaUserCircle size={38} color="#00C2FF" />
+               <FaUserCircle size={38} color="#00C2FF" />
             </div>
           </Col>
         </Row>
