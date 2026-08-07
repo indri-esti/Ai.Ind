@@ -246,28 +246,41 @@ const handleAbout = ()=>{
 
     {/* Sidebar */}
    <div
-style={{
-  position: mobile ? "fixed" : "relative",
-  top: 0,
-  left: mobile ? (open ? 0 : "-270px") : 0,
-  width: "260px",
-  height: "100vh",
-  background: "#0B1D2A",
-  color: "#fff",
-  transition: ".3s ease",
-  borderRight: "1px solid #1B3445",
-  display: "flex",
-  flexDirection: "column",
-  zIndex: 999,
-  overflow: "hidden",
-}}
+  style={{
+    position: mobile ? "fixed" : "relative",
+    top: 0,
+    left: mobile ? (open ? 0 : "-280px") : 0,
+
+    width: "280px",
+    maxWidth: "calc(100vw - 32px)",
+
+    height: "100vh",
+
+    background: "#0B1D2A",
+    color: "#fff",
+
+    transition: "left .3s ease",
+
+    borderRight: "1px solid #1B3445",
+
+    display: "flex",
+    flexDirection: "column",
+
+    zIndex: 999,
+
+    overflow: "hidden",
+    boxSizing: "border-box",
+  }}
 >
       {/* Atas */}
-      <div
-        style={{
-          padding: "22px",
-        }}
-      >
+     <div
+  style={{
+    padding: "22px 20px 18px",
+    boxSizing: "border-box",
+    width: "100%",
+    flexShrink: 0,
+  }}
+>
         <h3
           style={{
             color: "#00C2FF",
@@ -290,126 +303,155 @@ style={{
         </small>
 
         <button
-          onClick={chatBaru}
-          style={{
-            marginTop: "25px",
-            width: "100%",
-            padding: "12px",
-            background: "#00C2FF",
-            color: "#081420",
-            border: "none",
-            borderRadius: "10px",
-            fontWeight: "600",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-            cursor: "pointer",
-          }}
-        >
-          <FiPlus />
-          Chat Baru
-        </button>
+  onClick={chatBaru}
+  style={{
+    marginTop: "25px",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "13px 12px",
+    background: "#00C2FF",
+    color: "#081420",
+    border: "none",
+    borderRadius: "12px",
+    fontWeight: "600",
+    fontSize: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    cursor: "pointer",
+  }}
+>
+  <FiPlus size={19} />
+  Chat Baru
+</button>
       </div>
 
       {/* Riwayat */}
-     <div
-style={{
-  flex: 1,
-  overflowY:"auto",
-  overflowX:"hidden",
-  padding: "0 22px 12px",
-  minHeight:0,
-}}
+<div
+  style={{
+    flex: 1,
+    overflowY: "auto",
+    overflowX: "hidden",
+    padding: "0 22px 12px",
+    minHeight: 0,
+  }}
 >
-        <p
-          style={{
-            color: "#8A9BB5",
-            fontSize: "13px",
-            marginBottom: "10px",
-          }}
-        >
-          Riwayat Chat
-        </p>
-
-        {!history || history.length === 0 ? (
-          <p
-            style={{
-              color: "#8A9BB5",
-              fontSize: "13px",
-            }}
-          >
-            Belum ada riwayat
-          </p>
-        ) : (
-        
-history.map((chat, index) => (
-  <div
-    key={chat.id}
+  <p
     style={{
-      background: "#122B3C",
-      borderRadius: "12px",
-      padding: "12px",
-      display: "flex",
-      alignItems: "center",
+      color: "#8A9BB5",
+      fontSize: "13px",
       marginBottom: "10px",
-      cursor: "pointer",
-      transition: ".2s",
     }}
   >
-    <div
-      onClick={() => {
-        setMessages(chat.messages);
+    Riwayat Chat
+  </p>
 
-        if (mobile) {
-          setOpen(false);
-        }
-      }}
+  {!history || history.length === 0 ? (
+    <p
       style={{
-        display: "flex",
-        alignItems: "center",
-        flex: 1,
-        gap: "10px",
+        color: "#8A9BB5",
+        fontSize: "13px",
       }}
     >
-      <FiMessageSquare />
-
-      <span
+      Belum ada riwayat
+    </p>
+  ) : (
+    history.map((chat, index) => (
+      <div
+        key={chat.id}
         style={{
-          flex: 1,
+          width: "100%",
+          boxSizing: "border-box",
+          background: "#122B3C",
+          borderRadius: "12px",
+          padding: "10px 8px 10px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          marginBottom: "10px",
+          cursor: "pointer",
+          transition: ".2s",
           overflow: "hidden",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
         }}
       >
-        {chat.title}
-      </span>
-    </div>
+        {/* Isi Riwayat */}
+        <div
+          onClick={() => {
+            setMessages(chat.messages);
 
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
+            if (mobile) {
+              setOpen(false);
+            }
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flex: "1 1 auto",
+            minWidth: 0,
+            gap: "10px",
+            overflow: "hidden",
+          }}
+        >
+          <FiMessageSquare
+            size={20}
+            style={{
+              flexShrink: 0,
+            }}
+          />
 
-        const data = [...history];
-        data.splice(index, 1);
+          <span
+            style={{
+              display: "block",
+              flex: "1 1 auto",
+              minWidth: 0,
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {chat.title}
+          </span>
+        </div>
 
-        setHistory(data);
-        localStorage.setItem("history", JSON.stringify(data));
-      }}
-      style={{
-        background: "transparent",
-        border: "none",
-        color: "#ff5c5c",
-        cursor: "pointer",
-        fontSize: "16px",
-      }}
-    >
-      <FaTrash />
-    </button>
-  </div>
-))
-        )}
+        {/* Tombol Hapus */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+
+            const data = [...history];
+            data.splice(index, 1);
+
+            setHistory(data);
+            localStorage.setItem(
+              "history",
+              JSON.stringify(data)
+            );
+          }}
+          style={{
+            flex: "0 0 32px",
+            width: "32px",
+            minWidth: "32px",
+            height: "32px",
+            padding: 0,
+            margin: 0,
+            background: "transparent",
+            border: "none",
+            borderRadius: "8px",
+            color: "#ff5c5c",
+            cursor: "pointer",
+            fontSize: "15px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <FaTrash />
+        </button>
       </div>
+    ))
+  )}
+</div>
 
            {/* Menu bawah */}
       <div
