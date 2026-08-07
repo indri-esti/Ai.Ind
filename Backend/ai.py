@@ -60,6 +60,11 @@ def balas(pesan):
 
         jawaban = hasil["choices"][0]["message"]["content"]
 
+        # Hapus informasi safety jika ikut masuk ke jawaban
+        jawaban = jawaban.replace("User Safety: safe", "")
+        jawaban = jawaban.replace("Response Safety: safe", "")
+        jawaban = jawaban.strip()
+
         add_message("user", pesan)
         add_message("assistant", jawaban)
 
