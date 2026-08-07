@@ -34,7 +34,6 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-
     try:
         data = request.get_json()
 
@@ -57,7 +56,6 @@ def chat():
         })
 
     except Exception as e:
-
         print("Chat Error:", e)
 
         return jsonify({
@@ -67,10 +65,13 @@ def chat():
 
 @app.errorhandler(404)
 def not_found(error):
-
     return jsonify({
         "error": "Endpoint tidak ditemukan"
     }), 404
+
+
+# Untuk PythonAnywhere / WSGI
+application = app
 
 
 if __name__ == "__main__":

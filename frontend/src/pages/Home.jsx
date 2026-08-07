@@ -89,15 +89,21 @@ function Home() {
           content: res.data.reply,
         },
       ]);
+      
     } catch (err) {
-      console.error(err);
+      console.error("Chat Error:", err);
 
       let errorMessage = "Server tidak dapat dihubungi.";
 
       if (err.response) {
-        errorMessage = `Error ${err.response.status}`;
+        errorMessage = `Error ${err.response.status}: ${
+          err.response.data?.error || "Terjadi kesalahan server"
+        }`;
       } else if (err.request) {
-        errorMessage = "Backend belum berjalan.";
+        errorMessage =
+          "Tidak ada respon dari backend. Cek koneksi atau CORS.";
+      } else {
+        errorMessage = err.message;
       }
 
       setMessages((prev) => [
@@ -108,6 +114,7 @@ function Home() {
         },
       ]);
     } finally {
+      
       setLoading(false);
     }
   };
