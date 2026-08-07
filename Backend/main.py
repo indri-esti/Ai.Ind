@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -18,10 +20,8 @@ except Exception as e:
     print("Database error:", e)
 
 
-
 # Register Auth
 app.register_blueprint(auth)
-
 
 
 @app.route("/", methods=["GET"])
@@ -30,7 +30,6 @@ def home():
         "status": "AI.Ind Backend Running",
         "message": "Backend siap digunakan"
     })
-
 
 
 @app.route("/chat", methods=["POST"])
@@ -44,23 +43,18 @@ def chat():
                 "error": "Request body kosong"
             }), 400
 
-
         pesan = data.get("message")
-
 
         if not pesan or pesan.strip() == "":
             return jsonify({
                 "error": "Pesan tidak boleh kosong"
             }), 400
 
-
         jawaban = balas(pesan.strip())
-
 
         return jsonify({
             "reply": jawaban
         })
-
 
     except Exception as e:
 
@@ -71,7 +65,6 @@ def chat():
         }), 500
 
 
-
 @app.errorhandler(404)
 def not_found(error):
 
@@ -80,13 +73,12 @@ def not_found(error):
     }), 404
 
 
-
 if __name__ == "__main__":
 
-    print("🚀 AI.Ind Backend berjalan di port 5000")
+    print("🚀 AI.Ind Backend berjalan...")
 
     app.run(
         host="0.0.0.0",
-        port=5000,
-        debug=True
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False
     )
