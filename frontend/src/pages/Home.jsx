@@ -1,455 +1,215 @@
-import {
-  Container,
-  Row,
-  Col,
-  Button,
-  Form,
-} from "react-bootstrap";
-
-import {
-  FaPaperPlane,
-  FaRobot,
-  FaUserCircle,
-} from "react-icons/fa";
-
-import { useState } from "react";
+import { Container, Row, Col } from "react-bootstrap";
+import { useState, useEffect, useRef } from "react";
 import axios from "../api";
 
+import Header from "../components/Header";
+import ChatBox from "../components/ChatBox";
+import ChatInput from "../components/ChatInput";
+import Loading from "../components/Loading";
+import Typing from "../components/Typing";
+import Sidebar from "../components/Sidebar";
+
 function Home() {
-
   const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([]);
 
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: "Halo 👋 Saya AI.Ind."
-    }
-  ]);
+  const [history, setHistory] = useState(() => {
+    const data = localStorage.getItem("history");
+    return data ? JSON.parse(data) : [];
+  });
 
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  // Kirim pesan
- const kirimPesan = async () => {
-  if (!message.trim()) return;
+  const chatEndRef = useRef(null);
 
-  const text = message;
-
-  // Kosongkan input
-  setMessage("");
-
-  // Tampilkan pesan user
-  setMessages((prev) => [
-    ...prev,
-    {
-      role: "user",
-      content: text,
-    },
-  ]);
-
-  setLoading(true);
-
-  try {
-    const res = await axios.post("/chat", {
-      message: text,
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({
+      behavior: "smooth",
     });
+  }, [messages, loading]);
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        content: res.data.reply,
-      },
-    ]);
-  } catch (err) {
-    console.error(err);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+  setPageLoading(false);
+}, 1800);
 
-    let errorMessage = "Server tidak dapat dihubungi.";
+    return () => clearTimeout(timer);
+  }, []);
 
-    if (err.response) {
-      errorMessage = `Error ${err.response.status}`;
-    } else if (err.request) {
-      errorMessage = "Backend belum berjalan.";
-    }
+  useEffect(() => {
+    localStorage.setItem(
+      "history",
+      JSON.stringify(history)
+    );
+  }, [history]);
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
-        content: errorMessage,
-      },
-    ]);
-  } finally {
-    setLoading(false);
+  const chatBaru = () => {
+  if (messages.length > 0) {
+    const chat = {
+      id: Date.now(),
+      title:
+        messages.find((m) => m.role === "user")?.content ||
+        "Percakapan Baru",
+      messages,
+    };
+
+    setHistory((prev) => [chat, ...prev]);
   }
+
+  setMessages([]);
 };
+
+  const kirimPesan = async () => {
+    if (!message.trim() || loading) return;
+
+    const text = message;
+
+    setMessage("");
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: text,
+      },
+    ]);
+
+    setLoading(true);
+
+    try {
+      const res = await axios.post("/chat", {
+        message: text,
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: res.data.reply,
+        },
+      ]);
+    } catch (err) {
+      console.error(err);
+
+      let errorMessage = "Server tidak dapat dihubungi.";
+
+      if (err.response) {
+        errorMessage = `Error ${err.response.status}`;
+      } else if (err.request) {
+        errorMessage = "Backend belum berjalan.";
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: errorMessage,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (pageLoading) {
+    return <Loading />;
+  }
 
   return (
     <div
-  style={{
-    background: "#081420",
-    height: "100vh",
-    color: "#fff",
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-  }}
->
-<Container
-  style={{
-    maxWidth: "980px",
-    margin: "0 auto",
-    paddingLeft: "20px",
-    paddingRight: "20px",
-  }}
->
-
-        {/* Header */}
-        <Container
-  style={{
-    maxWidth: "980px",
-    margin: "0 auto",
-  }}
->
-      <Row className="align-items-center justify-content-between">
-<Col xs={12} className="d-flex flex-column">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <h3
-                  style={{
-                    color: "#00C2FF",
-                    marginBottom: 0,
-                    fontWeight: "700",
-                  }}
-                >
-                  AI.Ind
-                </h3>
-
-                <small style={{ color: "#8A9BB5" }}>
-                  Buatan Indonesia
-                </small>
-              </div>
-
-               <FaUserCircle size={38} color="#00C2FF" />
-            </div>
-          </Col>
-        </Row>
-        </Container>
-
-       {/* Welcome */}
-{messages.length === 1 && (
-  <Row
-    className="justify-content-center"
-    style={{
-      flex: 1,
-      alignItems: "center",
-      minHeight: "65vh",
-    }}
-  >
-    <Col xs={12} md={10} lg={9} xl={8}>
-
-      <div
-        className="text-center"
-        style={{
-          animation: "fadeIn .4s ease",
-        }}
-      >
-        <div
-          style={{
-            width: 90,
-            height: 90,
-            margin: "0 auto 25px",
-            borderRadius: "50%",
-            background: "#13283F",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            boxShadow: "0 0 40px rgba(0,194,255,.15)",
-          }}
-        >
-          <FaRobot
-            size={42}
-            color="#00C2FF"
-          />
-        </div>
-
-        <p
-          style={{
-            color: "#8A9BB5",
-            fontSize: 18,
-            maxWidth: 650,
-            margin: "auto",
-            lineHeight: 1.8,
-          }}
-        >
-          Saya dapat membantu membuat website,
-          memperbaiki kode, menjelaskan materi,
-          menganalisis file, serta menjawab berbagai
-          pertanyaan.
-        </p>
-
-      </div>
-
-    </Col>
-  </Row>
-)}
-
-       {/* Chat */}
-<Row
-className="justify-content-center"
-style={{
-    flex:1,
-}}
->
-  <Col xs={12}>
-
-  <div
-style={{
-    display:"flex",
-    flexDirection:"column",
-    gap:18,
-    overflowY:"auto",
-    padding:"0 6px 140px",
-}}
->
-
-      {messages.map((msg, index) => (
-  <div
-    key={index}
-    style={{
-      display: "flex",
-      justifyContent:
-        msg.role === "user"
-          ? "flex-end"
-          : "flex-start",
-      width: "100%",
-    }}
-  >
-    <div
       style={{
-        background:
-          msg.role === "user"
-            ? "#00C2FF"
-            : "#13283F",
-
-        color:
-          msg.role === "user"
-            ? "#081420"
-            : "#FFFFFF",
-
-        padding: "14px 18px",
-
-        borderRadius:
-          msg.role === "user"
-            ? "22px 22px 6px 22px"
-            : "22px 22px 22px 6px",
-
-        lineHeight: 1.7,
-        fontSize: 16,
-
-       maxWidth:"78%",
-minWidth:90,
-border:"1px solid rgba(255,255,255,.05)",
-
-        wordBreak: "break-word",
-        whiteSpace: "pre-wrap",
-
-        boxShadow:
-          "0 8px 20px rgba(0,0,0,.18)",
+        background: "#081420",
+        minHeight: "100vh",
+        color: "#fff",
+        display: "flex",
       }}
     >
-      {msg.content}
-    </div>
-  </div>
-))}
+<Sidebar
+  messages={messages}
+  setMessages={setMessages}
+  history={history}
+  setHistory={setHistory}
+  chatBaru={chatBaru}
+/>
 
-     
-
-      {loading && (
-
-        <div
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          height: "100vh",
+        }}
+      >
+        <Container
+          fluid
           style={{
+            flex: 1,
             display: "flex",
-            alignItems: "center",
-            gap: 10,
+            flexDirection: "column",
+            padding: "18px",
+            maxWidth: "980px",
           }}
         >
+          <Header />
 
-          <div
+          <Row
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: "50%",
-              background: "#13283F",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
+              flex: 1,
+              marginTop: "10px",
             }}
           >
-            <FaRobot
-              color="#00C2FF"
-            />
-          </div>
-
-          <div
-            style={{
-              background: "#13283F",
-              padding: "14px 18px",
-              borderRadius: "20px 20px 20px 4px",
-              color: "#8A9BB5",
-              fontStyle: "italic",
-            }}
-          >
-            AI.Ind sedang mengetik...
-          </div>
-
-        </div>
-
-      )}
-
-    </div>
-
-  </Col>
-</Row>
-
-      </Container>
-
-     {/* Input */}
-<div
-  style={{
-    position: "fixed",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    background: "#081420",
-    padding: "18px 24px 24px",
-    borderTop: "1px solid rgba(255,255,255,.08)",
-    backdropFilter: "blur(12px)",
-    zIndex: 999,
-  }}
->
-  <Container
-  fluid
-  className="h-100 px-0"
->
-  <Row className="justify-content-center h-100 m-0">
-
-    <Col
-      xs={12}
-      md={11}
-      lg={9}
-      xl={8}
-      xxl={7}
-      className="d-flex flex-column px-3"
-    >
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            kirimPesan();
-          }}
-        >
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              gap: 12,
-              width: "100%",
-              background: "#13283F",
-              border: "1px solid #1F3850",
-              borderRadius: 26,
-              padding:"12px 6px",
-              boxShadow: "0 10px 30px rgba(0,0,0,.25)",
-            }}
-          >
-
-
-            <Form.Control className="border-0 shadow-none"
-              as="textarea"
-              rows={1}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  kirimPesan();
-                }
-              }}
-              placeholder="Ketik pertanyaan untuk AI.Ind..."
+            <Col
+              xs={12}
               style={{
-                flex: 1,
-                width: "100%",
-                minWidth: 0,
-                resize: "none",
-                overflowY: "auto",
-                background: "transparent",
-                border: "none",
-                color: "#fff",
-                boxShadow: "none",
-                fontSize: 16,
-                lineHeight: "26px",
-                padding: "10px 4px",
-                minHeight: 48,
-                maxHeight: 180,
-              }}
-            />
-
-            <Button
-              type="submit"
-              disabled={loading}
-              style={{
-                width:50,
-height:50,
-                borderRadius: "50%",
-                border: "none",
-                background: loading ? "#4B647A" : "#00C2FF",
                 display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                flexShrink: 0,
+                flexDirection: "column",
+                minHeight: 0,
               }}
             >
-              {loading ? (
-                <span
-                  style={{
-                    color: "#081420",
-                    fontWeight: "bold",
-                    fontSize: 18,
-                  }}
-                >
-                  ...
-                </span>
-              ) : (
-                <FaPaperPlane color="#081420" size={16} />
-              )}
-            </Button>
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  paddingBottom: "140px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                <ChatBox
+                  messages={messages}
+                  loading={false}
+                  chatEndRef={chatEndRef}
+                />
 
-          </div>
+                {loading && <Typing />}
 
-        </Form>
+                <div ref={chatEndRef} />
+              </div>
+            </Col>
+          </Row>
+        </Container>
 
         <div
           style={{
-            marginTop: 12,
-            textAlign: "center",
-            color: "#6F849A",
-            fontSize: 12,
+            position: "sticky",
+            bottom: 0,
+            background: "#081420",
+            padding: "12px 18px 20px",
+            borderTop: "1px solid rgba(255,255,255,.05)",
           }}
         >
-          AI.Ind dapat membuat kesalahan. Selalu periksa kembali jawaban penting.
+          <ChatInput
+            message={message}
+            setMessage={setMessage}
+            kirimPesan={kirimPesan}
+            loading={loading}
+          />
         </div>
-
-      </Col>
-    </Row>
-
-  </Container>
-</div>
-</div>
+      </div>
+    </div>
   );
 }
 

@@ -2,48 +2,89 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 from ai import balas
-from memory import load_memory, save_memory
+from auth import auth
+from database import init_db
+
 
 app = Flask(__name__)
+
 CORS(app)
 
-memory = load_memory()
+
+try:
+    init_db()
+    print("Database berhasil diinisialisasi")
+except Exception as e:
+    print("Database error:", e)
 
 
-@app.route("/")
+
+# Register Auth
+app.register_blueprint(auth)
+
+
+
+@app.route("/", methods=["GET"])
 def home():
-    return {
-        "status": "AI.Ind Backend Running"
-    }
+    return jsonify({
+        "status": "AI.Ind Backend Running",
+        "message": "Backend siap digunakan"
+    })
+
 
 
 @app.route("/chat", methods=["POST"])
 def chat():
 
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    pesan = data.get("message", "").strip()
+        if not data:
+            return jsonify({
+                "error": "Request body kosong"
+            }), 400
 
-    if pesan == "":
+
+        pesan = data.get("message")
+
+
+        if not pesan or pesan.strip() == "":
+            return jsonify({
+                "error": "Pesan tidak boleh kosong"
+            }), 400
+
+
+        jawaban = balas(pesan.strip())
+
+
         return jsonify({
-            "reply": "Pesan tidak boleh kosong."
-        }), 400
+            "reply": jawaban
+        })
 
-    jawaban = balas(pesan)
 
-    memory.append({
-        "kamu": pesan,
-        "ai": jawaban
-    })
+    except Exception as e:
 
-    save_memory(memory)
+        print("Chat Error:", e)
+
+        return jsonify({
+            "error": "Terjadi kesalahan server"
+        }), 500
+
+
+
+@app.errorhandler(404)
+def not_found(error):
 
     return jsonify({
-        "reply": jawaban
-    })
+        "error": "Endpoint tidak ditemukan"
+    }), 404
+
 
 
 if __name__ == "__main__":
+
+    print("🚀 AI.Ind Backend berjalan di port 5000")
+
     app.run(
         host="0.0.0.0",
         port=5000,
