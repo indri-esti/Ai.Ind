@@ -1,4 +1,9 @@
 function ChatMessage({ msg }) {
+  // Bersihkan tanda Markdown tertentu
+  const cleanContent = msg.content
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/\*\*/g, "");
+
   return (
     <div
       style={{
@@ -27,7 +32,7 @@ function ChatMessage({ msg }) {
           whiteSpace: "pre-wrap",
         }}
       >
-        {msg.content}
+        {cleanContent}
       </div>
     </div>
   );
