@@ -1,0 +1,22 @@
+{
+  "name": "AI.Ind",
+  "short_name": "AI.Ind",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#081420",
+  "theme_color": "#081420",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
