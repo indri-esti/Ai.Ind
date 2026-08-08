@@ -20,6 +20,7 @@ function Login() {
     confirmButtonColor: "#00C2FF",
   };
 
+  // Google OAuth Client ID untuk Web
   const GOOGLE_CLIENT_ID =
     "982157239392-of4crmlsd85g4ogshdk74lstfp7l867g.apps.googleusercontent.com";
 
@@ -122,7 +123,7 @@ function Login() {
     }
   };
 
-  // Login dengan Google Cloud OAuth
+  // Login dengan Google
   const handleGoogleLogin = async () => {
     try {
       let googleUser;
@@ -141,7 +142,7 @@ function Login() {
             "",
         };
       } else {
-        // Web / PWA menggunakan Google Cloud OAuth Client ID
+        // Web / PWA menggunakan Google Identity Services
         await loadGoogleScript();
 
         googleUser = await new Promise((resolve, reject) => {
@@ -158,18 +159,28 @@ function Login() {
 
             callback: (response) => {
               try {
-                const payload =
-                  decodeGoogleCredential(
-                    response.credential
+                if (!response?.credential) {
+                  finish(() =>
+                    reject(
+                      new Error(
+                        "Credential Google tidak diterima."
+                      )
+                    )
                   );
+                  return;
+                }
 
-                finish(() => {
+                const payload = decodeGoogleCredential(
+                  response.credential
+                );
+
+                finish(() =>
                   resolve({
                     nama: payload.name || "",
                     email: payload.email || "",
                     foto: payload.picture || "",
-                  });
-                });
+                  })
+                );
               } catch (error) {
                 finish(() => reject(error));
               }
@@ -188,7 +199,7 @@ function Login() {
                 finish(() =>
                   reject(
                     new Error(
-                      "Popup Google tidak dapat ditampilkan. Pastikan domain aplikasi sudah ditambahkan ke Authorized JavaScript origins di Google Cloud."
+                      "Login Google tidak dapat ditampilkan. Pastikan domain https://ai-ind.vercel.app sudah terdaftar pada Authorized JavaScript origins untuk OAuth Client ID yang digunakan."
                     )
                   )
                 );
@@ -321,9 +332,7 @@ function Login() {
             type="email"
             placeholder="Masukkan email"
             value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
+            onChange={(e) => setEmail(e.target.value)}
             style={inputStyle}
           />
         </div>
@@ -350,16 +359,10 @@ function Login() {
             }}
           >
             <input
-              type={
-                showPassword
-                  ? "text"
-                  : "password"
-              }
+              type={showPassword ? "text" : "password"}
               placeholder="Masukkan password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
+              onChange={(e) => setPassword(e.target.value)}
               style={{
                 ...inputStyle,
                 flex: 1,
@@ -377,11 +380,7 @@ function Login() {
                 color: "#8A9BB5",
               }}
             >
-              {showPassword ? (
-                <FaEye />
-              ) : (
-                <FaEyeSlash />
-              )}
+              {showPassword ? <FaEye /> : <FaEyeSlash />}
             </span>
           </div>
         </div>

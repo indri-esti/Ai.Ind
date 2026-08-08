@@ -37,17 +37,24 @@ function Register() {
       );
 
       if (existingScript) {
-        existingScript.addEventListener("load", resolve);
-        existingScript.addEventListener("error", reject);
+        existingScript.addEventListener("load", resolve, {
+          once: true,
+        });
+        existingScript.addEventListener("error", reject, {
+          once: true,
+        });
         return;
       }
 
       const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
+
+      script.src =
+        "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
 
       script.onload = () => resolve();
+
       script.onerror = () =>
         reject(
           new Error(
@@ -62,7 +69,21 @@ function Register() {
   // Decode credential Google
   const decodeGoogleCredential = (credential) => {
     try {
-      const payload = credential.split(".")[1];
+      if (!credential) {
+        throw new Error(
+          "Credential Google tidak ditemukan."
+        );
+      }
+
+      const parts = credential.split(".");
+
+      if (parts.length < 2) {
+        throw new Error(
+          "Format credential Google tidak valid."
+        );
+      }
+
+      const payload = parts[1];
 
       const base64 = payload
         .replace(/-/g, "+")
@@ -81,7 +102,8 @@ function Register() {
         (char) => char.charCodeAt(0)
       );
 
-      const decoded = new TextDecoder().decode(bytes);
+      const decoded =
+        new TextDecoder().decode(bytes);
 
       return JSON.parse(decoded);
     } catch (error) {
@@ -104,6 +126,7 @@ function Register() {
         text: "Semua field harus diisi.",
         ...alertStyle,
       });
+
       return;
     }
 
@@ -159,7 +182,7 @@ function Register() {
             "",
         };
       } else {
-        // Web / PWA menggunakan Google Cloud OAuth Client ID
+        // Web / PWA menggunakan Google Identity Services
         await loadGoogleScript();
 
         googleUser = await new Promise(
@@ -173,57 +196,92 @@ function Register() {
               callback();
             };
 
-            window.google.accounts.id.initialize({
-              client_id: GOOGLE_CLIENT_ID,
+            try {
+              window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
 
-              callback: (response) => {
-                try {
-                  const payload =
-                    decodeGoogleCredential(
-                      response.credential
+                callback: (response) => {
+                  try {
+                    if (
+                      !response ||
+                      !response.credential
+                    ) {
+                      finish(() =>
+                        reject(
+                          new Error(
+                            "Google tidak memberikan credential."
+                          )
+                        )
+                      );
+
+                      return;
+                    }
+
+                    const payload =
+                      decodeGoogleCredential(
+                        response.credential
+                      );
+
+                    finish(() =>
+                      resolve({
+                        nama:
+                          payload.name || "",
+                        email:
+                          payload.email || "",
+                        foto:
+                          payload.picture || "",
+                      })
+                    );
+                  } catch (error) {
+                    finish(() =>
+                      reject(error)
+                    );
+                  }
+                },
+
+                auto_select: false,
+                cancel_on_tap_outside: true,
+              });
+
+              window.google.accounts.id.prompt(
+                (notification) => {
+                  if (
+                    notification.isNotDisplayed()
+                  ) {
+                    finish(() =>
+                      reject(
+                        new Error(
+                          "Google Login tidak dapat ditampilkan. Pastikan https://ai-ind.vercel.app sudah ditambahkan pada Authorized JavaScript origins untuk OAuth Client ID yang digunakan."
+                        )
+                      )
                     );
 
-                  finish(() =>
-                    resolve({
-                      nama: payload.name || "",
-                      email:
-                        payload.email || "",
-                      foto:
-                        payload.picture || "",
-                    })
-                  );
-                } catch (error) {
-                  finish(() =>
-                    reject(error)
-                  );
-                }
-              },
+                    return;
+                  }
 
-              auto_select: false,
-              cancel_on_tap_outside: true,
-            });
-
-            window.google.accounts.id.prompt(
-              (notification) => {
-                if (
-                  notification.isNotDisplayed() ||
-                  notification.isSkippedMoment()
-                ) {
-                  finish(() =>
-                    reject(
-                      new Error(
-                        "Popup Google tidak dapat ditampilkan. Pastikan domain aplikasi sudah ditambahkan ke Authorized JavaScript origins di Google Cloud."
+                  if (
+                    notification.isSkippedMoment()
+                  ) {
+                    finish(() =>
+                      reject(
+                        new Error(
+                          "Login Google dilewati atau popup tidak dapat ditampilkan."
+                        )
                       )
-                    )
-                  );
+                    );
+                  }
                 }
-              }
-            );
+              );
+            } catch (error) {
+              finish(() =>
+                reject(error)
+              );
+            }
           }
         );
       }
 
-      if (!googleUser.email) {
+      if (!googleUser?.email) {
         throw new Error(
           "Email Google tidak ditemukan."
         );
@@ -257,7 +315,7 @@ function Register() {
       );
     } catch (err) {
       console.error(
-        "Google Login Error:",
+        "Google Register Error:",
         err
       );
 
