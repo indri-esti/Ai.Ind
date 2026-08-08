@@ -1,27 +1,91 @@
-import { Container, Row, Col } from "react-bootstrap";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "../api";
 
 import Header from "../components/Header";
 import ChatBox from "../components/ChatBox";
 import ChatInput from "../components/ChatInput";
 import Loading from "../components/Loading";
-import Typing from "../components/Typing";
 import Sidebar from "../components/Sidebar";
+import Welcome from "../components/Welcome";
 
 function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-
-  const [history, setHistory] = useState(() => {
-    const data = localStorage.getItem("history");
-    return data ? JSON.parse(data) : [];
-  });
-
+  const [history, setHistory] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
   const chatEndRef = useRef(null);
+
+  const getUser = () => {
+    try {
+      const data = localStorage.getItem("user");
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadHistory = async () => {
+    const user = getUser();
+
+    if (!user?.id) {
+      setHistory([]);
+      return;
+    }
+
+    try {
+      const res = await axios.get(
+        `/chats?user_id=${encodeURIComponent(user.id)}`
+      );
+
+      setHistory(
+        Array.isArray(res.data)
+          ? res.data
+          : res.data?.chats || []
+      );
+    } catch (error) {
+      console.error("History Error:", error);
+      setHistory([]);
+    }
+  };
+
+  useEffect(() => {
+    const start = async () => {
+      await loadHistory();
+      setPageLoading(false);
+    };
+
+    start();
+  }, []);
+
+  useEffect(() => {
+    const handleUserChange = () => {
+      const user = getUser();
+
+      setMessages([]);
+      setMessage("");
+      setCurrentChatId(null);
+
+      if (user?.id) {
+        loadHistory();
+      } else {
+        setHistory([]);
+      }
+    };
+
+    window.addEventListener(
+      "aiind-user-change",
+      handleUserChange
+    );
+
+    return () =>
+      window.removeEventListener(
+        "aiind-user-change",
+        handleUserChange
+      );
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
@@ -29,41 +93,47 @@ function Home() {
     });
   }, [messages, loading]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-  setPageLoading(false);
-}, 1800);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "history",
-      JSON.stringify(history)
-    );
-  }, [history]);
-
   const chatBaru = () => {
-  if (messages.length > 0) {
-    const chat = {
-      id: Date.now(),
-      title:
-        messages.find((m) => m.role === "user")?.content ||
-        "Percakapan Baru",
-      messages,
-    };
+    setMessages([]);
+    setMessage("");
+    setCurrentChatId(null);
+  };
 
-    setHistory((prev) => [chat, ...prev]);
-  }
+  const bukaChat = async (chat) => {
+    const user = getUser();
 
-  setMessages([]);
-};
+    if (!chat?.id || !user?.id) return;
+
+    try {
+      const res = await axios.get(
+        `/chats/${chat.id}?user_id=${encodeURIComponent(
+          user.id
+        )}`
+      );
+
+      const data = res.data?.chat || res.data;
+
+      setMessages(data?.messages || []);
+      setCurrentChatId(data?.id || chat.id);
+    } catch (error) {
+      console.error("Open Chat Error:", error);
+
+      setMessages(chat.messages || []);
+      setCurrentChatId(chat.id);
+    }
+  };
 
   const kirimPesan = async () => {
     if (!message.trim() || loading) return;
 
-    const text = message;
+    const user = getUser();
+
+    if (!user?.id) {
+      alert("Silakan login terlebih dahulu.");
+      return;
+    }
+
+    const text = message.trim();
 
     setMessage("");
 
@@ -80,25 +150,38 @@ function Home() {
     try {
       const res = await axios.post("/chat", {
         message: text,
+        user_id: user.id,
+        chat_id: currentChatId,
       });
+
+      const reply =
+        res.data?.reply ||
+        res.data?.message ||
+        "Maaf, AI.Ind tidak memberikan jawaban.";
+
+      if (res.data?.chat_id) {
+        setCurrentChatId(res.data.chat_id);
+      }
 
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: res.data.reply,
+          content: reply,
         },
       ]);
-    } catch (err) {
-      console.error(err);
 
-      let errorMessage = "Server tidak dapat dihubungi.";
+      await loadHistory();
+    } catch (error) {
+      console.error("Chat Error:", error);
 
-      if (err.response) {
-        errorMessage = `Error ${err.response.status}`;
-      } else if (err.request) {
-        errorMessage = "Backend belum berjalan.";
-      }
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response
+          ? `Server error (${error.response.status}).`
+          : error.request
+          ? "Backend tidak memberikan respons."
+          : error.message || "Terjadi kesalahan.";
 
       setMessages((prev) => [
         ...prev,
@@ -117,90 +200,48 @@ function Home() {
   }
 
   return (
-    <div
-      style={{
-        background: "#081420",
-        minHeight: "100vh",
-        color: "#fff",
-        display: "flex",
-      }}
-    >
-<Sidebar
-  messages={messages}
-  setMessages={setMessages}
-  history={history}
-  setHistory={setHistory}
-  chatBaru={chatBaru}
-/>
+    <div className="aiind-app">
+      <Sidebar
+        messages={messages}
+        setMessages={setMessages}
+        history={history}
+        setHistory={setHistory}
+        chatBaru={chatBaru}
+        bukaChat={bukaChat}
+        loadHistory={loadHistory}
+      />
 
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
-          height: "100vh",
-        }}
-      >
-        <Container
-          fluid
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: "18px",
-            maxWidth: "980px",
-          }}
-        >
+      <main className="aiind-main">
+        <header className="aiind-header">
           <Header />
+        </header>
 
-          <Row
-            style={{
-              flex: 1,
-              marginTop: "10px",
-            }}
-          >
-            <Col
-              xs={12}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                minHeight: 0,
-              }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  overflowY: "auto",
-                  paddingBottom: "140px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
-                <ChatBox
-                  messages={messages}
-                  loading={false}
-                  chatEndRef={chatEndRef}
-                />
+        <section className="aiind-chat-area">
+          <div className="aiind-chat-content">
+            <Welcome messages={messages} />
 
-                {loading && <Typing />}
+            {messages.length > 0 && (
+              <ChatBox
+                messages={messages}
+                loading={loading}
+                chatEndRef={chatEndRef}
+              />
+            )}
 
-                <div ref={chatEndRef} />
+            {loading && (
+              <div className="aiind-typing">
+                <span>AI.Ind</span>
+                <i />
+                <i />
+                <i />
               </div>
-            </Col>
-          </Row>
-        </Container>
+            )}
 
-        <div
-          style={{
-            position: "sticky",
-            bottom: 0,
-            background: "#081420",
-            padding: "12px 18px 20px",
-            borderTop: "1px solid rgba(255,255,255,.05)",
-          }}
-        >
+            <div ref={chatEndRef} />
+          </div>
+        </section>
+
+        <div className="aiind-input">
           <ChatInput
             message={message}
             setMessage={setMessage}
@@ -208,7 +249,7 @@ function Home() {
             loading={loading}
           />
         </div>
-      </div>
+      </main>
     </div>
   );
 }

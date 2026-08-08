@@ -6,8 +6,6 @@ import axios from "../api";
 
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { Capacitor } from "@capacitor/core";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../firebase";
 
 function Login() {
   const navigate = useNavigate();
@@ -22,6 +20,71 @@ function Login() {
     confirmButtonColor: "#00C2FF",
   };
 
+  const GOOGLE_CLIENT_ID =
+    "982157239392-of4crmlsd85g4ogshdk74lstfp7l867g.apps.googleusercontent.com";
+
+  // Load Google Identity Services
+  const loadGoogleScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.google?.accounts?.id) {
+        resolve();
+        return;
+      }
+
+      const existingScript = document.querySelector(
+        'script[src="https://accounts.google.com/gsi/client"]'
+      );
+
+      if (existingScript) {
+        existingScript.addEventListener("load", resolve);
+        existingScript.addEventListener("error", reject);
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+
+      script.onload = () => resolve();
+      script.onerror = () =>
+        reject(new Error("Google Identity Services gagal dimuat."));
+
+      document.head.appendChild(script);
+    });
+  };
+
+  // Decode credential Google
+  const decodeGoogleCredential = (credential) => {
+    try {
+      const payload = credential.split(".")[1];
+
+      const base64 = payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+
+      const padded = base64.padEnd(
+        base64.length + ((4 - (base64.length % 4)) % 4),
+        "="
+      );
+
+      const binary = atob(padded);
+
+      const bytes = Uint8Array.from(
+        binary,
+        (char) => char.charCodeAt(0)
+      );
+
+      const decoded = new TextDecoder().decode(bytes);
+
+      return JSON.parse(decoded);
+    } catch (error) {
+      console.error("Decode Google Credential Error:", error);
+      throw new Error("Data Google tidak dapat dibaca.");
+    }
+  };
+
+  // Login dengan email dan password
   const handleLogin = async () => {
     if (!email || !password) {
       Swal.fire({
@@ -51,31 +114,106 @@ function Login() {
       Swal.fire({
         icon: "error",
         title: "Login Gagal",
-        text: err.response?.data?.message || "Email atau password salah.",
+        text:
+          err.response?.data?.message ||
+          "Email atau password salah.",
         ...alertStyle,
       });
     }
   };
 
+  // Login dengan Google Cloud OAuth
   const handleGoogleLogin = async () => {
     try {
-      let user;
+      let googleUser;
 
       if (Capacitor.isNativePlatform()) {
-        const result = await FirebaseAuthentication.signInWithGoogle();
-        user = result.user;
+        // Android / native tetap menggunakan Firebase Authentication
+        const result =
+          await FirebaseAuthentication.signInWithGoogle();
+
+        googleUser = {
+          nama: result.user?.displayName || "",
+          email: result.user?.email || "",
+          foto:
+            result.user?.photoUrl ||
+            result.user?.photoURL ||
+            "",
+        };
       } else {
-        const result = await signInWithPopup(auth, googleProvider);
-        user = result.user;
+        // Web / PWA menggunakan Google Cloud OAuth Client ID
+        await loadGoogleScript();
+
+        googleUser = await new Promise((resolve, reject) => {
+          let finished = false;
+
+          const finish = (callback) => {
+            if (finished) return;
+            finished = true;
+            callback();
+          };
+
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+
+            callback: (response) => {
+              try {
+                const payload =
+                  decodeGoogleCredential(
+                    response.credential
+                  );
+
+                finish(() => {
+                  resolve({
+                    nama: payload.name || "",
+                    email: payload.email || "",
+                    foto: payload.picture || "",
+                  });
+                });
+              } catch (error) {
+                finish(() => reject(error));
+              }
+            },
+
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+
+          window.google.accounts.id.prompt(
+            (notification) => {
+              if (
+                notification.isNotDisplayed() ||
+                notification.isSkippedMoment()
+              ) {
+                finish(() =>
+                  reject(
+                    new Error(
+                      "Popup Google tidak dapat ditampilkan. Pastikan domain aplikasi sudah ditambahkan ke Authorized JavaScript origins di Google Cloud."
+                    )
+                  )
+                );
+              }
+            }
+          );
+        });
+      }
+
+      if (!googleUser.email) {
+        throw new Error(
+          "Email Google tidak ditemukan."
+        );
       }
 
       const res = await axios.post("/google-login", {
-        nama: user.displayName || "",
-        email: user.email || "",
-        foto: user.photoUrl || user.photoURL || "",
+        nama: googleUser.nama,
+        email: googleUser.email,
+        foto: googleUser.foto,
       });
 
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      localStorage.setItem(
+        "user",
+        JSON.stringify(res.data.user)
+      );
 
       Swal.fire({
         icon: "success",
@@ -87,7 +225,10 @@ function Login() {
 
       setTimeout(() => navigate("/"), 1200);
     } catch (err) {
-      console.error("Google Login Error:", err);
+      console.error(
+        "Google Login Error:",
+        err
+      );
 
       Swal.fire({
         icon: "error",
@@ -166,7 +307,13 @@ function Login() {
         </div>
 
         <div style={{ marginBottom: "18px" }}>
-          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
+          <label
+            style={{
+              color: "#fff",
+              display: "block",
+              marginBottom: "8px",
+            }}
+          >
             Email
           </label>
 
@@ -174,13 +321,21 @@ function Login() {
             type="email"
             placeholder="Masukkan email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) =>
+              setEmail(e.target.value)
+            }
             style={inputStyle}
           />
         </div>
 
         <div style={{ marginBottom: "22px" }}>
-          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
+          <label
+            style={{
+              color: "#fff",
+              display: "block",
+              marginBottom: "8px",
+            }}
+          >
             Password
           </label>
 
@@ -195,10 +350,16 @@ function Login() {
             }}
           >
             <input
-              type={showPassword ? "text" : "password"}
+              type={
+                showPassword
+                  ? "text"
+                  : "password"
+              }
               placeholder="Masukkan password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
               style={{
                 ...inputStyle,
                 flex: 1,
@@ -208,10 +369,19 @@ function Login() {
             />
 
             <span
-              onClick={() => setShowPassword(!showPassword)}
-              style={{ cursor: "pointer", color: "#8A9BB5" }}
+              onClick={() =>
+                setShowPassword(!showPassword)
+              }
+              style={{
+                cursor: "pointer",
+                color: "#8A9BB5",
+              }}
             >
-              {showPassword ? <FaEye /> : <FaEyeSlash />}
+              {showPassword ? (
+                <FaEye />
+              ) : (
+                <FaEyeSlash />
+              )}
             </span>
           </div>
         </div>
