@@ -1,16 +1,99 @@
 import requests
+import re
 
 from config import API_KEY, BASE_URL, MODEL
 from prompt import SYSTEM_PROMPT
-from memory import load_memory, add_message
 
 
-def balas(pesan):
+# ==================================================
+# BERSIHKAN JAWABAN
+# ==================================================
+
+def bersihkan_jawaban(teks):
+
+    if not teks:
+        return ""
+
+    teks = str(teks)
+
+    # Hilangkan heading Markdown
+    teks = re.sub(
+        r"^\s*#{1,6}\s?",
+        "",
+        teks,
+        flags=re.MULTILINE
+    )
+
+    # Hilangkan blockquote
+    teks = re.sub(
+        r"^\s*>\s?",
+        "",
+        teks,
+        flags=re.MULTILINE
+    )
+
+    # Hilangkan bold
+    teks = teks.replace(
+        "**",
+        ""
+    )
+
+    # Hilangkan italic pada bullet
+    teks = re.sub(
+        r"^\s*\*\s+",
+        "",
+        teks,
+        flags=re.MULTILINE
+    )
+
+    # Hilangkan informasi safety
+    teks = teks.replace(
+        "User Safety: safe",
+        ""
+    )
+
+    teks = teks.replace(
+        "Response Safety: safe",
+        ""
+    )
+
+    # Rapikan baris kosong
+    teks = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        teks
+    )
+
+    return teks.strip()
+
+
+# ==================================================
+# BALAS AI
+# ==================================================
+
+def balas(pesan, history=None):
+
+    # =========================
+    # CEK API KEY
+    # =========================
 
     if not API_KEY:
+
         return "API Key belum ditemukan."
 
-    memory = load_memory()
+
+    # =========================
+    # HISTORY
+    # =========================
+
+    if not isinstance(history, list):
+
+        history = []
+
+
+    # =========================
+    # SYSTEM PROMPT
+    # =========================
 
     messages = [
         {
@@ -19,80 +102,268 @@ def balas(pesan):
         }
     ]
 
-    messages.extend(memory)
+
+    # =========================
+    # HISTORY CHAT
+    # =========================
+
+    for item in history:
+
+        if not isinstance(item, dict):
+            continue
+
+        role = item.get("role")
+        content = item.get("content")
+
+
+        if role not in [
+            "user",
+            "assistant"
+        ]:
+            continue
+
+
+        if not content:
+            continue
+
+
+        messages.append({
+            "role": role,
+            "content": str(content)
+        })
+
+
+    # =========================
+    # PESAN TERBARU
+    # =========================
 
     messages.append({
         "role": "user",
-        "content": pesan
+        "content": str(pesan)
     })
 
+
+    # =========================
+    # HEADER
+    # =========================
+
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://localhost",
-        "X-Title": "AI.Ind"
+
+        "Authorization":
+            f"Bearer {API_KEY}",
+
+        "Content-Type":
+            "application/json",
+
+        "HTTP-Referer":
+            "https://ai-ind.vercel.app/",
+
+        "X-Title":
+            "AI.Ind"
     }
 
+
+    # =========================
+    # REQUEST DATA
+    # =========================
+
     data = {
-        "model": MODEL,
-        "messages": messages,
-        "max_tokens": 500,
-        "temperature": 0.7
+
+        "model":
+            MODEL,
+
+        "messages":
+            messages,
+
+        "max_tokens":
+            1200,
+
+        "temperature":
+            0.7
     }
+
 
     try:
 
         response = requests.post(
+
             BASE_URL,
+
             headers=headers,
+
             json=data,
-            timeout=60
+
+            timeout=90
         )
 
+
+        # =========================
+        # CEK STATUS
+        # =========================
+
         if response.status_code != 200:
-            return f"Error {response.status_code}\n{response.text}"
 
-        hasil = response.json()
+            print(
+                "OpenRouter Error:",
+                response.status_code,
+                response.text
+            )
 
-        # Cek apakah response AI memiliki choices
-        if "choices" not in hasil or not hasil["choices"]:
-            return f"Response AI tidak sesuai:\n{hasil}"
+            return (
+                f"Server AI mengalami masalah "
+                f"(HTTP {response.status_code}). "
+                f"Coba lagi beberapa saat."
+            )
 
-        # Cek apakah message tersedia
-        message = hasil["choices"][0].get("message")
+
+        # =========================
+        # PARSE RESPONSE
+        # =========================
+
+        try:
+
+            hasil = response.json()
+
+        except ValueError:
+
+            return (
+                "Response dari AI tidak valid."
+            )
+
+
+        # =========================
+        # CHOICES
+        # =========================
+
+        choices = hasil.get(
+            "choices"
+        )
+
+
+        if not choices:
+
+            print(
+                "Response AI tidak memiliki choices:",
+                hasil
+            )
+
+            return (
+                "AI tidak memberikan jawaban. "
+                "Coba kirim pesan lagi."
+            )
+
+
+        # =========================
+        # MESSAGE
+        # =========================
+
+        message = choices[0].get(
+            "message"
+        )
+
 
         if not message:
-            return f"Response AI tidak memiliki message:\n{hasil}"
 
-        # Ambil jawaban AI
-        jawaban = message.get("content")
+            print(
+                "Response AI tidak memiliki message:",
+                hasil
+            )
 
-        # Jika content kosong atau None
-        if not jawaban or not str(jawaban).strip():
-            jawaban = "Maaf, aku belum mendapatkan jawaban. Coba kirim lagi ya."
+            return (
+                "AI tidak memberikan jawaban yang valid."
+            )
 
-        jawaban = str(jawaban)
 
-        # Hapus informasi safety jika ikut masuk ke jawaban
-        jawaban = jawaban.replace("User Safety: safe", "")
-        jawaban = jawaban.replace("Response Safety: safe", "")
-        jawaban = jawaban.strip()
+        # =========================
+        # CONTENT
+        # =========================
 
-        # Pastikan setelah pembersihan jawaban tidak menjadi kosong
+        jawaban = message.get(
+            "content"
+        )
+
+
+        if (
+            not jawaban
+            or not str(jawaban).strip()
+        ):
+
+            return (
+                "Maaf, aku belum mendapatkan "
+                "jawaban. Coba kirim pertanyaan lagi."
+            )
+
+
+        jawaban = str(
+            jawaban
+        ).strip()
+
+
+        # =========================
+        # BERSIHKAN
+        # =========================
+
+        jawaban = bersihkan_jawaban(
+            jawaban
+        )
+
+
         if not jawaban:
-            jawaban = "Maaf, aku belum mendapatkan jawaban. Coba kirim lagi ya."
 
-        # Simpan ke memory
-        add_message("user", pesan)
-        add_message("assistant", jawaban)
+            return (
+                "Maaf, aku belum mendapatkan "
+                "jawaban. Coba kirim lagi ya."
+            )
+
 
         return jawaban
 
+
+    # =========================
+    # TIMEOUT
+    # =========================
+
     except requests.exceptions.Timeout:
-        return "Waktu koneksi habis. Coba lagi beberapa saat."
+
+        print(
+            "OpenRouter request timeout"
+        )
+
+        return (
+            "Waktu respons AI terlalu lama. "
+            "Coba kirim pertanyaan lagi."
+        )
+
+
+    # =========================
+    # CONNECTION ERROR
+    # =========================
 
     except requests.exceptions.ConnectionError:
-        return "Tidak dapat terhubung ke internet."
+
+        print(
+            "Connection Error"
+        )
+
+        return (
+            "Tidak dapat terhubung ke "
+            "server AI. Periksa koneksi "
+            "internet atau backend."
+        )
+
+
+    # =========================
+    # ERROR LAIN
+    # =========================
 
     except Exception as e:
-        return f"Terjadi kesalahan:\n{e}"
+
+        print(
+            "AI Error:",
+            repr(e)
+        )
+
+        return (
+            "Terjadi kesalahan saat "
+            "memproses pesan."
+        )

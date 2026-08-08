@@ -1,17 +1,34 @@
 function ChatMessage({ msg }) {
-  // Bersihkan tanda Markdown tertentu
-  const cleanContent = msg.content
-    .replace(/^\s*>\s?/gm, "")
-    .replace(/\*\*/g, "");
+  const cleanContent = (content = "") => {
+    return content
+      // Hilangkan tanda # di awal baris
+      .replace(/^\s*#+\s?/gm, "")
+      
+      // Hilangkan tanda > di awal baris
+      .replace(/^\s*>\s?/gm, "")
+      
+      // Hilangkan tanda **
+      .replace(/\*\*/g, "")
+      
+      // Hilangkan tanda * untuk bullet sederhana
+      .replace(/^\s*\*\s+/gm, "")
+      
+      // Hilangkan tanda ' jika berdiri sebagai tanda kutip
+      .replace(/'/g, "")
+      
+      // Rapikan spasi berlebihan
+      .replace(/[ \t]+$/gm, "")
+      .trim();
+  };
 
   return (
     <div
       style={{
         display: "flex",
         justifyContent:
-          msg.role === "user"
-            ? "flex-end"
-            : "flex-start",
+          msg.role === "user" ? "flex-end" : "flex-start",
+        width: "100%",
+        marginBottom: "12px",
       }}
     >
       <div
@@ -27,12 +44,14 @@ function ChatMessage({ msg }) {
               : "#fff",
 
           padding: "14px 18px",
-          borderRadius: 20,
+          borderRadius: "20px",
           maxWidth: "90%",
           whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          lineHeight: "1.6",
         }}
       >
-        {cleanContent}
+        {cleanContent(msg.content)}
       </div>
     </div>
   );
