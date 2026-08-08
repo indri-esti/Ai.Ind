@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "531938783552",
+    "project_id": "ai-ind-c3f64",
+    "storage_bucket": "ai-ind-c3f64.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:531938783552:android:775de96780872443ddcaa5",
+        "android_client_info": {
+          "package_name": "com.aiind.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "531938783552-ku1qr0olunogp99ahk9onmtd48cj55be.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbr0MhGtL6iyzM6GFh5N3cWRNaQyFcyu8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "531938783552-ku1qr0olunogp99ahk9onmtd48cj55be.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

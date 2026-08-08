@@ -11,66 +11,113 @@ import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import axios from "../api";
 
-import { GoogleLogin } from "@react-oauth/google";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 
 function Login() {
-  
   const navigate = useNavigate();
 
-const [email, setEmail] = useState("");
-const [password, setPassword] = useState("");
-
-const handleLogin = async () => {
-  if (!email || !password) {
-Swal.fire({
-  icon: "warning",
-  title: "Oops...",
-  text: "Email dan password harus diisi.",
-  background: "#122B3C",
-  color: "#fff",
-  confirmButtonColor: "#00C2FF",
-});
-    return;
-  }
-
-  try {
-    const res = await axios.post("/login", {
-      email,
-      password,
-    });
-
-    localStorage.setItem(
-      "user",
-      JSON.stringify(res.data.user)
-    );
-
-Swal.fire({
-  icon: "success",
-  title: "Login Berhasil",
-  timer: 1200,
-  showConfirmButton: false,
-  background: "#122B3C",
-  color: "#fff",
-});
-
-    setTimeout(() => {
-      navigate("/");
-    }, 1200);
-  } catch (err) {
-    Swal.fire({
-  icon: "error",
-  title: "Login Gagal",
-  text:
-    err.response?.data?.message ||
-    "Email atau password salah.",
-  background: "#122B3C",
-  color: "#fff",
-  confirmButtonColor: "#00C2FF",
-});
-  }
-};
-
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Login dengan email dan password
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Swal.fire({
+        icon: "warning",
+        title: "Oops...",
+        text: "Email dan password harus diisi.",
+        background: "#122B3C",
+        color: "#fff",
+        confirmButtonColor: "#00C2FF",
+      });
+      return;
+    }
+
+    try {
+      const res = await axios.post("/login", {
+        email,
+        password,
+      });
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(res.data.user)
+      );
+
+      Swal.fire({
+        icon: "success",
+        title: "Login Berhasil",
+        timer: 1200,
+        showConfirmButton: false,
+        background: "#122B3C",
+        color: "#fff",
+      });
+
+      setTimeout(() => {
+        navigate("/");
+      }, 1200);
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Login Gagal",
+        text:
+          err.response?.data?.message ||
+          "Email atau password salah.",
+        background: "#122B3C",
+        color: "#fff",
+        confirmButtonColor: "#00C2FF",
+      });
+    }
+  };
+
+  // Login dengan Google melalui Firebase Native Android
+  const handleGoogleLogin = async () => {
+    try {
+      const result =
+        await FirebaseAuthentication.signInWithGoogle();
+
+      const user = result.user;
+
+      const res = await axios.post("/google-login", {
+        nama: user.displayName || "",
+        email: user.email || "",
+        foto: user.photoUrl || "",
+      });
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(res.data.user)
+      );
+
+      Swal.fire({
+        icon: "success",
+        title: "Login Google Berhasil",
+        timer: 1200,
+        showConfirmButton: false,
+        background: "#122B3C",
+        color: "#fff",
+      });
+
+      setTimeout(() => {
+        navigate("/");
+      }, 1200);
+    } catch (err) {
+      console.error("Google Login Error:", err);
+
+      Swal.fire({
+        icon: "error",
+        title: "Google Login Gagal",
+        text:
+          err.response?.data?.message ||
+          err.message ||
+          "Terjadi kesalahan saat login dengan Google.",
+        background: "#122B3C",
+        color: "#fff",
+        confirmButtonColor: "#00C2FF",
+      });
+    }
+  };
 
   return (
     <div
@@ -155,7 +202,7 @@ Swal.fire({
             type="email"
             placeholder="Masukkan email"
             value={email}
-  onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             style={{
               width: "100%",
               padding: "14px",
@@ -195,7 +242,9 @@ Swal.fire({
               type={showPassword ? "text" : "password"}
               placeholder="Masukkan password"
               value={password}
-  onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setPassword(e.target.value)
+              }
               style={{
                 flex: 1,
                 padding: "14px",
@@ -225,22 +274,22 @@ Swal.fire({
         </div>
 
         {/* Login */}
-       <button
-  onClick={handleLogin}
-  style={{
-    width: "100%",
-    padding: "14px",
-    border: "none",
-    borderRadius: "10px",
-    background: "#00C2FF",
-    color: "#081420",
-    fontWeight: "700",
-    cursor: "pointer",
-    fontSize: "16px",
-  }}
->
-  Login
-</button>
+        <button
+          onClick={handleLogin}
+          style={{
+            width: "100%",
+            padding: "14px",
+            border: "none",
+            borderRadius: "10px",
+            background: "#00C2FF",
+            color: "#081420",
+            fontWeight: "700",
+            cursor: "pointer",
+            fontSize: "16px",
+          }}
+        >
+          Login
+        </button>
 
         <div
           style={{
@@ -252,109 +301,52 @@ Swal.fire({
           atau
         </div>
 
-        {/* Google */}
-       <div
-  style={{
-    display: "flex",
-    justifyContent: "center",
-    marginTop: "10px",
-  }}
->
-<GoogleLogin
-  onSuccess={async (credentialResponse) => {
-    try {
+        {/* Google Login */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          style={{
+            width: "100%",
+            padding: "13px",
+            border: "1px solid #1B3445",
+            borderRadius: "10px",
+            background: "#fff",
+            color: "#222",
+            fontWeight: "600",
+            cursor: "pointer",
+            fontSize: "15px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+          }}
+        >
+          <FaGoogle />
+          Login dengan Google
+        </button>
 
-      const token = credentialResponse.credential;
+        {/* Register */}
+        <p
+          style={{
+            textAlign: "center",
+            color: "#8A9BB5",
+            marginTop: "18px",
+          }}
+        >
+          Belum punya akun?{" "}
+          <Link
+            to="/register"
+            style={{
+              color: "#00C2FF",
+              textDecoration: "none",
+              fontWeight: "600",
+            }}
+          >
+            Daftar
+          </Link>
+        </p>
 
-      // Ambil data user dari token Google
-      const payload = JSON.parse(
-        atob(token.split(".")[1])
-      );
-
-
-      const res = await axios.post("/google-login", {
-        nama: payload.name,
-        email: payload.email,
-        foto: payload.picture || "",
-      });
-
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify(res.data.user)
-      );
-
-
-      Swal.fire({
-        icon: "success",
-        title: "Login Google Berhasil",
-        timer: 1200,
-        showConfirmButton: false,
-        background: "#122B3C",
-        color: "#fff",
-      });
-
-
-      setTimeout(() => {
-        navigate("/");
-      }, 1200);
-
-
-    } catch (err) {
-
-      console.log(err.response?.data);
-
-
-      Swal.fire({
-        icon: "error",
-        title: "Google Login Gagal",
-        text:
-          err.response?.data?.message ||
-          "Terjadi kesalahan.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
-      });
-
-    }
-  }}
-
-
-  onError={() => {
-
-    Swal.fire({
-      icon: "error",
-      title: "Google Login Gagal",
-      text: "Tidak dapat terhubung ke Google.",
-      background: "#122B3C",
-      color: "#fff",
-      confirmButtonColor: "#00C2FF",
-    });
-
-  }}
-/>
-</div>
-
-<p
-  style={{
-    textAlign: "center",
-    color: "#8A9BB5",
-    marginTop: "18px",
-  }}
->
-  Belum punya akun?{" "}
-  <Link
-    to="/register"
-    style={{
-      color: "#00C2FF",
-      textDecoration: "none",
-      fontWeight: "600",
-    }}
-  >
-    Daftar
-  </Link>
-</p>
-
+        {/* Footer */}
         <p
           style={{
             textAlign: "center",

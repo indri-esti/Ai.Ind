@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   FaRobot,
+  FaGoogle,
   FaEye,
   FaEyeSlash,
 } from "react-icons/fa";
@@ -10,7 +11,7 @@ import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import axios from "../api";
 
-import { GoogleLogin } from "@react-oauth/google";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 
 function Register() {
   const navigate = useNavigate();
@@ -60,6 +61,54 @@ function Register() {
         text:
           err.response?.data?.message ||
           "Terjadi kesalahan.",
+        background: "#122B3C",
+        color: "#fff",
+        confirmButtonColor: "#00C2FF",
+      });
+    }
+  };
+
+  // Login / Daftar dengan Google melalui Firebase Native Android
+  const handleGoogleRegister = async () => {
+    try {
+      const result =
+        await FirebaseAuthentication.signInWithGoogle();
+
+      const user = result.user;
+
+      const res = await axios.post("/google-login", {
+        nama: user.displayName || "",
+        email: user.email || "",
+        foto: user.photoUrl || "",
+      });
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(res.data.user)
+      );
+
+      Swal.fire({
+        icon: "success",
+        title: "Login Google Berhasil",
+        timer: 1200,
+        showConfirmButton: false,
+        background: "#122B3C",
+        color: "#fff",
+      });
+
+      setTimeout(() => {
+        navigate("/");
+      }, 1200);
+    } catch (err) {
+      console.error("Google Login Error:", err);
+
+      Swal.fire({
+        icon: "error",
+        title: "Google Login Gagal",
+        text:
+          err.response?.data?.message ||
+          err.message ||
+          "Terjadi kesalahan saat login dengan Google.",
         background: "#122B3C",
         color: "#fff",
         confirmButtonColor: "#00C2FF",
@@ -263,87 +312,29 @@ function Register() {
           atau
         </div>
 
-        <div
-  style={{
-    display: "flex",
-    justifyContent: "center",
-    marginTop: "10px",
-  }}
->
-<GoogleLogin
-  onSuccess={async (credentialResponse) => {
-    try {
-
-      const token = credentialResponse.credential;
-
-      // Ambil data user dari token Google
-      const payload = JSON.parse(
-        atob(token.split(".")[1])
-      );
-
-
-      const res = await axios.post("/google-login", {
-        nama: payload.name,
-        email: payload.email,
-        foto: payload.picture || "",
-      });
-
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify(res.data.user)
-      );
-
-
-      Swal.fire({
-        icon: "success",
-        title: "Login Google Berhasil",
-        timer: 1200,
-        showConfirmButton: false,
-        background: "#122B3C",
-        color: "#fff",
-      });
-
-
-      setTimeout(() => {
-        navigate("/");
-      }, 1200);
-
-
-    } catch (err) {
-
-      console.log(err.response?.data);
-
-
-      Swal.fire({
-        icon: "error",
-        title: "Google Login Gagal",
-        text:
-          err.response?.data?.message ||
-          "Terjadi kesalahan.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
-      });
-
-    }
-  }}
-
-
-  onError={() => {
-
-    Swal.fire({
-      icon: "error",
-      title: "Google Login Gagal",
-      text: "Tidak dapat terhubung ke Google.",
-      background: "#122B3C",
-      color: "#fff",
-      confirmButtonColor: "#00C2FF",
-    });
-
-  }}
-/>
-</div>
+        {/* Google Login */}
+        <button
+          type="button"
+          onClick={handleGoogleRegister}
+          style={{
+            width: "100%",
+            padding: "13px",
+            border: "1px solid #1B3445",
+            borderRadius: "10px",
+            background: "#fff",
+            color: "#222",
+            fontWeight: "600",
+            cursor: "pointer",
+            fontSize: "15px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+          }}
+        >
+          <FaGoogle />
+          Daftar dengan Google
+        </button>
 
         <p
           style={{
