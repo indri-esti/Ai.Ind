@@ -54,17 +54,35 @@ def balas(pesan):
 
         hasil = response.json()
 
-        # Cek apakah response AI memiliki jawaban
-        if "choices" not in hasil:
+        # Cek apakah response AI memiliki choices
+        if "choices" not in hasil or not hasil["choices"]:
             return f"Response AI tidak sesuai:\n{hasil}"
 
-        jawaban = hasil["choices"][0]["message"]["content"]
+        # Cek apakah message tersedia
+        message = hasil["choices"][0].get("message")
+
+        if not message:
+            return f"Response AI tidak memiliki message:\n{hasil}"
+
+        # Ambil jawaban AI
+        jawaban = message.get("content")
+
+        # Jika content kosong atau None
+        if not jawaban or not str(jawaban).strip():
+            jawaban = "Maaf, aku belum mendapatkan jawaban. Coba kirim lagi ya."
+
+        jawaban = str(jawaban)
 
         # Hapus informasi safety jika ikut masuk ke jawaban
         jawaban = jawaban.replace("User Safety: safe", "")
         jawaban = jawaban.replace("Response Safety: safe", "")
         jawaban = jawaban.strip()
 
+        # Pastikan setelah pembersihan jawaban tidak menjadi kosong
+        if not jawaban:
+            jawaban = "Maaf, aku belum mendapatkan jawaban. Coba kirim lagi ya."
+
+        # Simpan ke memory
         add_message("user", pesan)
         add_message("assistant", jawaban)
 
