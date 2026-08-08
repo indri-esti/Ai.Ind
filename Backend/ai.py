@@ -202,18 +202,15 @@ def balas(pesan, history=None):
         # =========================
 
         if response.status_code != 200:
+    print("========== OPENROUTER ERROR ==========")
+    print("STATUS:", response.status_code)
+    print("RESPONSE:", response.text)
+    print("======================================")
 
-            print(
-                "OpenRouter Error:",
-                response.status_code,
-                response.text
-            )
-
-            return (
-                f"Server AI mengalami masalah "
-                f"(HTTP {response.status_code}). "
-                f"Coba lagi beberapa saat."
-            )
+    return (
+        f"OpenRouter error HTTP {response.status_code}: "
+        f"{response.text[:500]}"
+    )
 
 
         # =========================
