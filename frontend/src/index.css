@@ -1,4 +1,6 @@
-/* RESET */
+/* =====================================================
+   RESET
+===================================================== */
 
 * {
   margin: 0;
@@ -13,6 +15,7 @@ body,
   padding: 0;
   width: 100%;
   height: 100%;
+  min-height: 100%;
   background: #081420;
 }
 
@@ -23,9 +26,29 @@ body {
   overflow-x: hidden;
 }
 
+/* =====================================================
+   GLOBAL
+===================================================== */
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
 /* Hilangkan garis focus bawaan Bootstrap */
 .form-control:focus {
   box-shadow: none !important;
+  outline: none !important;
 }
 
 .chat-input:focus {
@@ -39,8 +62,141 @@ body {
   color: #8A9BB5;
 }
 
+/* =====================================================
+   LOGO
+===================================================== */
+
 .logo {
   width: 48px;
   height: 48px;
   object-fit: contain;
+  display: block;
+}
+
+/* Logo SVG tidak terpotong */
+svg {
+  display: block;
+}
+
+/* =====================================================
+   SCROLLBAR
+===================================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #23445E;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2d5a78;
+}
+
+/* =====================================================
+   CHAT AREA
+===================================================== */
+
+.chat-container {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* =====================================================
+   AI.IND TYPING
+===================================================== */
+
+.ai-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00C2FF;
+  display: inline-block;
+  animation: aiTyping 1.2s infinite ease-in-out;
+}
+
+.ai-dot.delay1 {
+  animation-delay: 0.15s;
+}
+
+.ai-dot.delay2 {
+  animation-delay: 0.3s;
+}
+
+@keyframes aiTyping {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* =====================================================
+   FADE
+===================================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =====================================================
+   SWEETALERT AI.IND
+===================================================== */
+
+.aiind-swal-popup {
+  border: 1px solid rgba(0, 194, 255, 0.12) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 18px !important;
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .logo {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* =====================================================
+   TABLET / DESKTOP
+===================================================== */
+
+@media (min-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
 }

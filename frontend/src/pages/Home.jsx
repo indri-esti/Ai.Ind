@@ -1,5 +1,4 @@
-import { Container, Row, Col } from "react-bootstrap";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "../api";
 
 import Header from "../components/Header";
@@ -7,44 +6,27 @@ import ChatBox from "../components/ChatBox";
 import ChatInput from "../components/ChatInput";
 import Loading from "../components/Loading";
 import Sidebar from "../components/Sidebar";
+import Welcome from "../components/Welcome";
 
 function Home() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-
   const [history, setHistory] = useState([]);
-
   const [currentChatId, setCurrentChatId] = useState(null);
-
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
   const chatEndRef = useRef(null);
 
-  // =========================
-  // AMBIL USER
-  // =========================
   const getUser = () => {
     try {
       const data = localStorage.getItem("user");
-
-      if (!data) return null;
-
-      const user = JSON.parse(data);
-
-      if (!user?.id) return null;
-
-      return user;
-    } catch (error) {
-      console.error("User error:", error);
+      return data ? JSON.parse(data) : null;
+    } catch {
       return null;
     }
   };
 
-  // =========================
-  // AMBIL RIWAYAT DARI DATABASE
-  // KHUSUS USER YANG SEDANG LOGIN
-  // =========================
   const loadHistory = async () => {
     const user = getUser();
 
@@ -58,57 +40,33 @@ function Home() {
         `/chats?user_id=${encodeURIComponent(user.id)}`
       );
 
-      let chats = [];
-
-      if (Array.isArray(res.data)) {
-        chats = res.data;
-      } else if (Array.isArray(res.data?.chats)) {
-        chats = res.data.chats;
-      }
-
-      setHistory(chats);
+      setHistory(
+        Array.isArray(res.data)
+          ? res.data
+          : res.data?.chats || []
+      );
     } catch (error) {
       console.error("History Error:", error);
       setHistory([]);
     }
   };
 
-  // =========================
-  // LOAD HOME
-  // =========================
   useEffect(() => {
-    let mounted = true;
-
     const start = async () => {
       await loadHistory();
-
-      if (!mounted) return;
-
-      setTimeout(() => {
-        if (mounted) {
-          setPageLoading(false);
-        }
-      }, 500);
+      setPageLoading(false);
     };
 
     start();
-
-    return () => {
-      mounted = false;
-    };
   }, []);
 
-  // =========================
-  // CEK PERGANTIAN USER
-  // =========================
   useEffect(() => {
     const handleUserChange = () => {
       const user = getUser();
 
-      // Reset chat ketika akun berubah
       setMessages([]);
-      setCurrentChatId(null);
       setMessage("");
+      setCurrentChatId(null);
 
       if (user?.id) {
         loadHistory();
@@ -118,82 +76,53 @@ function Home() {
     };
 
     window.addEventListener(
-      "aiind-user-changed",
+      "aiind-user-change",
       handleUserChange
     );
 
-    return () => {
+    return () =>
       window.removeEventListener(
-        "aiind-user-changed",
+        "aiind-user-change",
         handleUserChange
       );
-    };
   }, []);
 
-  // =========================
-  // AUTO SCROLL
-  // =========================
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth",
-      block: "end",
     });
   }, [messages, loading]);
 
-  // =========================
-  // CHAT BARU
-  // =========================
   const chatBaru = () => {
     setMessages([]);
     setMessage("");
     setCurrentChatId(null);
   };
 
-  // =========================
-  // BUKA CHAT
-  // =========================
   const bukaChat = async (chat) => {
-    if (!chat?.id) return;
-
     const user = getUser();
 
-    if (!user?.id) {
-      setMessages([]);
-      setCurrentChatId(null);
-      return;
-    }
+    if (!chat?.id || !user?.id) return;
 
     try {
       const res = await axios.get(
-        `/chats/${chat.id}?user_id=${encodeURIComponent(user.id)}`
+        `/chats/${chat.id}?user_id=${encodeURIComponent(
+          user.id
+        )}`
       );
 
-      const chatData = res.data?.chat || res.data;
+      const data = res.data?.chat || res.data;
 
-      if (chatData?.messages) {
-        setMessages(chatData.messages);
-        setCurrentChatId(chatData.id || chat.id);
-      } else {
-        setMessages([]);
-        setCurrentChatId(chat.id);
-      }
+      setMessages(data?.messages || []);
+      setCurrentChatId(data?.id || chat.id);
     } catch (error) {
       console.error("Open Chat Error:", error);
 
-      // Fallback jika history sudah membawa messages
-      if (Array.isArray(chat.messages)) {
-        setMessages(chat.messages);
-        setCurrentChatId(chat.id);
-      } else {
-        setMessages([]);
-        setCurrentChatId(null);
-      }
+      setMessages(chat.messages || []);
+      setCurrentChatId(chat.id);
     }
   };
 
-  // =========================
-  // KIRIM PESAN
-  // =========================
   const kirimPesan = async () => {
     if (!message.trim() || loading) return;
 
@@ -208,7 +137,6 @@ function Home() {
 
     setMessage("");
 
-    // Tampilkan pesan user langsung
     setMessages((prev) => [
       ...prev,
       {
@@ -231,14 +159,10 @@ function Home() {
         res.data?.message ||
         "Maaf, AI.Ind tidak memberikan jawaban.";
 
-      const newChatId = res.data?.chat_id;
-
-      // Simpan chat_id dari database
-      if (newChatId) {
-        setCurrentChatId(newChatId);
+      if (res.data?.chat_id) {
+        setCurrentChatId(res.data.chat_id);
       }
 
-      // Tampilkan jawaban AI
       setMessages((prev) => [
         ...prev,
         {
@@ -247,25 +171,17 @@ function Home() {
         },
       ]);
 
-      // Update riwayat database
       await loadHistory();
-    } catch (err) {
-      console.error("Chat Error:", err);
+    } catch (error) {
+      console.error("Chat Error:", error);
 
-      let errorMessage =
-        "Maaf, terjadi kesalahan saat menghubungi AI.Ind.";
-
-      if (err.response) {
-        errorMessage =
-          err.response.data?.error ||
-          `Server error (${err.response.status}).`;
-      } else if (err.request) {
-        errorMessage =
-          "Backend tidak memberikan respons. Periksa koneksi internet atau server.";
-      } else {
-        errorMessage =
-          err.message || "Terjadi kesalahan.";
-      }
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response
+          ? `Server error (${error.response.status}).`
+          : error.request
+          ? "Backend tidak memberikan respons."
+          : error.message || "Terjadi kesalahan.";
 
       setMessages((prev) => [
         ...prev,
@@ -279,26 +195,12 @@ function Home() {
     }
   };
 
-  // =========================
-  // PAGE LOADING
-  // =========================
   if (pageLoading) {
     return <Loading />;
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        height: "100vh",
-        background:
-          "radial-gradient(circle at top, #10263A 0%, #081420 45%, #050D15 100%)",
-        color: "#fff",
-        display: "flex",
-        overflow: "hidden",
-      }}
-    >
-      {/* SIDEBAR */}
+    <div className="aiind-app">
       <Sidebar
         messages={messages}
         setMessages={setMessages}
@@ -309,293 +211,45 @@ function Home() {
         loadHistory={loadHistory}
       />
 
-      {/* MAIN */}
-      <main
-        style={{
-          flex: 1,
-          minWidth: 0,
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-        }}
-      >
-        {/* HEADER */}
-        <div
-          style={{
-            flexShrink: 0,
-            padding: "14px 18px 8px",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-          }}
-        >
+      <main className="aiind-main">
+        <header className="aiind-header">
           <Header />
-        </div>
+        </header>
 
-        {/* CHAT AREA */}
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            padding: "8px 16px 150px",
-            scrollbarWidth: "thin",
-            scrollbarColor: "#23445E transparent",
-          }}
-        >
-          <Container
-            fluid
-            style={{
-              maxWidth: "920px",
-              margin: "0 auto",
-              padding: 0,
-            }}
-          >
-            <Row>
-              <Col xs={12} style={{ padding: 0 }}>
+        <section className="aiind-chat-area">
+          <div className="aiind-chat-content">
+            <Welcome messages={messages} />
 
-                {/* WELCOME */}
-                {messages.length === 0 && !loading && (
-                  <div
-                    style={{
-                      minHeight: "55vh",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: "30px 20px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "76px",
-                        height: "76px",
-                        borderRadius: "24px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background:
-                          "linear-gradient(135deg, #00C2FF, #0077FF)",
-                        boxShadow:
-                          "0 12px 40px rgba(0,194,255,.25)",
-                        marginBottom: "20px",
-                        fontSize: "34px",
-                      }}
-                    >
-                      🤖
-                    </div>
+            {messages.length > 0 && (
+              <ChatBox
+                messages={messages}
+                loading={loading}
+                chatEndRef={chatEndRef}
+              />
+            )}
 
-                    <h2
-                      style={{
-                        fontWeight: 700,
-                        marginBottom: "8px",
-                        fontSize: "clamp(24px, 5vw, 32px)",
-                      }}
-                    >
-                      Halo 👋
-                    </h2>
+            {loading && (
+              <div className="aiind-typing">
+                <span>AI.Ind</span>
+                <i />
+                <i />
+                <i />
+              </div>
+            )}
 
-                    <p
-                      style={{
-                        color: "#9CB0C0",
-                        maxWidth: "520px",
-                        margin: 0,
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      Saya{" "}
-                      <b style={{ color: "#00C2FF" }}>
-                        AI.Ind
-                      </b>
-                      .
-                      <br />
-                      Tanyakan apa saja dan mari mulai percakapan.
-                    </p>
-                  </div>
-                )}
-
-                {/* MESSAGES */}
-                {messages.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "14px",
-                    }}
-                  >
-                    <ChatBox
-                      messages={messages}
-                      loading={loading}
-                      chatEndRef={chatEndRef}
-                    />
-                  </div>
-                )}
-
-                {/* TYPING */}
-                {loading && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      marginTop: "16px",
-                      marginBottom: "10px",
-                      animation: "fadeIn .25s ease",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "38px",
-                        height: "38px",
-                        borderRadius: "13px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background:
-                          "linear-gradient(135deg, #123B56, #0D2538)",
-                        border:
-                          "1px solid rgba(0,194,255,.18)",
-                        boxShadow:
-                          "0 5px 20px rgba(0,0,0,.18)",
-                      }}
-                    >
-                      <span style={{ fontSize: "17px" }}>
-                        ✦
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "5px",
-                        padding: "11px 15px",
-                        borderRadius: "16px",
-                        background:
-                          "rgba(19,40,63,.85)",
-                        border:
-                          "1px solid rgba(255,255,255,.06)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          color: "#8FA7B8",
-                          fontSize: "13px",
-                          marginRight: "3px",
-                        }}
-                      >
-                        AI.Ind
-                      </span>
-
-                      <span className="ai-dot" />
-                      <span className="ai-dot delay1" />
-                      <span className="ai-dot delay2" />
-                    </div>
-                  </div>
-                )}
-
-                <div ref={chatEndRef} />
-              </Col>
-            </Row>
-          </Container>
-        </div>
-
-        {/* INPUT AREA */}
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding:
-              "12px max(16px, calc((100vw - 920px) / 2)) 18px",
-            background:
-              "linear-gradient(to top, #081420 72%, rgba(8,20,32,0))",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              pointerEvents: "auto",
-              maxWidth: "920px",
-              margin: "0 auto",
-            }}
-          >
-            <ChatInput
-              message={message}
-              setMessage={setMessage}
-              kirimPesan={kirimPesan}
-              loading={loading}
-            />
-
-            <div
-              style={{
-                textAlign: "center",
-                color: "#607789",
-                fontSize: "10px",
-                marginTop: "7px",
-              }}
-            >
-              AI.Ind dapat melakukan kesalahan. Periksa kembali informasi penting.
-            </div>
+            <div ref={chatEndRef} />
           </div>
+        </section>
+
+        <div className="aiind-input">
+          <ChatInput
+            message={message}
+            setMessage={setMessage}
+            kirimPesan={kirimPesan}
+            loading={loading}
+          />
         </div>
       </main>
-
-      {/* ANIMATION */}
-      <style>
-        {`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(5px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-
-          @keyframes typingDot {
-            0%, 60%, 100% {
-              transform: translateY(0);
-              opacity: .35;
-            }
-            30% {
-              transform: translateY(-4px);
-              opacity: 1;
-            }
-          }
-
-          .ai-dot {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #00C2FF;
-            display: inline-block;
-            animation: typingDot 1.2s infinite ease-in-out;
-          }
-
-          .ai-dot.delay1 {
-            animation-delay: .15s;
-          }
-
-          .ai-dot.delay2 {
-            animation-delay: .3s;
-          }
-
-          @media (max-width: 576px) {
-            main {
-              width: 100%;
-            }
-          }
-
-          * {
-            box-sizing: border-box;
-          }
-        `}
-      </style>
     </div>
   );
 }
