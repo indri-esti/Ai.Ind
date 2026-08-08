@@ -18,14 +18,34 @@ function Home() {
 
   const chatEndRef = useRef(null);
 
+  // ==================================================
+  // GET USER
+  // ==================================================
+
   const getUser = () => {
     try {
       const data = localStorage.getItem("user");
-      return data ? JSON.parse(data) : null;
-    } catch {
+
+      if (!data) {
+        return null;
+      }
+
+      const user = JSON.parse(data);
+
+      if (!user || !user.id) {
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      console.error("Get User Error:", error);
       return null;
     }
   };
+
+  // ==================================================
+  // LOAD HISTORY
+  // ==================================================
 
   const loadHistory = async () => {
     const user = getUser();
@@ -51,6 +71,10 @@ function Home() {
     }
   };
 
+  // ==================================================
+  // INITIAL LOAD
+  // ==================================================
+
   useEffect(() => {
     const start = async () => {
       await loadHistory();
@@ -59,6 +83,10 @@ function Home() {
 
     start();
   }, []);
+
+  // ==================================================
+  // USER CHANGE
+  // ==================================================
 
   useEffect(() => {
     const handleUserChange = () => {
@@ -87,17 +115,29 @@ function Home() {
       );
   }, []);
 
+  // ==================================================
+  // AUTO SCROLL
+  // ==================================================
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
   }, [messages, loading]);
 
+  // ==================================================
+  // CHAT BARU
+  // ==================================================
+
   const chatBaru = () => {
     setMessages([]);
     setMessage("");
     setCurrentChatId(null);
   };
+
+  // ==================================================
+  // BUKA CHAT
+  // ==================================================
 
   const bukaChat = async (chat) => {
     const user = getUser();
@@ -123,11 +163,16 @@ function Home() {
     }
   };
 
+  // ==================================================
+  // KIRIM PESAN
+  // ==================================================
+
   const kirimPesan = async () => {
     if (!message.trim() || loading) return;
 
     const user = getUser();
 
+    // Pastikan user benar-benar tersedia
     if (!user?.id) {
       alert("Silakan login terlebih dahulu.");
       return;
@@ -150,8 +195,10 @@ function Home() {
     try {
       const res = await axios.post("/chat", {
         message: text,
-        user_id: user.id,
-        chat_id: currentChatId,
+        user_id: Number(user.id),
+        chat_id: currentChatId
+          ? Number(currentChatId)
+          : null,
       });
 
       const reply =
@@ -159,6 +206,7 @@ function Home() {
         res.data?.message ||
         "Maaf, AI.Ind tidak memberikan jawaban.";
 
+      // Backend membuat chat baru
       if (res.data?.chat_id) {
         setCurrentChatId(res.data.chat_id);
       }
@@ -175,13 +223,25 @@ function Home() {
     } catch (error) {
       console.error("Chat Error:", error);
 
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response
-          ? `Server error (${error.response.status}).`
-          : error.request
-          ? "Backend tidak memberikan respons."
-          : error.message || "Terjadi kesalahan.";
+      let errorMessage = "Terjadi kesalahan.";
+
+      if (error.response) {
+        errorMessage =
+          error.response.data?.error ||
+          error.response.data?.message ||
+          `Server error (${error.response.status}).`;
+
+        // Kalau backend mengatakan belum login
+        if (error.response.status === 401) {
+          errorMessage =
+            "Sesi login tidak ditemukan. Silakan login kembali.";
+        }
+      } else if (error.request) {
+        errorMessage =
+          "Backend tidak memberikan respons.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -195,9 +255,17 @@ function Home() {
     }
   };
 
+  // ==================================================
+  // PAGE LOADING
+  // ==================================================
+
   if (pageLoading) {
     return <Loading />;
   }
+
+  // ==================================================
+  // UI
+  // ==================================================
 
   return (
     <div className="aiind-app">
