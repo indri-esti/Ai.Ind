@@ -30,7 +30,11 @@ function Home() {
 
       if (!data) return null;
 
-      return JSON.parse(data);
+      const user = JSON.parse(data);
+
+      if (!user?.id) return null;
+
+      return user;
     } catch (error) {
       console.error("User error:", error);
       return null;
@@ -39,6 +43,7 @@ function Home() {
 
   // =========================
   // AMBIL RIWAYAT DARI DATABASE
+  // KHUSUS USER YANG SEDANG LOGIN
   // =========================
   const loadHistory = async () => {
     const user = getUser();
@@ -50,16 +55,18 @@ function Home() {
 
     try {
       const res = await axios.get(
-        `/chats?user_id=${user.id}`
+        `/chats?user_id=${encodeURIComponent(user.id)}`
       );
 
+      let chats = [];
+
       if (Array.isArray(res.data)) {
-        setHistory(res.data);
+        chats = res.data;
       } else if (Array.isArray(res.data?.chats)) {
-        setHistory(res.data.chats);
-      } else {
-        setHistory([]);
+        chats = res.data.chats;
       }
+
+      setHistory(chats);
     } catch (error) {
       console.error("History Error:", error);
       setHistory([]);
@@ -67,20 +74,60 @@ function Home() {
   };
 
   // =========================
-  // LOAD SAAT HOME DIBUKA
+  // LOAD HOME
   // =========================
   useEffect(() => {
+    let mounted = true;
+
     const start = async () => {
       await loadHistory();
 
-      const timer = setTimeout(() => {
-        setPageLoading(false);
-      }, 500);
+      if (!mounted) return;
 
-      return () => clearTimeout(timer);
+      setTimeout(() => {
+        if (mounted) {
+          setPageLoading(false);
+        }
+      }, 500);
     };
 
     start();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // =========================
+  // CEK PERGANTIAN USER
+  // =========================
+  useEffect(() => {
+    const handleUserChange = () => {
+      const user = getUser();
+
+      // Reset chat ketika akun berubah
+      setMessages([]);
+      setCurrentChatId(null);
+      setMessage("");
+
+      if (user?.id) {
+        loadHistory();
+      } else {
+        setHistory([]);
+      }
+    };
+
+    window.addEventListener(
+      "aiind-user-changed",
+      handleUserChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        "aiind-user-changed",
+        handleUserChange
+      );
+    };
   }, []);
 
   // =========================
@@ -103,18 +150,22 @@ function Home() {
   };
 
   // =========================
-  // BUKA CHAT DARI SIDEBAR
+  // BUKA CHAT
   // =========================
   const bukaChat = async (chat) => {
     if (!chat?.id) return;
 
     const user = getUser();
 
-    if (!user?.id) return;
+    if (!user?.id) {
+      setMessages([]);
+      setCurrentChatId(null);
+      return;
+    }
 
     try {
       const res = await axios.get(
-        `/chats/${chat.id}?user_id=${user.id}`
+        `/chats/${chat.id}?user_id=${encodeURIComponent(user.id)}`
       );
 
       const chatData = res.data?.chat || res.data;
@@ -129,10 +180,13 @@ function Home() {
     } catch (error) {
       console.error("Open Chat Error:", error);
 
-      // Fallback jika messages sudah dikirim dari endpoint history
+      // Fallback jika history sudah membawa messages
       if (Array.isArray(chat.messages)) {
         setMessages(chat.messages);
         setCurrentChatId(chat.id);
+      } else {
+        setMessages([]);
+        setCurrentChatId(null);
       }
     }
   };
@@ -179,7 +233,7 @@ function Home() {
 
       const newChatId = res.data?.chat_id;
 
-      // Simpan ID chat yang dibuat backend
+      // Simpan chat_id dari database
       if (newChatId) {
         setCurrentChatId(newChatId);
       }
@@ -193,7 +247,7 @@ function Home() {
         },
       ]);
 
-      // Refresh daftar chat dari database
+      // Update riwayat database
       await loadHistory();
     } catch (err) {
       console.error("Chat Error:", err);
