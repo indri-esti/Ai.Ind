@@ -12,6 +12,14 @@ import Swal from "sweetalert2";
 import axios from "../api";
 
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
+import { Capacitor } from "@capacitor/core";
+import {
+  signInWithPopup,
+} from "firebase/auth";
+import {
+  auth,
+  googleProvider,
+} from "../firebase";
 
 function Register() {
   const navigate = useNavigate();
@@ -68,18 +76,31 @@ function Register() {
     }
   };
 
-  // Login / Daftar dengan Google melalui Firebase Native Android
+  // Login / Daftar dengan Google
   const handleGoogleRegister = async () => {
     try {
-      const result =
-        await FirebaseAuthentication.signInWithGoogle();
+      let user;
 
-      const user = result.user;
+      if (Capacitor.isNativePlatform()) {
+        // Android / native
+        const result =
+          await FirebaseAuthentication.signInWithGoogle();
+
+        user = result.user;
+      } else {
+        // Web / PWA
+        const result = await signInWithPopup(
+          auth,
+          googleProvider
+        );
+
+        user = result.user;
+      }
 
       const res = await axios.post("/google-login", {
         nama: user.displayName || "",
         email: user.email || "",
-        foto: user.photoUrl || "",
+        foto: user.photoUrl || user.photoURL || "",
       });
 
       localStorage.setItem(
