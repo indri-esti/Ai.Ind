@@ -85,6 +85,19 @@ function Login() {
     }
   };
 
+  // Simpan user setelah login
+  const saveUserLogin = (user) => {
+    if (!user || !user.id) {
+      throw new Error("Data user dari server tidak ditemukan.");
+    }
+
+    localStorage.setItem("user", JSON.stringify(user));
+
+    // Simpan ID user ke Axios supaya request berikutnya
+    // tetap membawa identitas user.
+    axios.defaults.headers.common["X-User-ID"] = String(user.id);
+  };
+
   // Login dengan email dan password
   const handleLogin = async () => {
     if (!email || !password) {
@@ -98,9 +111,12 @@ function Login() {
     }
 
     try {
-      const res = await axios.post("/login", { email, password });
+      const res = await axios.post("/login", {
+        email,
+        password,
+      });
 
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      saveUserLogin(res.data.user);
 
       Swal.fire({
         icon: "success",
@@ -221,10 +237,7 @@ function Login() {
         foto: googleUser.foto,
       });
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify(res.data.user)
-      );
+      saveUserLogin(res.data.user);
 
       Swal.fire({
         icon: "success",
@@ -286,7 +299,12 @@ function Login() {
           boxShadow: "0 0 25px rgba(0,194,255,.15)",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "30px" }}>
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: "30px",
+          }}
+        >
           <div
             style={{
               width: "80px",
