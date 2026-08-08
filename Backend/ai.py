@@ -202,15 +202,15 @@ def balas(pesan, history=None):
         # =========================
 
         if response.status_code != 200:
-    print("========== OPENROUTER ERROR ==========")
-    print("STATUS:", response.status_code)
-    print("RESPONSE:", response.text)
-    print("======================================")
+            print("========== OPENROUTER ERROR ==========")
+            print("STATUS:", response.status_code)
+            print("RESPONSE:", response.text)
+            print("======================================")
 
-    return (
-        f"OpenRouter error HTTP {response.status_code}: "
-        f"{response.text[:500]}"
-    )
+            return (
+                f"OpenRouter error HTTP {response.status_code}: "
+                f"{response.text[:500]}"
+            )
 
 
         # =========================
