@@ -1,5 +1,10 @@
 {
   "appId": "com.aiind.app",
   "appName": "AI.Ind",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "url": "https://ai-ind.vercel.app",
+    "cleartext": false
+  }
 }
+
