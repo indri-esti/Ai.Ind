@@ -1,5 +1,5 @@
 {
-  "appId": "com.aiind.app",
+  "appId": "com.ai.ind",
   "appName": "AI.Ind",
   "webDir": "dist",
   "server": {
@@ -7,4 +7,3 @@
     "cleartext": false
   }
 }
-
