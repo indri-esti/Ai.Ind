@@ -1,25 +1,13 @@
 import { useState } from "react";
-import {
-  FaRobot,
-  FaGoogle,
-  FaEye,
-  FaEyeSlash,
-} from "react-icons/fa";
-
+import { FaRobot, FaGoogle, FaEye, FaEyeSlash } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
-
 import Swal from "sweetalert2";
 import axios from "../api";
 
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { Capacitor } from "@capacitor/core";
-import {
-  signInWithPopup,
-} from "firebase/auth";
-import {
-  auth,
-  googleProvider,
-} from "../firebase";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "../firebase";
 
 function Login() {
   const navigate = useNavigate();
@@ -28,75 +16,56 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Login dengan email dan password
+  const alertStyle = {
+    background: "#122B3C",
+    color: "#fff",
+    confirmButtonColor: "#00C2FF",
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       Swal.fire({
         icon: "warning",
         title: "Oops...",
         text: "Email dan password harus diisi.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
+        ...alertStyle,
       });
       return;
     }
 
     try {
-      const res = await axios.post("/login", {
-        email,
-        password,
-      });
+      const res = await axios.post("/login", { email, password });
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify(res.data.user)
-      );
+      localStorage.setItem("user", JSON.stringify(res.data.user));
 
       Swal.fire({
         icon: "success",
         title: "Login Berhasil",
         timer: 1200,
         showConfirmButton: false,
-        background: "#122B3C",
-        color: "#fff",
+        ...alertStyle,
       });
 
-      setTimeout(() => {
-        navigate("/");
-      }, 1200);
+      setTimeout(() => navigate("/"), 1200);
     } catch (err) {
       Swal.fire({
         icon: "error",
         title: "Login Gagal",
-        text:
-          err.response?.data?.message ||
-          "Email atau password salah.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
+        text: err.response?.data?.message || "Email atau password salah.",
+        ...alertStyle,
       });
     }
   };
 
-  // Login dengan Google
   const handleGoogleLogin = async () => {
     try {
       let user;
 
       if (Capacitor.isNativePlatform()) {
-        // Android / native
-        const result =
-          await FirebaseAuthentication.signInWithGoogle();
-
+        const result = await FirebaseAuthentication.signInWithGoogle();
         user = result.user;
       } else {
-        // Web / PWA
-        const result = await signInWithPopup(
-          auth,
-          googleProvider
-        );
-
+        const result = await signInWithPopup(auth, googleProvider);
         user = result.user;
       }
 
@@ -106,23 +75,17 @@ function Login() {
         foto: user.photoUrl || user.photoURL || "",
       });
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify(res.data.user)
-      );
+      localStorage.setItem("user", JSON.stringify(res.data.user));
 
       Swal.fire({
         icon: "success",
         title: "Login Google Berhasil",
         timer: 1200,
         showConfirmButton: false,
-        background: "#122B3C",
-        color: "#fff",
+        ...alertStyle,
       });
 
-      setTimeout(() => {
-        navigate("/");
-      }, 1200);
+      setTimeout(() => navigate("/"), 1200);
     } catch (err) {
       console.error("Google Login Error:", err);
 
@@ -133,11 +96,20 @@ function Login() {
           err.response?.data?.message ||
           err.message ||
           "Terjadi kesalahan saat login dengan Google.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
+        ...alertStyle,
       });
     }
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "14px",
+    borderRadius: "10px",
+    border: "1px solid #1B3445",
+    background: "#122B3C",
+    color: "#fff",
+    outline: "none",
+    boxSizing: "border-box",
   };
 
   return (
@@ -162,13 +134,7 @@ function Login() {
           boxShadow: "0 0 25px rgba(0,194,255,.15)",
         }}
       >
-        {/* Logo */}
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "30px",
-          }}
-        >
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
           <div
             style={{
               width: "80px",
@@ -181,10 +147,7 @@ function Login() {
               margin: "0 auto",
             }}
           >
-            <FaRobot
-              size={42}
-              color="#00C2FF"
-            />
+            <FaRobot size={42} color="#00C2FF" />
           </div>
 
           <h2
@@ -197,25 +160,13 @@ function Login() {
             AI.Ind
           </h2>
 
-          <p
-            style={{
-              color: "#8A9BB5",
-              margin: 0,
-            }}
-          >
+          <p style={{ color: "#8A9BB5", margin: 0 }}>
             Selamat Datang Kembali
           </p>
         </div>
 
-        {/* Email */}
         <div style={{ marginBottom: "18px" }}>
-          <label
-            style={{
-              color: "#fff",
-              display: "block",
-              marginBottom: "8px",
-            }}
-          >
+          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
             Email
           </label>
 
@@ -224,28 +175,12 @@ function Login() {
             placeholder="Masukkan email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px",
-              borderRadius: "10px",
-              border: "1px solid #1B3445",
-              background: "#122B3C",
-              color: "#fff",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
+            style={inputStyle}
           />
         </div>
 
-        {/* Password */}
         <div style={{ marginBottom: "22px" }}>
-          <label
-            style={{
-              color: "#fff",
-              display: "block",
-              marginBottom: "8px",
-            }}
-          >
+          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
             Password
           </label>
 
@@ -263,38 +198,24 @@ function Login() {
               type={showPassword ? "text" : "password"}
               placeholder="Masukkan password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
+              onChange={(e) => setPassword(e.target.value)}
               style={{
+                ...inputStyle,
                 flex: 1,
-                padding: "14px",
                 border: "none",
                 background: "transparent",
-                color: "#fff",
-                outline: "none",
               }}
             />
 
             <span
-              onClick={() =>
-                setShowPassword(!showPassword)
-              }
-              style={{
-                cursor: "pointer",
-                color: "#8A9BB5",
-              }}
+              onClick={() => setShowPassword(!showPassword)}
+              style={{ cursor: "pointer", color: "#8A9BB5" }}
             >
-              {showPassword ? (
-                <FaEye />
-              ) : (
-                <FaEyeSlash />
-              )}
+              {showPassword ? <FaEye /> : <FaEyeSlash />}
             </span>
           </div>
         </div>
 
-        {/* Login */}
         <button
           onClick={handleLogin}
           style={{
@@ -322,7 +243,6 @@ function Login() {
           atau
         </div>
 
-        {/* Google Login */}
         <button
           type="button"
           onClick={handleGoogleLogin}
@@ -346,7 +266,6 @@ function Login() {
           Login dengan Google
         </button>
 
-        {/* Register */}
         <p
           style={{
             textAlign: "center",
@@ -367,7 +286,6 @@ function Login() {
           </Link>
         </p>
 
-        {/* Footer */}
         <p
           style={{
             textAlign: "center",

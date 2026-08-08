@@ -1,25 +1,13 @@
 import { useState } from "react";
-import {
-  FaRobot,
-  FaGoogle,
-  FaEye,
-  FaEyeSlash,
-} from "react-icons/fa";
-
+import { FaRobot, FaGoogle, FaEye, FaEyeSlash } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
-
 import Swal from "sweetalert2";
 import axios from "../api";
 
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { Capacitor } from "@capacitor/core";
-import {
-  signInWithPopup,
-} from "firebase/auth";
-import {
-  auth,
-  googleProvider,
-} from "../firebase";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "../firebase";
 
 function Register() {
   const navigate = useNavigate();
@@ -29,15 +17,19 @@ function Register() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  const alertStyle = {
+    background: "#122B3C",
+    color: "#fff",
+    confirmButtonColor: "#00C2FF",
+  };
+
   const handleRegister = async () => {
     if (!nama || !email || !password) {
       Swal.fire({
         icon: "warning",
         title: "Oops...",
         text: "Semua field harus diisi.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
+        ...alertStyle,
       });
       return;
     }
@@ -55,45 +47,29 @@ function Register() {
         text: res.data.message,
         timer: 1500,
         showConfirmButton: false,
-        background: "#122B3C",
-        color: "#fff",
+        ...alertStyle,
       });
 
-      setTimeout(() => {
-        navigate("/login");
-      }, 1500);
+      setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
       Swal.fire({
         icon: "error",
         title: "Register Gagal",
-        text:
-          err.response?.data?.message ||
-          "Terjadi kesalahan.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
+        text: err.response?.data?.message || "Terjadi kesalahan.",
+        ...alertStyle,
       });
     }
   };
 
-  // Login / Daftar dengan Google
   const handleGoogleRegister = async () => {
     try {
       let user;
 
       if (Capacitor.isNativePlatform()) {
-        // Android / native
-        const result =
-          await FirebaseAuthentication.signInWithGoogle();
-
+        const result = await FirebaseAuthentication.signInWithGoogle();
         user = result.user;
       } else {
-        // Web / PWA
-        const result = await signInWithPopup(
-          auth,
-          googleProvider
-        );
-
+        const result = await signInWithPopup(auth, googleProvider);
         user = result.user;
       }
 
@@ -103,23 +79,17 @@ function Register() {
         foto: user.photoUrl || user.photoURL || "",
       });
 
-      localStorage.setItem(
-        "user",
-        JSON.stringify(res.data.user)
-      );
+      localStorage.setItem("user", JSON.stringify(res.data.user));
 
       Swal.fire({
         icon: "success",
         title: "Login Google Berhasil",
         timer: 1200,
         showConfirmButton: false,
-        background: "#122B3C",
-        color: "#fff",
+        ...alertStyle,
       });
 
-      setTimeout(() => {
-        navigate("/");
-      }, 1200);
+      setTimeout(() => navigate("/"), 1200);
     } catch (err) {
       console.error("Google Login Error:", err);
 
@@ -130,11 +100,20 @@ function Register() {
           err.response?.data?.message ||
           err.message ||
           "Terjadi kesalahan saat login dengan Google.",
-        background: "#122B3C",
-        color: "#fff",
-        confirmButtonColor: "#00C2FF",
+        ...alertStyle,
       });
     }
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "14px",
+    borderRadius: "10px",
+    border: "1px solid #1B3445",
+    background: "#122B3C",
+    color: "#fff",
+    outline: "none",
+    boxSizing: "border-box",
   };
 
   return (
@@ -159,12 +138,7 @@ function Register() {
           boxShadow: "0 0 25px rgba(0,194,255,.15)",
         }}
       >
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "30px",
-          }}
-        >
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
           <div
             style={{
               width: "80px",
@@ -190,24 +164,13 @@ function Register() {
             AI.Ind
           </h2>
 
-          <p
-            style={{
-              color: "#8A9BB5",
-              margin: 0,
-            }}
-          >
+          <p style={{ color: "#8A9BB5", margin: 0 }}>
             Buat Akun Baru
           </p>
         </div>
 
         <div style={{ marginBottom: "18px" }}>
-          <label
-            style={{
-              color: "#fff",
-              display: "block",
-              marginBottom: "8px",
-            }}
-          >
+          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
             Nama
           </label>
 
@@ -216,27 +179,12 @@ function Register() {
             placeholder="Masukkan nama"
             value={nama}
             onChange={(e) => setNama(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px",
-              borderRadius: "10px",
-              border: "1px solid #1B3445",
-              background: "#122B3C",
-              color: "#fff",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
+            style={inputStyle}
           />
         </div>
 
         <div style={{ marginBottom: "18px" }}>
-          <label
-            style={{
-              color: "#fff",
-              display: "block",
-              marginBottom: "8px",
-            }}
-          >
+          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
             Email
           </label>
 
@@ -245,27 +193,12 @@ function Register() {
             placeholder="Masukkan email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px",
-              borderRadius: "10px",
-              border: "1px solid #1B3445",
-              background: "#122B3C",
-              color: "#fff",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
+            style={inputStyle}
           />
         </div>
 
         <div style={{ marginBottom: "22px" }}>
-          <label
-            style={{
-              color: "#fff",
-              display: "block",
-              marginBottom: "8px",
-            }}
-          >
+          <label style={{ color: "#fff", display: "block", marginBottom: "8px" }}>
             Password
           </label>
 
@@ -285,21 +218,16 @@ function Register() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
+                ...inputStyle,
                 flex: 1,
-                padding: "14px",
                 border: "none",
                 background: "transparent",
-                color: "#fff",
-                outline: "none",
               }}
             />
 
             <span
               onClick={() => setShowPassword(!showPassword)}
-              style={{
-                cursor: "pointer",
-                color: "#8A9BB5",
-              }}
+              style={{ cursor: "pointer", color: "#8A9BB5" }}
             >
               {showPassword ? <FaEye /> : <FaEyeSlash />}
             </span>
@@ -333,7 +261,6 @@ function Register() {
           atau
         </div>
 
-        {/* Google Login */}
         <button
           type="button"
           onClick={handleGoogleRegister}
