@@ -21,7 +21,11 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
 
+  const [currentChatId, setCurrentChatId] = useState(null);
+
   const chatEndRef = useRef(null);
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
@@ -31,8 +35,8 @@ function Home() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-  setPageLoading(false);
-}, 1800);
+      setPageLoading(false);
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, []);
@@ -45,20 +49,21 @@ function Home() {
   }, [history]);
 
   const chatBaru = () => {
-  if (messages.length > 0) {
-    const chat = {
-      id: Date.now(),
-      title:
-        messages.find((m) => m.role === "user")?.content ||
-        "Percakapan Baru",
-      messages,
-    };
+    if (messages.length > 0) {
+      const chat = {
+        id: Date.now(),
+        title:
+          messages.find((m) => m.role === "user")?.content ||
+          "Percakapan Baru",
+        messages,
+      };
 
-    setHistory((prev) => [chat, ...prev]);
-  }
+      setHistory((prev) => [chat, ...prev]);
+    }
 
-  setMessages([]);
-};
+    setMessages([]);
+    setCurrentChatId(null);
+  };
 
   const kirimPesan = async () => {
     if (!message.trim() || loading) return;
@@ -78,16 +83,27 @@ function Home() {
     setLoading(true);
 
     try {
+      const res = await axios.post("/chat", {
+        message: text,
+        user_id: Number(user.id),
+        chat_id: currentChatId
+          ? Number(currentChatId)
+          : null,
+      });
 
-const res = await axios.post("/chat", {
-  message: text,
-  user_id: Number(user.id),
-  chat_id: currentChatId
-    ? Number(currentChatId)
-    : null,
-});      
+      if (res.data.chat_id) {
+        setCurrentChatId(res.data.chat_id);
+      }
 
-
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            res.data.reply ||
+            "AI tidak memberikan jawaban.",
+        },
+      ]);
     } catch (err) {
       console.error(err);
 
@@ -124,13 +140,13 @@ const res = await axios.post("/chat", {
         display: "flex",
       }}
     >
-<Sidebar
-  messages={messages}
-  setMessages={setMessages}
-  history={history}
-  setHistory={setHistory}
-  chatBaru={chatBaru}
-/>
+      <Sidebar
+        messages={messages}
+        setMessages={setMessages}
+        history={history}
+        setHistory={setHistory}
+        chatBaru={chatBaru}
+      />
 
       <div
         style={{
