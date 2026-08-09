@@ -16,13 +16,21 @@ export default defineConfig({
         name: "AI.Ind",
         short_name: "AI.Ind",
         description: "Asisten AI buatan Indonesia.",
-        theme_color: "#081420",
-        background_color: "#081420",
-        display: "standalone",
+        id: "/",
         start_url: "/",
         scope: "/",
+        display: "standalone",
+        background_color: "#081420",
+        theme_color: "#081420",
+        lang: "id",
 
         icons: [
+          {
+            src: "/logo.svg",
+            sizes: "192x192",
+            type: "image/svg+xml",
+            purpose: "any",
+          },
           {
             src: "/logo.svg",
             sizes: "512x512",
