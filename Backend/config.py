@@ -13,5 +13,4 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-
-MODEL = "meta-llama/llama-3.2-3b-instruct:free"
+MODEL = "openrouter/free"
