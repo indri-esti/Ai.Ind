@@ -1,7 +1,10 @@
 {
   "name": "AI.Ind",
   "short_name": "AI.Ind",
+  "description": "Asisten AI buatan Indonesia.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#081420",
   "theme_color": "#081420",
