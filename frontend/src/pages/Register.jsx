@@ -464,48 +464,54 @@ color="#00C2FF"
     </div>
 
     {Capacitor.isNativePlatform() ? (
-      <button
-        type="button"
-        onClick={handleNativeGoogleRegister}
-        style={{
-          width: "100%",
-          padding: "13px",
-          border: "1px solid #1B3445",
-          borderRadius: "10px",
-          background: "#fff",
-          color: "#222",
-          fontWeight: "600",
-          cursor: "pointer",
-          fontSize: "15px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "10px",
-        }}
-      >
-        <FaGoogle />
-        Daftar dengan Google
-      </button>
-    ) : (
-      <div
-        style={{
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
-        <GoogleLogin
-          onSuccess={handleGoogleSuccess}
-          onError={handleGoogleError}
-          useOneTap={false}
-          theme="outline"
-          size="large"
-          text="signup_with"
-          shape="rectangular"
-          width="350"
-        />
-      </div>
-    )}
+  <button
+    type="button"
+    onClick={handleNativeGoogleRegister}
+    style={{
+      width: "100%",
+      maxWidth: "280px",
+      margin: "0 auto",
+      padding: "11px 14px",
+      border: "1px solid #DADCE0",
+      borderRadius: "8px",
+      background: "#fff",
+      color: "#3C4043",
+      fontWeight: "600",
+      cursor: "pointer",
+      fontSize: "14px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "9px",
+      boxSizing: "border-box",
+    }}
+  >
+    <FaGoogle color="#4285F4" />
+    Daftar dengan Google
+  </button>
+) : (
+  <div
+    style={{
+      width: "100%",
+      maxWidth: "280px",
+      margin: "0 auto",
+      display: "flex",
+      justifyContent: "center",
+      overflow: "hidden",
+    }}
+  >
+    <GoogleLogin
+      onSuccess={handleGoogleSuccess}
+      onError={handleGoogleError}
+      useOneTap={false}
+      theme="outline"
+      size="medium"
+      text="signup_with"
+      shape="rectangular"
+      width="280"
+    />
+  </div>
+)}
 
     <p
       style={{
