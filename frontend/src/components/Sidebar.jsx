@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
@@ -6,6 +6,8 @@ import {
   FiMenu,
   FiPlus,
   FiMessageSquare,
+  FiChevronDown,
+  FiChevronUp,
 } from "react-icons/fi";
 
 import {
@@ -24,537 +26,805 @@ function Sidebar({
   setHistory,
   chatBaru,
 }) {
-  
-
-const [profileOpen, setProfileOpen] = useState(false);
-
-console.log("SIDEBAR AKTIF");
-
   const navigate = useNavigate();
 
-
+  const [profileOpen, setProfileOpen] = useState(false);
   const [user, setUser] = useState(null);
-
 
   const isMobile = window.innerWidth < 768;
 
-const [mobile, setMobile] = useState(isMobile);
-
+  const [mobile, setMobile] = useState(isMobile);
   const [settingOpen, setSettingOpen] = useState(false);
-
   const [open, setOpen] = useState(!isMobile);
 
+  // Dipakai agar history lama tidak langsung tertulis
+  // ke akun baru saat akun sedang berganti.
+  const skipSaveRef = useRef(false);
 
+  console.log("SIDEBAR AKTIF");
 
-  // ambil user aman
+  // ==================================================
+  // KEY RIWAYAT PER AKUN
+  // ==================================================
+  const getUserKey = (currentUser) => {
+    if (!currentUser) return null;
+
+    const identifier =
+      currentUser.email ||
+      currentUser.id ||
+      currentUser.googleId ||
+      currentUser.nama;
+
+    if (!identifier) return null;
+
+    return `history_${String(identifier).toLowerCase()}`;
+  };
+
+  // ==================================================
+  // AMBIL USER
+  // ==================================================
   useEffect(() => {
+    const loadUser = () => {
+      try {
+        const data = localStorage.getItem("user");
 
-    try {
-      const data = localStorage.getItem("user");
-
-      if(data){
-        setUser(JSON.parse(data));
+        if (data) {
+          const parsedUser = JSON.parse(data);
+          setUser(parsedUser);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.log("User error:", err);
+        setUser(null);
       }
+    };
 
-    } catch(err){
-      console.log("User error:", err);
-      setUser(null);
-    }
+    loadUser();
 
+    // Cek kembali ketika storage berubah
+    const handleStorage = () => {
+      loadUser();
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
-
-
-  // responsive
+  // ==================================================
+  // LOAD RIWAYAT SESUAI AKUN
+  // ==================================================
   useEffect(() => {
-  const handleResize = () => {
-    const isNowMobile = window.innerWidth < 768;
+    const userKey = getUserKey(user);
 
-    setMobile(isNowMobile);
+    skipSaveRef.current = true;
 
-    // hanya ubah otomatis saat berpindah desktop <-> mobile
-    setOpen((prev) => {
-      if (isNowMobile) return false;
-      return true;
+    if (!userKey) {
+      setHistory([]);
+      return;
+    }
+
+    try {
+      const savedHistory = localStorage.getItem(userKey);
+
+      if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+
+        if (Array.isArray(parsedHistory)) {
+          setHistory(parsedHistory);
+        } else {
+          setHistory([]);
+        }
+      } else {
+        setHistory([]);
+      }
+    } catch (err) {
+      console.log("History error:", err);
+      setHistory([]);
+    }
+
+    // Beri kesempatan effect penyimpanan berikutnya
+    // untuk tidak menulis history lama ke akun baru.
+    setTimeout(() => {
+      skipSaveRef.current = false;
+    }, 0);
+  }, [user]);
+
+  // ==================================================
+  // SIMPAN RIWAYAT SESUAI AKUN
+  // ==================================================
+  useEffect(() => {
+    const userKey = getUserKey(user);
+
+    if (!userKey) return;
+
+    if (skipSaveRef.current) return;
+
+    try {
+      localStorage.setItem(
+        userKey,
+        JSON.stringify(Array.isArray(history) ? history : [])
+      );
+    } catch (err) {
+      console.log("Gagal menyimpan history:", err);
+    }
+  }, [history, user]);
+
+  // ==================================================
+  // RESPONSIVE
+  // ==================================================
+  useEffect(() => {
+    const handleResize = () => {
+      const isNowMobile = window.innerWidth < 768;
+
+      setMobile(isNowMobile);
+
+      setOpen((prev) => {
+        if (isNowMobile) return false;
+        return true;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  // ==================================================
+  // TUTUP SIDEBAR SAAT PILIH CHAT DI HP
+  // ==================================================
+  const closeMobileSidebar = () => {
+    if (mobile) {
+      setOpen(false);
+    }
+  };
+
+  // ==================================================
+  // GANTI AKUN
+  // ==================================================
+  const handleChangeAccount = () => {
+    Swal.fire({
+      title: "Ganti Akun?",
+      text: "Kamu akan keluar dari akun saat ini.",
+      icon: "warning",
+      background: "#122B3C",
+      color: "#fff",
+      showCancelButton: true,
+      confirmButtonText: "Ganti Akun",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#00C2FF",
+      cancelButtonColor: "#ef4444",
+      borderRadius: "16px",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Jangan sampai chat akun sebelumnya terlihat
+        setMessages([]);
+        setHistory([]);
+
+        localStorage.removeItem("user");
+
+        setUser(null);
+        setProfileOpen(false);
+        setSettingOpen(false);
+
+        navigate("/login");
+      }
     });
   };
 
-  window.addEventListener("resize", handleResize);
+  // ==================================================
+  // LOGOUT
+  // ==================================================
+  const handleLogout = () => {
+    Swal.fire({
+      title: "Keluar Akun?",
+      text: "Apakah kamu yakin ingin keluar?",
+      icon: "warning",
+      background: "#122B3C",
+      color: "#fff",
+      showCancelButton: true,
+      confirmButtonText: "Keluar",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#475569",
+      borderRadius: "16px",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setMessages([]);
+        setHistory([]);
 
-  return () => {
-    window.removeEventListener("resize", handleResize);
+        localStorage.removeItem("user");
+
+        setUser(null);
+        setProfileOpen(false);
+        setSettingOpen(false);
+
+        navigate("/login");
+      }
+    });
   };
-}, []);
 
-
-
-const handleChangeAccount = () => {
-
- Swal.fire({
-
-    title:"Ganti Akun?",
-
-    text:"Kamu akan keluar dari akun saat ini.",
-
-    icon:"warning",
-
-    background:"#122B3C",
-
-    color:"#fff",
-
-    showCancelButton:true,
-
-    confirmButtonText:"Ganti Akun",
-
-    cancelButtonText:"Batal",
-
-    confirmButtonColor:"#00C2FF",
-
-    cancelButtonColor:"#ef4444"
-
- }).then((result)=>{
-
-
-    if(result.isConfirmed){
-
-      localStorage.removeItem("user");
-
-      setUser(null);
-
-
-      navigate("/login");
-
+  // ==================================================
+  // CHAT BARU
+  // ==================================================
+  const handleChatBaru = () => {
+    if (typeof chatBaru === "function") {
+      chatBaru();
     }
 
+    closeMobileSidebar();
+  };
 
- });
+  // ==================================================
+  // HAPUS RIWAYAT
+  // ==================================================
+  const handleDeleteHistory = (e, index) => {
+    e.stopPropagation();
 
+    const newHistory = [...history];
+    newHistory.splice(index, 1);
 
-};
+    setHistory(newHistory);
 
+    const userKey = getUserKey(user);
 
+    if (userKey) {
+      try {
+        localStorage.setItem(userKey, JSON.stringify(newHistory));
+      } catch (err) {
+        console.log("Gagal menghapus history:", err);
+      }
+    }
+  };
 
-const handleLogout = () => {
+  // ==================================================
+  // TENTANG
+  // ==================================================
+  const handleAbout = () => {
+    Swal.fire({
+      title: "AI.Ind",
+      html: `
+        <div style="line-height:1.7">
+          <b>AI.Ind</b><br>
+          Buatan Indonesia 🇮🇩<br><br>
+          <span style="color:#8A9BB5">
+            Asisten AI untuk membantu aktivitasmu.
+          </span><br><br>
+          Versi 1.0.0
+        </div>
+      `,
+      icon: "info",
+      background: "#122B3C",
+      color: "#fff",
+      confirmButtonColor: "#00C2FF",
+      borderRadius: "16px",
+    });
+  };
 
-
- Swal.fire({
-
- title:"Keluar Akun?",
-
- text:"Apakah kamu yakin?",
-
- icon:"warning",
-
- background:"#122B3C",
-
- color:"#fff",
-
- showCancelButton:true,
-
- confirmButtonText:"Keluar",
-
- cancelButtonText:"Batal",
-
- confirmButtonColor:"#ef4444"
-
-
- }).then((result)=>{
-
-
- if(result.isConfirmed){
-
-   localStorage.removeItem("user");
-
-   setUser(null);
-
-
-   navigate("/login");
-
- }
-
-
- });
-
-
-};
-
-
-
-const handleAbout = ()=>{
-
- Swal.fire({
-
- title:"AI.Ind",
-
- html:`
- <b>AI.Ind</b><br>
- Buatan Indonesia 🇮🇩<br><br>
- Versi 1.0.0
- `,
-
- icon:"info",
-
- background:"#122B3C",
-
- color:"#fff"
-
- });
-
-};
-
+  // ==================================================
+  // RENDER
+  // ==================================================
   return (
-  <>
-    {/* Tombol Menu */}
-    {mobile && (
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          position: "fixed",
-          top: "18px",
-          left: "18px",
-          zIndex: 1001,
-          background: "#00C2FF",
-          color: "#081420",
-          border: "none",
-          borderRadius: "12px",
-          width: "46px",
-          height: "46px",
-          cursor: "pointer",
-          fontSize: "22px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 4px 15px rgba(0,194,255,.25)",
-        }}
-      >
-        <FiMenu />
-      </button>
-    )}
-
-    {/* Overlay HP */}
-    {mobile && open && (
-      <div
-        onClick={() => setOpen(false)}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,.45)",
-          zIndex: 998,
-        }}
-      />
-    )}
-
-    {/* Sidebar */}
-   <div
-style={{
-  position: mobile ? "fixed" : "relative",
-  top: 0,
-  left: mobile ? (open ? 0 : "-270px") : 0,
-  width: "260px",
-  height: "100vh",
-  background: "#0B1D2A",
-  color: "#fff",
-  transition: ".3s ease",
-  borderRight: "1px solid #1B3445",
-  display: "flex",
-  flexDirection: "column",
-  zIndex: 999,
-  overflow: "hidden",
-}}
->
-      {/* Atas */}
-      <div
-        style={{
-          padding: "22px",
-        }}
-      >
-        <h3
-          style={{
-            color: "#00C2FF",
-            fontWeight: "700",
-            marginBottom: "5px",
-            marginTop: mobile ? "55px" : "0",
-            fontSize: "32px",
-          }}
-        >
-          AI.Ind
-        </h3>
-
-        <small
-          style={{
-            color: "#8A9BB5",
-            fontSize: "16px",
-          }}
-        >
-          Buatan Indonesia
-        </small>
-
+    <>
+      {/* ================================================
+          TOMBOL MENU HP
+      ================================================= */}
+      {mobile && (
         <button
-          onClick={chatBaru}
+          onClick={() => setOpen(!open)}
+          aria-label="Buka menu"
           style={{
-            marginTop: "25px",
-            width: "100%",
-            padding: "12px",
+            position: "fixed",
+            top: "18px",
+            left: "18px",
+            zIndex: 1001,
             background: "#00C2FF",
             color: "#081420",
             border: "none",
-            borderRadius: "10px",
-            fontWeight: "600",
+            borderRadius: "12px",
+            width: "46px",
+            height: "46px",
+            cursor: "pointer",
+            fontSize: "22px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "10px",
-            cursor: "pointer",
+            boxShadow: "0 6px 20px rgba(0,194,255,.25)",
           }}
         >
-          <FiPlus />
-          Chat Baru
+          <FiMenu />
         </button>
-      </div>
+      )}
 
-      {/* Riwayat */}
-     <div
-style={{
-  flex: 1,
-  overflowY:"auto",
-  overflowX:"hidden",
-  padding: "0 22px 12px",
-  minHeight:0,
-}}
->
-        <p
+      {/* ================================================
+          OVERLAY HP
+      ================================================= */}
+      {mobile && open && (
+        <div
+          onClick={() => setOpen(false)}
           style={{
-            color: "#8A9BB5",
-            fontSize: "13px",
-            marginBottom: "10px",
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.55)",
+            backdropFilter: "blur(2px)",
+            zIndex: 998,
           }}
-        >
-          Riwayat Chat
-        </p>
+        />
+      )}
 
-        {!history || history.length === 0 ? (
-          <p
-            style={{
-              color: "#8A9BB5",
-              fontSize: "13px",
-            }}
-          >
-            Belum ada riwayat
-          </p>
-        ) : (
-        
-history.map((chat, index) => (
-  <div
-    key={chat.id}
-    style={{
-      background: "#122B3C",
-      borderRadius: "12px",
-      padding: "12px",
-      display: "flex",
-      alignItems: "center",
-      marginBottom: "10px",
-      cursor: "pointer",
-      transition: ".2s",
-    }}
-  >
-    <div
-      onClick={() => {
-        setMessages(chat.messages);
-
-        if (mobile) {
-          setOpen(false);
-        }
-      }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        flex: 1,
-        gap: "10px",
-      }}
-    >
-      <FiMessageSquare />
-
-      <span
+      {/* ================================================
+          SIDEBAR
+      ================================================= */}
+      <div
         style={{
-          flex: 1,
+          position: mobile ? "fixed" : "relative",
+          top: 0,
+          left: mobile ? (open ? 0 : "-280px") : 0,
+          width: "260px",
+          height: "100vh",
+          background:
+            "linear-gradient(180deg, #0B1D2A 0%, #091923 100%)",
+          color: "#fff",
+          transition: ".3s ease",
+          borderRight: "1px solid #1B3445",
+          display: "flex",
+          flexDirection: "column",
+          zIndex: 999,
           overflow: "hidden",
-          whiteSpace: "nowrap",
-          textOverflow: "ellipsis",
+          boxShadow: mobile && open
+            ? "8px 0 30px rgba(0,0,0,.25)"
+            : "none",
         }}
       >
-        {chat.title}
-      </span>
-    </div>
-
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-
-        const data = [...history];
-        data.splice(index, 1);
-
-        setHistory(data);
-        localStorage.setItem("history", JSON.stringify(data));
-      }}
-      style={{
-        background: "transparent",
-        border: "none",
-        color: "#ff5c5c",
-        cursor: "pointer",
-        fontSize: "16px",
-      }}
-    >
-      <FaTrash />
-    </button>
-  </div>
-))
-        )}
-      </div>
-
-           {/* Menu bawah */}
-      <div
-  style={{
-    flexShrink: 0,
-    padding: "16px 20px",
-    background: "#0B1D2A",
-    borderTop: "1px solid #1B3445",
-    boxShadow: "0 -2px 10px rgba(0,0,0,.2)",
-  }}
->
-        {/* Profil */}
-       <div
-  onClick={() => setProfileOpen(!profileOpen)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            marginBottom: "15px",
-            padding: "12px",
-            borderRadius: "12px",
-            background: "#122B3C",
-            cursor: "pointer",
-          }}
-        >
-<FaUserCircle 
-  size={35} 
-  color="#00C2FF"
-/>
-
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontWeight: "600",
-                fontSize: "15px",
-              }}
-            >
-              {user?.nama || "Belum Login"}
-            </div>
-
-            <small style={{ color: "#8A9BB5" }}>
-              {user?.email || "Masuk untuk menggunakan AI.Ind"}
-            </small>
-          </div>
-        </div>
-
-        {/* Pengaturan */}
+        {/* ============================================
+            BAGIAN ATAS
+        ============================================= */}
         <div
-          onClick={() => setSettingOpen(!settingOpen)}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "10px",
-            color: "#8A9BB5",
-            cursor: "pointer",
+            padding: "22px",
+            paddingBottom: "18px",
           }}
         >
-          <FaCog />
-          Pengaturan
-        </div>
-
-        {settingOpen && (
-         <div
-  style={{
-    marginLeft: "18px",
-    marginTop: "6px",
-    marginBottom: "8px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  }}
->
-            {!user ? (
-              <div
-                onClick={() => navigate("/login")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  cursor: "pointer",
-                  color: "#fff",
-                }}
-              >
-                <FaGoogle />
-                Login dengan Google
-              </div>
-            ) : (
-              <div
-                onClick={handleChangeAccount}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  cursor: "pointer",
-                  color: "#fff",
-                }}
-              >
-                <FaUserCircle />
-Ganti Akun
-              </div>
-            )}
-
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginTop: mobile ? "55px" : "0",
+            }}
+          >
             <div
-              onClick={handleLogout}
               style={{
+                width: "42px",
+                height: "42px",
+                borderRadius: "13px",
+                background:
+                  "linear-gradient(135deg,#00C2FF,#0088FF)",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
-                cursor: "pointer",
-                color: "#ff6b6b",
+                justifyContent: "center",
+                color: "#081420",
+                fontWeight: "800",
+                fontSize: "17px",
+                boxShadow: "0 5px 18px rgba(0,194,255,.2)",
               }}
             >
-              <FaSignOutAlt />
-              Keluar
+              AI
+            </div>
+
+            <div>
+              <h3
+                style={{
+                  color: "#00C2FF",
+                  fontWeight: "800",
+                  margin: 0,
+                  fontSize: "24px",
+                  letterSpacing: ".2px",
+                }}
+              >
+                AI.Ind
+              </h3>
+
+              <small
+                style={{
+                  color: "#8A9BB5",
+                  fontSize: "12px",
+                }}
+              >
+                Buatan Indonesia 🇮🇩
+              </small>
             </div>
           </div>
-        )}
 
-        {/* Tentang */}
-       <div
-  onClick={handleAbout}
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px",
-    color: "#8A9BB5",
-    cursor: "pointer",
-    flexShrink:0,
-    position: "relative",
-    zIndex: 5,
-    marginTop:"12px",
-paddingTop:"12px",
-borderTop:"1px solid rgba(255,255,255,.08)",
-  }}
->
-          <FaInfoCircle />
-          Tentang AI.Ind
+          <button
+            onClick={handleChatBaru}
+            style={{
+              marginTop: "22px",
+              width: "100%",
+              padding: "12px 14px",
+              background:
+                "linear-gradient(135deg,#00C2FF,#009FE3)",
+              color: "#081420",
+              border: "none",
+              borderRadius: "11px",
+              fontWeight: "700",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "9px",
+              cursor: "pointer",
+              boxShadow: "0 5px 18px rgba(0,194,255,.16)",
+            }}
+          >
+            <FiPlus size={18} />
+            Chat Baru
+          </button>
+        </div>
+
+        {/* ============================================
+            RIWAYAT
+        ============================================= */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            padding: "0 18px 12px",
+            minHeight: 0,
+            scrollbarWidth: "thin",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "4px 4px 10px",
+            }}
+          >
+            <p
+              style={{
+                color: "#8A9BB5",
+                fontSize: "12px",
+                fontWeight: "700",
+                margin: 0,
+                textTransform: "uppercase",
+                letterSpacing: ".7px",
+              }}
+            >
+              Riwayat Chat
+            </p>
+
+            {history && history.length > 0 && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "#60788D",
+                }}
+              >
+                {history.length}
+              </span>
+            )}
+          </div>
+
+          {!history || history.length === 0 ? (
+            <div
+              style={{
+                padding: "24px 12px",
+                textAlign: "center",
+                color: "#61798D",
+              }}
+            >
+              <FiMessageSquare
+                size={28}
+                style={{
+                  opacity: 0.5,
+                  marginBottom: "8px",
+                }}
+              />
+
+              <p
+                style={{
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                Belum ada riwayat
+              </p>
+
+              <small
+                style={{
+                  display: "block",
+                  marginTop: "5px",
+                  fontSize: "11px",
+                }}
+              >
+                Percakapanmu akan muncul di sini
+              </small>
+            </div>
+          ) : (
+            history.map((chat, index) => (
+              <div
+                key={chat.id || `${chat.title}-${index}`}
+                style={{
+                  background:
+                    "linear-gradient(135deg,#122B3C,#102736)",
+                  borderRadius: "11px",
+                  padding: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                  cursor: "pointer",
+                  transition: ".2s",
+                  border: "1px solid rgba(255,255,255,.035)",
+                }}
+              >
+                <div
+                  onClick={() => {
+                    setMessages(
+                      Array.isArray(chat.messages)
+                        ? chat.messages
+                        : []
+                    );
+
+                    closeMobileSidebar();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    flex: 1,
+                    minWidth: 0,
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      minWidth: "32px",
+                      borderRadius: "9px",
+                      background: "rgba(0,194,255,.08)",
+                      color: "#00C2FF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <FiMessageSquare size={15} />
+                  </div>
+
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                      color: "#E7F3FA",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {chat.title || "Percakapan baru"}
+                  </span>
+                </div>
+
+                <button
+                  onClick={(e) =>
+                    handleDeleteHistory(e, index)
+                  }
+                  aria-label="Hapus riwayat"
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "8px",
+                    background: "transparent",
+                    border: "none",
+                    color: "#71899A",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: ".2s",
+                  }}
+                >
+                  <FaTrash size={13} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ============================================
+            MENU BAWAH
+        ============================================= */}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "14px 18px 16px",
+            background: "#0B1D2A",
+            borderTop: "1px solid #1B3445",
+            boxShadow: "0 -5px 18px rgba(0,0,0,.15)",
+          }}
+        >
+          {/* Profil */}
+          <div
+            onClick={() => setProfileOpen(!profileOpen)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "11px",
+              marginBottom: "8px",
+              padding: "11px",
+              borderRadius: "12px",
+              background: "#122B3C",
+              cursor: "pointer",
+              border: "1px solid rgba(255,255,255,.035)",
+            }}
+          >
+            <FaUserCircle
+              size={34}
+              color="#00C2FF"
+            />
+
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: "600",
+                  fontSize: "14px",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user?.nama || "Belum Login"}
+              </div>
+
+              <small
+                style={{
+                  color: "#8A9BB5",
+                  fontSize: "11px",
+                  display: "block",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user?.email || "Masuk untuk menggunakan AI.Ind"}
+              </small>
+            </div>
+
+            {profileOpen ? (
+              <FiChevronUp color="#8A9BB5" />
+            ) : (
+              <FiChevronDown color="#8A9BB5" />
+            )}
+          </div>
+
+          {/* Pengaturan */}
+          <div
+            onClick={() => setSettingOpen(!settingOpen)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "9px 10px",
+              color: "#8A9BB5",
+              cursor: "pointer",
+              borderRadius: "9px",
+            }}
+          >
+            <FaCog />
+            <span style={{ flex: 1 }}>
+              Pengaturan
+            </span>
+
+            {settingOpen ? (
+              <FiChevronUp size={15} />
+            ) : (
+              <FiChevronDown size={15} />
+            )}
+          </div>
+
+          {settingOpen && (
+            <div
+              style={{
+                marginLeft: "18px",
+                marginTop: "5px",
+                marginBottom: "5px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "5px",
+              }}
+            >
+              {!user ? (
+                <div
+                  onClick={() => navigate("/login")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    color: "#fff",
+                    fontSize: "13px",
+                  }}
+                >
+                  <FaGoogle color="#4285F4" />
+                  Login dengan Google
+                </div>
+              ) : (
+                <div
+                  onClick={handleChangeAccount}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    color: "#fff",
+                    fontSize: "13px",
+                  }}
+                >
+                  <FaUserCircle color="#00C2FF" />
+                  Ganti Akun
+                </div>
+              )}
+
+              <div
+                onClick={handleLogout}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  color: "#ff6b6b",
+                  fontSize: "13px",
+                }}
+              >
+                <FaSignOutAlt />
+                Keluar
+              </div>
+            </div>
+          )}
+
+          {/* Tentang */}
+          <div
+            onClick={handleAbout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "11px 10px 4px",
+              marginTop: "5px",
+              color: "#8A9BB5",
+              cursor: "pointer",
+              flexShrink: 0,
+              position: "relative",
+              zIndex: 5,
+              borderTop: "1px solid rgba(255,255,255,.07)",
+            }}
+          >
+            <FaInfoCircle />
+            Tentang AI.Ind
+          </div>
         </div>
       </div>
-
-    </div>
-  </>
-);
+    </>
+  );
 }
 
 export default Sidebar;
