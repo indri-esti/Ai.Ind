@@ -23,9 +23,20 @@ function Home() {
 
   const chatEndRef = useRef(null);
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "{}"
-  );
+  const savedUser = localStorage.getItem("user");
+
+let user = {};
+
+try {
+  user = savedUser
+    ? JSON.parse(savedUser)
+    : {};
+} catch (error) {
+  console.error("Data user rusak:", error);
+  user = {};
+}
+
+const userId = Number(user?.id);
 
   // ==================================================
   // AUTO SCROLL
@@ -76,73 +87,121 @@ function Home() {
   // KIRIM PESAN
   // ==================================================
   const kirimPesan = async () => {
-    if (!message.trim() || loading) return;
+  if (!message.trim() || loading)
+    return;
 
-    const text = message;
+  // ==========================================
+  // CEK USER LOGIN
+  // ==========================================
 
-    setMessage("");
+  const savedUser =
+    localStorage.getItem("user");
+
+  let currentUser = {};
+
+  try {
+    currentUser = savedUser
+      ? JSON.parse(savedUser)
+      : {};
+  } catch (error) {
+    console.error(
+      "Data user tidak valid:",
+      error
+    );
+
+    currentUser = {};
+  }
+
+  const userId = Number(
+    currentUser?.id
+  );
+
+  if (
+    !Number.isInteger(userId) ||
+    userId <= 0
+  ) {
+    console.error(
+      "USER ID TIDAK VALID:",
+      currentUser
+    );
 
     setMessages((prev) => [
       ...prev,
       {
-        role: "user",
-        content: text,
+        role: "assistant",
+        content:
+          "Sesi login kamu tidak valid. Silakan logout lalu login kembali.",
       },
     ]);
 
-    setLoading(true);
+    return;
+  }
 
-    try {
-      const res = await axios.post(
-        "/chat",
-        {
-          message: text,
-          user_id: Number(user.id),
-          chat_id: currentChatId
-            ? Number(currentChatId)
-            : null,
-        }
+  const text = message;
+
+  setMessage("");
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "user",
+      content: text,
+    },
+  ]);
+
+  setLoading(true);
+
+  try {
+    const res = await axios.post(
+      "/chat",
+      {
+        message: text,
+        user_id: userId,
+        chat_id: currentChatId
+          ? Number(currentChatId)
+          : null,
+      }
+    );
+
+    if (res.data.chat_id) {
+      setCurrentChatId(
+        res.data.chat_id
       );
-
-      if (res.data.chat_id) {
-        setCurrentChatId(
-          res.data.chat_id
-        );
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            res.data.reply ||
-            "AI tidak memberikan jawaban.",
-        },
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      let errorMessage =
-        "Server tidak dapat dihubungi.";
-
-      if (err.response) {
-        errorMessage = `Error ${err.response.status}`;
-      } else if (err.request) {
-        errorMessage =
-          "Backend belum berjalan.";
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: errorMessage,
-        },
-      ]);
-    } finally {
-      setLoading(false);
     }
-  };
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content:
+          res.data.reply ||
+          "AI tidak memberikan jawaban.",
+      },
+    ]);
+  } catch (err) {
+    console.error(err);
+
+    let errorMessage =
+      "Server tidak dapat dihubungi.";
+
+    if (err.response) {
+      errorMessage = `Error ${err.response.status}`;
+    } else if (err.request) {
+      errorMessage =
+        "Backend belum berjalan.";
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: errorMessage,
+      },
+    ]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ==================================================
   // LOADING
