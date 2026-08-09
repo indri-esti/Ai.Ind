@@ -73,39 +73,43 @@ def bersihkan_jawaban(teks):
 
 def balas(pesan, history=None):
 
-    # =========================
+    # ==================================================
     # CEK API KEY
-    # =========================
+    # ==================================================
 
     if not API_KEY:
 
-        return "API Key belum ditemukan."
+        return (
+            "API Key Groq belum ditemukan. "
+            "Pastikan GROQ_API_KEY sudah ada "
+            "di file Backend/.env."
+        )
 
 
-    # =========================
+    # ==================================================
     # HISTORY
-    # =========================
+    # ==================================================
 
     if not isinstance(history, list):
 
         history = []
 
 
-    # =========================
+    # ==================================================
     # SYSTEM PROMPT
-    # =========================
+    # ==================================================
 
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_PROMPT
+            "content": str(SYSTEM_PROMPT)
         }
     ]
 
 
-    # =========================
+    # ==================================================
     # HISTORY CHAT
-    # =========================
+    # ==================================================
 
     for item in history:
 
@@ -133,9 +137,9 @@ def balas(pesan, history=None):
         })
 
 
-    # =========================
+    # ==================================================
     # PESAN TERBARU
-    # =========================
+    # ==================================================
 
     messages.append({
         "role": "user",
@@ -143,9 +147,9 @@ def balas(pesan, history=None):
     })
 
 
-    # =========================
-    # HEADER
-    # =========================
+    # ==================================================
+    # HEADER GROQ
+    # ==================================================
 
     headers = {
 
@@ -153,19 +157,13 @@ def balas(pesan, history=None):
             f"Bearer {API_KEY}",
 
         "Content-Type":
-            "application/json",
-
-        "HTTP-Referer":
-            "https://ai-ind.vercel.app/",
-
-        "X-Title":
-            "AI.Ind"
+            "application/json"
     }
 
 
-    # =========================
+    # ==================================================
     # REQUEST DATA
-    # =========================
+    # ==================================================
 
     data = {
 
@@ -183,6 +181,10 @@ def balas(pesan, history=None):
     }
 
 
+    # ==================================================
+    # REQUEST KE GROQ
+    # ==================================================
+
     try:
 
         response = requests.post(
@@ -197,25 +199,40 @@ def balas(pesan, history=None):
         )
 
 
-        # =========================
+        # ==================================================
         # CEK STATUS
-        # =========================
+        # ==================================================
 
         if response.status_code != 200:
-            print("========== OPENROUTER ERROR ==========")
-            print("STATUS:", response.status_code)
-            print("RESPONSE:", response.text)
-            print("======================================")
+
+            print(
+                "========== GROQ ERROR =========="
+            )
+
+            print(
+                "STATUS:",
+                response.status_code
+            )
+
+            print(
+                "RESPONSE:",
+                response.text
+            )
+
+            print(
+                "================================"
+            )
 
             return (
-                f"OpenRouter error HTTP {response.status_code}: "
+                f"Groq error HTTP "
+                f"{response.status_code}: "
                 f"{response.text[:500]}"
             )
 
 
-        # =========================
+        # ==================================================
         # PARSE RESPONSE
-        # =========================
+        # ==================================================
 
         try:
 
@@ -223,14 +240,19 @@ def balas(pesan, history=None):
 
         except ValueError:
 
+            print(
+                "Response Groq bukan JSON:",
+                response.text
+            )
+
             return (
                 "Response dari AI tidak valid."
             )
 
 
-        # =========================
+        # ==================================================
         # CHOICES
-        # =========================
+        # ==================================================
 
         choices = hasil.get(
             "choices"
@@ -240,7 +262,8 @@ def balas(pesan, history=None):
         if not choices:
 
             print(
-                "Response AI tidak memiliki choices:",
+                "Response AI tidak memiliki "
+                "choices:",
                 hasil
             )
 
@@ -250,9 +273,9 @@ def balas(pesan, history=None):
             )
 
 
-        # =========================
+        # ==================================================
         # MESSAGE
-        # =========================
+        # ==================================================
 
         message = choices[0].get(
             "message"
@@ -262,18 +285,20 @@ def balas(pesan, history=None):
         if not message:
 
             print(
-                "Response AI tidak memiliki message:",
+                "Response AI tidak memiliki "
+                "message:",
                 hasil
             )
 
             return (
-                "AI tidak memberikan jawaban yang valid."
+                "AI tidak memberikan jawaban "
+                "yang valid."
             )
 
 
-        # =========================
+        # ==================================================
         # CONTENT
-        # =========================
+        # ==================================================
 
         jawaban = message.get(
             "content"
@@ -296,9 +321,9 @@ def balas(pesan, history=None):
         ).strip()
 
 
-        # =========================
-        # BERSIHKAN
-        # =========================
+        # ==================================================
+        # BERSIHKAN JAWABAN
+        # ==================================================
 
         jawaban = bersihkan_jawaban(
             jawaban
@@ -316,14 +341,14 @@ def balas(pesan, history=None):
         return jawaban
 
 
-    # =========================
+    # ==================================================
     # TIMEOUT
-    # =========================
+    # ==================================================
 
     except requests.exceptions.Timeout:
 
         print(
-            "OpenRouter request timeout"
+            "Groq request timeout"
         )
 
         return (
@@ -332,26 +357,26 @@ def balas(pesan, history=None):
         )
 
 
-    # =========================
+    # ==================================================
     # CONNECTION ERROR
-    # =========================
+    # ==================================================
 
     except requests.exceptions.ConnectionError:
 
         print(
-            "Connection Error"
+            "Groq Connection Error"
         )
 
         return (
             "Tidak dapat terhubung ke "
-            "server AI. Periksa koneksi "
+            "server Groq. Periksa koneksi "
             "internet atau backend."
         )
 
 
-    # =========================
+    # ==================================================
     # ERROR LAIN
-    # =========================
+    # ==================================================
 
     except Exception as e:
 
