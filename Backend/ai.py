@@ -388,7 +388,7 @@ def balas(
             messages,
 
         "max_tokens":
-            1200,
+            500,
 
         "temperature":
             0.4
