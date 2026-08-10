@@ -12,16 +12,29 @@ app = Flask(__name__)
 
 CORS(app)
 
+# Batasi ukuran request.
+# Gambar dikirim sebagai Base64.
+app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+
 
 # ==================================================
 # DATABASE
 # ==================================================
 
 try:
+
     init_db()
-    print("Database berhasil diinisialisasi")
+
+    print(
+        "Database berhasil diinisialisasi"
+    )
+
 except Exception as e:
-    print("Database error:", repr(e))
+
+    print(
+        "Database error:",
+        repr(e)
+    )
 
 
 # ==================================================
@@ -39,8 +52,13 @@ app.register_blueprint(auth)
 def home():
 
     return jsonify({
-        "status": "AI.Ind Backend Running",
-        "message": "Backend siap digunakan"
+
+        "status":
+            "AI.Ind Backend Running",
+
+        "message":
+            "Backend siap digunakan"
+
     })
 
 
@@ -51,68 +69,110 @@ def home():
 @app.route("/chat", methods=["POST"])
 def chat():
 
+    conn = None
+
     try:
 
-        data = request.get_json()
+        data = request.get_json(
+            silent=True
+        )
+
+
+        # ==================================================
+        # CEK REQUEST
+        # ==================================================
 
         if not data:
 
             return jsonify({
-                "error": "Request body kosong"
+
+                "error":
+                    "Request body kosong"
+
             }), 400
 
 
-        # =========================
+        # ==================================================
         # DATA REQUEST
-        # =========================
+        # ==================================================
 
         pesan = data.get("message")
+
         user_id = data.get("user_id")
+
         chat_id = data.get("chat_id")
 
+        # Gambar Base64 / data URL
+        image = data.get("image")
 
-        # =========================
+
+        # ==================================================
         # VALIDASI PESAN
-        # =========================
+        # ==================================================
 
-        if not pesan or not str(pesan).strip():
+        # Pesan boleh kosong kalau ada gambar.
+        if (
+            not pesan
+            or not str(pesan).strip()
+        ):
 
-            return jsonify({
-                "error": "Pesan tidak boleh kosong"
-            }), 400
+            if not image:
+
+                return jsonify({
+
+                    "error":
+                        "Pesan atau gambar harus diisi"
+
+                }), 400
+
+            pesan = (
+                "Tolong analisis gambar ini."
+            )
 
 
-        # =========================
+        pesan = str(pesan).strip()
+
+
+        # ==================================================
         # VALIDASI LOGIN
-        # =========================
+        # ==================================================
 
         if not user_id:
 
             return jsonify({
-                "error": "User belum login"
+
+                "error":
+                    "User belum login"
+
             }), 401
 
 
         try:
+
             user_id = int(user_id)
+
         except (ValueError, TypeError):
 
             return jsonify({
-                "error": "User ID tidak valid"
+
+                "error":
+                    "User ID tidak valid"
+
             }), 400
 
 
-        # =========================
+        # ==================================================
         # DATABASE
-        # =========================
+        # ==================================================
 
         conn = get_connection()
+
         cursor = conn.cursor()
 
 
-        # =========================
+        # ==================================================
         # CEK USER
-        # =========================
+        # ==================================================
 
         cursor.execute(
             """
@@ -131,17 +191,27 @@ def chat():
             conn.close()
 
             return jsonify({
-                "error": "User tidak ditemukan"
+
+                "error":
+                    "User tidak ditemukan"
+
             }), 404
 
 
-        # =========================
+        # ==================================================
         # CHAT BARU
-        # =========================
+        # ==================================================
 
         if not chat_id:
 
-            title = str(pesan).strip()[:40]
+            if image and pesan == "Tolong analisis gambar ini.":
+
+                title = "Analisis gambar"
+
+            else:
+
+                title = pesan[:40]
+
 
             cursor.execute(
                 """
@@ -160,24 +230,29 @@ def chat():
             conn.commit()
 
 
-        # =========================
+        # ==================================================
         # VALIDASI CHAT ID
-        # =========================
+        # ==================================================
 
         try:
+
             chat_id = int(chat_id)
+
         except (ValueError, TypeError):
 
             conn.close()
 
             return jsonify({
-                "error": "Chat ID tidak valid"
+
+                "error":
+                    "Chat ID tidak valid"
+
             }), 400
 
 
-        # =========================
+        # ==================================================
         # CEK CHAT MILIK USER
-        # =========================
+        # ==================================================
 
         cursor.execute(
             """
@@ -199,13 +274,17 @@ def chat():
             conn.close()
 
             return jsonify({
-                "error": "Chat tidak ditemukan atau bukan milik akun ini"
+
+                "error":
+                    "Chat tidak ditemukan atau "
+                    "bukan milik akun ini"
+
             }), 404
 
 
-        # =========================
+        # ==================================================
         # AMBIL HISTORY CHAT
-        # =========================
+        # ==================================================
 
         cursor.execute(
             """
@@ -221,49 +300,72 @@ def chat():
 
         conn.close()
 
+        conn = None
 
-        # =========================
+
+        # ==================================================
         # UBAH HISTORY KE DICT
-        # =========================
+        # ==================================================
 
         history_data = []
 
         for item in history:
 
             role = item["role"]
+
             content = item["content"]
 
-            if role not in ["user", "assistant"]:
+
+            if role not in [
+                "user",
+                "assistant"
+            ]:
                 continue
+
 
             if not content:
                 continue
 
+
             history_data.append({
-                "role": role,
-                "content": str(content)
+
+                "role":
+                    role,
+
+                "content":
+                    str(content)
+
             })
 
 
-        # =========================
+        # ==================================================
         # KIRIM KE AI
-        # =========================
+        # ==================================================
 
         jawaban = balas(
-            str(pesan).strip(),
-            history_data
+
+            pesan,
+
+            history_data,
+
+            image
+
         )
 
 
-        # =========================
+        # ==================================================
         # SIMPAN PESAN
-        # =========================
+        # ==================================================
 
         conn = get_connection()
+
         cursor = conn.cursor()
 
 
-        # Pesan user
+        # ==================================================
+        # SIMPAN PESAN USER
+        # ==================================================
+
         cursor.execute(
             """
             INSERT INTO messages
@@ -272,13 +374,18 @@ def chat():
             """,
             (
                 chat_id,
+
                 "user",
-                str(pesan).strip()
+
+                pesan
             )
         )
 
 
-        # Jawaban AI
+        # ==================================================
+        # SIMPAN JAWABAN AI
+        # ==================================================
+
         cursor.execute(
             """
             INSERT INTO messages
@@ -287,48 +394,100 @@ def chat():
             """,
             (
                 chat_id,
+
                 "assistant",
+
                 str(jawaban)
             )
         )
 
 
         conn.commit()
+
         conn.close()
 
+        conn = None
 
-        # =========================
+
+        # ==================================================
         # RESPONSE
-        # =========================
+        # ==================================================
 
         return jsonify({
 
-            "success": True,
+            "success":
+                True,
 
-            "reply": jawaban,
+            "reply":
+                jawaban,
 
-            "chat_id": chat_id,
+            "chat_id":
+                chat_id,
+
+            "has_image":
+                bool(image),
 
             "user": {
-                "id": user["id"],
-                "nama": user["nama"],
-                "email": user["email"],
-                "foto": user["foto"]
+
+                "id":
+                    user["id"],
+
+                "nama":
+                    user["nama"],
+
+                "email":
+                    user["email"],
+
+                "foto":
+                    user["foto"]
+
             }
 
         })
 
 
+    # ==================================================
+    # REQUEST TERLALU BESAR
+    # ==================================================
+
     except Exception as e:
+
+        if conn:
+
+            try:
+                conn.close()
+            except Exception:
+                pass
+
 
         print(
             "Chat Error:",
             repr(e)
         )
 
+
         return jsonify({
-            "error": "Terjadi kesalahan server"
+
+            "error":
+                "Terjadi kesalahan server"
+
         }), 500
+
+
+# ==================================================
+# REQUEST TERLALU BESAR
+# ==================================================
+
+@app.errorhandler(413)
+def request_too_large(error):
+
+    return jsonify({
+
+        "error":
+            "Ukuran gambar terlalu besar. "
+            "Gunakan gambar maksimal sekitar 4 MB."
+
+    }), 413
 
 
 # ==================================================
@@ -339,8 +498,26 @@ def chat():
 def not_found(error):
 
     return jsonify({
-        "error": "Endpoint tidak ditemukan"
+
+        "error":
+            "Endpoint tidak ditemukan"
+
     }), 404
+
+
+# ==================================================
+# ERROR 500
+# ==================================================
+
+@app.errorhandler(500)
+def server_error(error):
+
+    return jsonify({
+
+        "error":
+            "Terjadi kesalahan server"
+
+    }), 500
 
 
 # ==================================================
@@ -361,12 +538,15 @@ if __name__ == "__main__":
     )
 
     app.run(
+
         host="0.0.0.0",
+
         port=int(
             os.environ.get(
                 "PORT",
                 5000
             )
         ),
+
         debug=False
     )

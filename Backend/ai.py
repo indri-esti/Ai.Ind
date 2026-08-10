@@ -1,6 +1,7 @@
 import requests
 import re
 
+
 from config import API_KEY, BASE_URL, MODEL
 from prompt import SYSTEM_PROMPT
 
@@ -33,10 +34,7 @@ def bersihkan_jawaban(teks):
     )
 
     # Hilangkan bold
-    teks = teks.replace(
-        "**",
-        ""
-    )
+    teks = teks.replace("**", "")
 
     # Hilangkan italic pada bullet
     teks = re.sub(
@@ -68,10 +66,44 @@ def bersihkan_jawaban(teks):
 
 
 # ==================================================
+# VALIDASI GAMBAR
+# ==================================================
+
+def validasi_gambar(image):
+
+    if not image:
+        return None
+
+    if not isinstance(image, str):
+        return None
+
+    image = image.strip()
+
+    # Groq menerima data URL seperti:
+    # data:image/jpeg;base64,xxxxx
+
+    if not image.startswith("data:image/"):
+        return None
+
+    if ";base64," not in image:
+        return None
+
+    # Batasi ukuran Base64 supaya tidak terlalu besar.
+    # Groq mempunyai batas sekitar 4 MB untuk base64 image.
+    if len(image) > 5_500_000:
+        raise ValueError(
+            "Ukuran gambar terlalu besar. "
+            "Kompres gambar terlebih dahulu."
+        )
+
+    return image
+
+
+# ==================================================
 # BALAS AI
 # ==================================================
 
-def balas(pesan, history=None):
+def balas(pesan, history=None, image=None):
 
     # ==================================================
     # CEK API KEY
@@ -91,8 +123,20 @@ def balas(pesan, history=None):
     # ==================================================
 
     if not isinstance(history, list):
-
         history = []
+
+
+    # ==================================================
+    # VALIDASI GAMBAR
+    # ==================================================
+
+    try:
+
+        image = validasi_gambar(image)
+
+    except ValueError as e:
+
+        return str(e)
 
 
     # ==================================================
@@ -119,17 +163,14 @@ def balas(pesan, history=None):
         role = item.get("role")
         content = item.get("content")
 
-
         if role not in [
             "user",
             "assistant"
         ]:
             continue
 
-
         if not content:
             continue
-
 
         messages.append({
             "role": role,
@@ -141,9 +182,37 @@ def balas(pesan, history=None):
     # PESAN TERBARU
     # ==================================================
 
+    # Kalau ada gambar, content harus berupa ARRAY
+    # berisi text + image_url.
+    if image:
+
+        user_content = [
+            {
+                "type": "text",
+                "text": (
+                    str(pesan).strip()
+                    if pesan and str(pesan).strip()
+                    else
+                    "Tolong analisis gambar ini dan jelaskan "
+                    "apa yang terlihat di dalamnya."
+                )
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image
+                }
+            }
+        ]
+
+    else:
+
+        user_content = str(pesan).strip()
+
+
     messages.append({
         "role": "user",
-        "content": str(pesan)
+        "content": user_content
     })
 
 
@@ -254,16 +323,13 @@ def balas(pesan, history=None):
         # CHOICES
         # ==================================================
 
-        choices = hasil.get(
-            "choices"
-        )
+        choices = hasil.get("choices")
 
 
         if not choices:
 
             print(
-                "Response AI tidak memiliki "
-                "choices:",
+                "Response AI tidak memiliki choices:",
                 hasil
             )
 
@@ -277,16 +343,13 @@ def balas(pesan, history=None):
         # MESSAGE
         # ==================================================
 
-        message = choices[0].get(
-            "message"
-        )
+        message = choices[0].get("message")
 
 
         if not message:
 
             print(
-                "Response AI tidak memiliki "
-                "message:",
+                "Response AI tidak memiliki message:",
                 hasil
             )
 
@@ -300,9 +363,7 @@ def balas(pesan, history=None):
         # CONTENT
         # ==================================================
 
-        jawaban = message.get(
-            "content"
-        )
+        jawaban = message.get("content")
 
 
         if (
@@ -316,9 +377,7 @@ def balas(pesan, history=None):
             )
 
 
-        jawaban = str(
-            jawaban
-        ).strip()
+        jawaban = str(jawaban).strip()
 
 
         # ==================================================

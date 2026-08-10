@@ -25,7 +25,8 @@ GROQ_BASE_URL = (
 )
 
 # Model Groq
-MODEL = "llama-3.3-70b-versatile"
+# Mendukung text + image input
+MODEL = "qwen/qwen3.6-27b"
 
 
 # ==================================================
