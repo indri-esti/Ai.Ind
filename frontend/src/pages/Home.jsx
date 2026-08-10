@@ -11,6 +11,51 @@ import Typing from "../components/Typing";
 import Sidebar from "../components/Sidebar";
 
 function Home() {
+  
+  // ==================================================
+  // BERSIHKAN RESPONSE AI
+  // ==================================================
+
+  const bersihkanJawabanAI = (teks) => {
+
+    if (!teks) {
+      return "";
+    }
+
+    let hasil = String(teks);
+
+    // Hapus <think>...</think>
+    hasil = hasil.replace(
+      /<think>[\s\S]*?<\/think>/gi,
+      ""
+    );
+
+    // Hapus <think> jika tidak ada penutup
+    hasil = hasil.replace(
+      /<think>[\s\S]*$/gi,
+      ""
+    );
+
+    // Hapus tag think yang tersisa
+    hasil = hasil.replace(
+      /<\/?think>/gi,
+      ""
+    );
+
+    // Hapus "Here's a thinking process..."
+    hasil = hasil.replace(
+      /^\s*(Here's|Heres|Here is)\s+a\s+thinking\s+process\s*:[\s\S]*$/i,
+      ""
+    );
+
+    // Rapikan baris kosong
+    hasil = hasil.replace(
+      /\n{3,}/g,
+      "\n\n"
+    );
+
+    return hasil.trim();
+  };
 
   // ==================================================
   // STATE
@@ -452,24 +497,27 @@ function Home() {
         // JAWABAN AI
         // ==================================================
 
-        setMessages(
-          (prev) => [
+        // ==================================================
+// JAWABAN AI
+// ==================================================
 
-            ...prev,
+const jawabanAI =
+  bersihkanJawabanAI(
+    res.data?.reply
+  );
 
-            {
+setMessages(
+  (prev) => [
+    ...prev,
+    {
+      role: "assistant",
 
-              role:
-                "assistant",
-
-              content:
-                res.data?.reply ||
-                "AI tidak memberikan jawaban.",
-
-            },
-
-          ]
-        );
+      content:
+        jawabanAI ||
+        "AI tidak memberikan jawaban.",
+    },
+  ]
+);
 
 
         // ==================================================
