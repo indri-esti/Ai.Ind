@@ -24,16 +24,17 @@ function ChatInput({
     }
 
     /*
-     * Jangan hapus gambar di sini.
+     * Gambar TIDAK dihapus di sini.
      *
-     * Home.jsx yang bertanggung jawab untuk:
+     * Home.jsx yang menangani:
      * 1. Mengambil selectedImage
-     * 2. Memasukkan gambar + teks ke messages
-     * 3. Mengirim gambar ke backend
-     * 4. Menghapus preview setelah berhasil diproses
+     * 2. Mengubah gambar ke Base64
+     * 3. Memasukkan gambar + teks ke messages
+     * 4. Mengirim gambar ke backend
+     * 5. Menghapus preview setelah gambar masuk ke pesan
      *
-     * Dengan begitu gambar tidak muncul double
-     * dan tidak pecah antara preview dan bubble chat.
+     * Dengan begitu gambar hanya muncul satu kali
+     * di bubble pesan user dan tidak double.
      */
     kirimPesan();
   };

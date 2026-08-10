@@ -386,26 +386,14 @@ function Home() {
         // TAMPILKAN PESAN USER
         // ==================================================
 
-        setMessages(
-          (prev) => [
-
-            ...prev,
-
-            {
-
-              role: "user",
-
-              content:
-                pesanText,
-
-              image:
-                imagePreview ||
-                null,
-
-            },
-
-          ]
-        );
+        setMessages((prev) => [
+  ...prev,
+  {
+    role: "user",
+    content: pesanText,
+    image: imagePreview || null,
+  },
+]);
 
 
         // ==================================================
