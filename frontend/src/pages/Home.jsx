@@ -1,4 +1,7 @@
 import { Row, Col } from "react-bootstrap";
+
+import { FiPlus, FiX, FiImage } from "react-icons/fi";
+
 import { useState, useEffect, useRef } from "react";
 import axios from "../api";
 
@@ -10,8 +13,55 @@ import Typing from "../components/Typing";
 import Sidebar from "../components/Sidebar";
 
 function Home() {
+  
+  // ==================================================
+// PILIH GAMBAR
+// ==================================================
+const pilihGambar = (event) => {
+  const file = event.target.files?.[0];
+
+  if (!file) return;
+
+  // Hanya gambar
+  if (!file.type.startsWith("image/")) {
+    alert("Silakan pilih file gambar.");
+    return;
+  }
+
+  // Batas 10 MB
+  if (file.size > 10 * 1024 * 1024) {
+    alert("Ukuran gambar maksimal 10 MB.");
+    return;
+  }
+
+  setSelectedImage(file);
+
+  const previewUrl = URL.createObjectURL(file);
+  setImagePreview(previewUrl);
+};
+
+const hapusGambar = () => {
+  setSelectedImage(null);
+
+  if (imagePreview) {
+    URL.revokeObjectURL(imagePreview);
+  }
+
+  setImagePreview(null);
+
+  if (fileInputRef.current) {
+    fileInputRef.current.value = "";
+  }
+};
+  
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([]);
+const [messages, setMessages] = useState([]);
+
+const [selectedImage, setSelectedImage] = useState(null);
+const [imagePreview, setImagePreview] = useState(null);
+
+const fileInputRef = useRef(null);
+
 
   const [history, setHistory] = useState([]);
 
@@ -73,8 +123,8 @@ function Home() {
   // KIRIM PESAN
   // ==================================================
   const kirimPesan = async () => {
-    if (!message.trim() || loading)
-      return;
+    if ((!message.trim() && !selectedImage) || loading)
+  return;
 
     // ==========================================
     // CEK USER LOGIN
@@ -125,15 +175,16 @@ function Home() {
 
     const text = message;
 
-    setMessage("");
+setMessage("");
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: text,
-      },
-    ]);
+setMessages((prev) => [
+  ...prev,
+  {
+    role: "user",
+    content: text,
+    image: imagePreview,
+  },
+]);
 
     setLoading(true);
 
@@ -858,13 +909,67 @@ function Home() {
           ========================================== */}
           <div className="home-input-area">
             <div className="home-input-container">
+              
+              {imagePreview && (
+  <div className="home-image-preview">
+    <div className="home-image-preview-inner">
 
-              <ChatInput
-                message={message}
-                setMessage={setMessage}
-                kirimPesan={kirimPesan}
-                loading={loading}
-              />
+      <img
+        src={imagePreview}
+        alt="Preview"
+      />
+
+      <button
+        type="button"
+        className="home-image-remove"
+        onClick={hapusGambar}
+        title="Hapus gambar"
+      >
+        <FiX size={16} />
+      </button>
+
+      <div className="home-image-label">
+        <FiImage size={14} />
+        Gambar siap dianalisis
+      </div>
+
+    </div>
+  </div>
+)}
+
+             <div className="home-input-row">
+
+  {/* INPUT GAMBAR */}
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept="image/*"
+    onChange={pilihGambar}
+    style={{ display: "none" }}
+  />
+
+  {/* TOMBOL PLUS */}
+  <button
+    type="button"
+    className="home-plus-button"
+    onClick={() => fileInputRef.current?.click()}
+    disabled={loading}
+    title="Tambahkan gambar"
+  >
+    <FiPlus size={22} />
+  </button>
+
+  {/* CHAT INPUT */}
+  <div className="home-chat-input-wrapper">
+    <ChatInput
+      message={message}
+      setMessage={setMessage}
+      kirimPesan={kirimPesan}
+      loading={loading}
+    />
+  </div>
+
+</div>
 
               <div className="home-disclaimer">
                 AI.Ind dapat membuat
