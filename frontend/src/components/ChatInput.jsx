@@ -62,7 +62,6 @@ function ChatInput({
               }}
             />
 
-            {/* HAPUS GAMBAR */}
             <button
               type="button"
               onClick={hapusGambar}
@@ -81,7 +80,7 @@ function ChatInput({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 padding: 0,
               }}
             >
@@ -108,7 +107,10 @@ function ChatInput({
           onSubmit={(e) => {
             e.preventDefault();
 
-            if (!loading && (message.trim() || imagePreview)) {
+            if (
+              !loading &&
+              (message.trim() || imagePreview)
+            ) {
               kirimPesan();
             }
           }}
@@ -121,11 +123,11 @@ function ChatInput({
               width: "100%",
             }}
           >
-            {/* INPUT FILE TERSEMBUNYI */}
+            {/* INPUT FILE */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={pilihGambar}
               style={{ display: "none" }}
             />
@@ -134,17 +136,22 @@ function ChatInput({
             <button
               type="button"
               className="home-plus-button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (!loading) {
+                  fileInputRef.current?.click();
+                }
+              }}
               disabled={loading}
               aria-label="Tambah gambar"
               title="Tambah gambar"
             >
-              <FiPlus size={23} strokeWidth={2.5} />
+              <FiPlus
+                size={23}
+                strokeWidth={2.5}
+              />
             </button>
 
-            {/* =========================
-                INPUT CHAT
-            ========================== */}
+            {/* INPUT CHAT */}
             <div
               style={{
                 flex: 1,
@@ -155,8 +162,10 @@ function ChatInput({
                 background: "#13283F",
                 borderRadius: 28,
                 padding: "7px 8px 7px 18px",
-                border: "1px solid rgba(255,255,255,.08)",
-                boxShadow: "0 8px 25px rgba(0,0,0,.25)",
+                border:
+                  "1px solid rgba(255,255,255,.08)",
+                boxShadow:
+                  "0 8px 25px rgba(0,0,0,.25)",
                 boxSizing: "border-box",
               }}
             >
@@ -164,14 +173,20 @@ function ChatInput({
                 as="textarea"
                 rows={1}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) =>
+                  setMessage(e.target.value)
+                }
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (
+                    e.key === "Enter" &&
+                    !e.shiftKey
+                  ) {
                     e.preventDefault();
 
                     if (
                       !loading &&
-                      (message.trim() || imagePreview)
+                      (message.trim() ||
+                        imagePreview)
                     ) {
                       kirimPesan();
                     }
@@ -202,7 +217,8 @@ function ChatInput({
                 type="submit"
                 disabled={
                   loading ||
-                  (!message.trim() && !imagePreview)
+                  (!message.trim() &&
+                    !imagePreview)
                 }
                 style={{
                   width: 46,
@@ -212,7 +228,8 @@ function ChatInput({
                   border: "none",
                   background:
                     loading ||
-                    (!message.trim() && !imagePreview)
+                    (!message.trim() &&
+                      !imagePreview)
                       ? "#4B647A"
                       : "#00C2FF",
                   display: "flex",
@@ -242,7 +259,8 @@ function ChatInput({
             paddingBottom: 2,
           }}
         >
-          AI.Ind dapat membuat kesalahan. Selalu periksa kembali jawaban penting.
+          AI.Ind dapat membuat kesalahan. Selalu periksa
+          kembali jawaban penting.
         </div>
       </div>
     </div>

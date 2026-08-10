@@ -11,240 +11,552 @@ import Typing from "../components/Typing";
 import Sidebar from "../components/Sidebar";
 
 function Home() {
-  
+
   // ==================================================
-// PILIH GAMBAR
-// ==================================================
-const pilihGambar = (event) => {
-  const file = event.target.files?.[0];
+  // STATE
+  // ==================================================
 
-  if (!file) return;
+  const [message, setMessage] =
+    useState("");
 
-  // Hanya gambar
-  if (!file.type.startsWith("image/")) {
-    alert("Silakan pilih file gambar.");
-    return;
-  }
+  const [messages, setMessages] =
+    useState([]);
 
-  // Batas 10 MB
-  if (file.size > 10 * 1024 * 1024) {
-    alert("Ukuran gambar maksimal 10 MB.");
-    return;
-  }
+  const [selectedImage, setSelectedImage] =
+    useState(null);
 
-  setSelectedImage(file);
+  const [imagePreview, setImagePreview] =
+    useState(null);
 
-  const previewUrl = URL.createObjectURL(file);
-  setImagePreview(previewUrl);
-};
+  const fileInputRef =
+    useRef(null);
 
-const hapusGambar = () => {
-  setSelectedImage(null);
+  const [history, setHistory] =
+    useState([]);
 
-  if (imagePreview) {
-    URL.revokeObjectURL(imagePreview);
-  }
+  const [loading, setLoading] =
+    useState(false);
 
-  setImagePreview(null);
-
-  if (fileInputRef.current) {
-    fileInputRef.current.value = "";
-  }
-};
-  
-  const [message, setMessage] = useState("");
-const [messages, setMessages] = useState([]);
-
-const [selectedImage, setSelectedImage] = useState(null);
-const [imagePreview, setImagePreview] = useState(null);
-
-const fileInputRef = useRef(null);
-
-
-  const [history, setHistory] = useState([]);
-
-  const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
+  const [pageLoading, setPageLoading] =
+    useState(true);
 
   const [currentChatId, setCurrentChatId] =
     useState(null);
 
-  const chatEndRef = useRef(null);
+  const chatEndRef =
+    useRef(null);
+
+
+  // ==================================================
+  // PILIH GAMBAR
+  // ==================================================
+
+  const pilihGambar = (event) => {
+
+    const file =
+      event.target.files?.[0];
+
+    if (!file) return;
+
+
+    // Hanya gambar
+    if (!file.type.startsWith("image/")) {
+
+      alert(
+        "Silakan pilih file gambar."
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+
+    // Batas 10 MB
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+
+      alert(
+        "Ukuran gambar maksimal 10 MB."
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+
+    setSelectedImage(file);
+
+
+    const previewUrl =
+      URL.createObjectURL(file);
+
+    setImagePreview(
+      previewUrl
+    );
+  };
+
+
+  // ==================================================
+  // HAPUS GAMBAR
+  // ==================================================
+
+  const hapusGambar = () => {
+
+    setSelectedImage(null);
+
+
+    if (imagePreview) {
+
+      URL.revokeObjectURL(
+        imagePreview
+      );
+
+    }
+
+
+    setImagePreview(null);
+
+
+    if (
+      fileInputRef.current
+    ) {
+
+      fileInputRef.current.value =
+        "";
+
+    }
+  };
 
 
   // ==================================================
   // AUTO SCROLL
   // ==================================================
+
   useEffect(() => {
+
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages, loading]);
+
+  }, [
+    messages,
+    loading,
+  ]);
+
 
   // ==================================================
   // PAGE LOADING
   // ==================================================
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPageLoading(false);
-    }, 1800);
 
-    return () => clearTimeout(timer);
+  useEffect(() => {
+
+    const timer =
+      setTimeout(() => {
+
+        setPageLoading(false);
+
+      }, 1800);
+
+
+    return () =>
+      clearTimeout(timer);
+
   }, []);
+
 
   // ==================================================
   // CHAT BARU
   // ==================================================
+
   const chatBaru = () => {
-    if (messages.length > 0) {
+
+    if (
+      messages.length > 0
+    ) {
+
       const chat = {
+
         id: Date.now(),
+
         title:
           messages.find(
-            (m) => m.role === "user"
+            (m) =>
+              m.role === "user"
           )?.content ||
           "Percakapan Baru",
+
         messages,
+
       };
 
+
       setHistory((prev) => [
+
         chat,
+
         ...prev,
+
       ]);
     }
 
+
     setMessages([]);
+
     setCurrentChatId(null);
+
+    hapusGambar();
   };
+
+
+  // ==================================================
+  // GAMBAR → BASE64
+  // ==================================================
+
+  const fileToBase64 = (file) => {
+
+    return new Promise(
+      (resolve, reject) => {
+
+        const reader =
+          new FileReader();
+
+
+        reader.onload = () => {
+
+          resolve(
+            reader.result
+          );
+
+        };
+
+
+        reader.onerror = () => {
+
+          reject(
+            new Error(
+              "Gagal membaca gambar."
+            )
+          );
+
+        };
+
+
+        reader.readAsDataURL(
+          file
+        );
+
+      }
+    );
+  };
+
 
   // ==================================================
   // KIRIM PESAN
   // ==================================================
-  const kirimPesan = async () => {
-    if ((!message.trim() && !selectedImage) || loading)
-  return;
 
-    // ==========================================
-    // CEK USER LOGIN
-    // ==========================================
+  const kirimPesan =
+    async () => {
 
-    const savedUser =
-      localStorage.getItem("user");
+      if (
+        (!message.trim() &&
+          !selectedImage) ||
+        loading
+      ) {
 
-    let currentUser = {};
+        return;
 
-    try {
-      currentUser = savedUser
-        ? JSON.parse(savedUser)
-        : {};
-    } catch (error) {
-      console.error(
-        "Data user tidak valid:",
-        error
-      );
-
-      currentUser = {};
-    }
-
-    const userId = Number(
-      currentUser?.id
-    );
-
-    if (
-      !Number.isInteger(userId) ||
-      userId <= 0
-    ) {
-      console.error(
-        "USER ID TIDAK VALID:",
-        currentUser
-      );
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "Sesi login kamu tidak valid. Silakan logout lalu login kembali.",
-        },
-      ]);
-
-      return;
-    }
-
-    const text = message;
-
-setMessage("");
-
-setMessages((prev) => [
-  ...prev,
-  {
-    role: "user",
-    content: text,
-    image: imagePreview,
-  },
-]);
-
-    setLoading(true);
-
-    try {
-      const res = await axios.post(
-        "/chat",
-        {
-          message: text,
-          user_id: userId,
-          chat_id: currentChatId
-            ? Number(currentChatId)
-            : null,
-        }
-      );
-
-      if (res.data.chat_id) {
-  setCurrentChatId(
-    res.data.chat_id
-  );
-}
-
-hapusGambar();
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            res.data.reply ||
-            "AI tidak memberikan jawaban.",
-        },
-      ]);
-    } catch (err) {
-      console.error(err);
-
-      let errorMessage =
-        "Server tidak dapat dihubungi.";
-
-      if (err.response) {
-        errorMessage = `Error ${err.response.status}`;
-      } else if (err.request) {
-        errorMessage =
-          "Backend belum berjalan.";
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: errorMessage,
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      // ==================================================
+      // CEK USER LOGIN
+      // ==================================================
+
+      const savedUser =
+        localStorage.getItem(
+          "user"
+        );
+
+
+      let currentUser = {};
+
+
+      try {
+
+        currentUser =
+          savedUser
+            ? JSON.parse(
+                savedUser
+              )
+            : {};
+
+      } catch (error) {
+
+        console.error(
+          "Data user tidak valid:",
+          error
+        );
+
+        currentUser = {};
+
+      }
+
+
+      const userId =
+        Number(
+          currentUser?.id
+        );
+
+
+      if (
+        !Number.isInteger(
+          userId
+        ) ||
+        userId <= 0
+      ) {
+
+        console.error(
+          "USER ID TIDAK VALID:",
+          currentUser
+        );
+
+
+        setMessages(
+          (prev) => [
+
+            ...prev,
+
+            {
+
+              role:
+                "assistant",
+
+              content:
+                "Sesi login kamu tidak valid. Silakan logout lalu login kembali.",
+
+            },
+
+          ]
+        );
+
+
+        return;
+      }
+
+
+      try {
+
+        setLoading(true);
+
+
+        // ==================================================
+        // PESAN
+        // ==================================================
+
+        const pesanText =
+          message.trim() ||
+          "Tolong analisis gambar ini.";
+
+
+        // ==================================================
+        // GAMBAR → BASE64
+        // ==================================================
+
+        let imageBase64 =
+          null;
+
+
+        if (
+          selectedImage
+        ) {
+
+          imageBase64 =
+            await fileToBase64(
+              selectedImage
+            );
+
+        }
+
+
+        // ==================================================
+        // TAMPILKAN PESAN USER
+        // ==================================================
+
+        setMessages(
+          (prev) => [
+
+            ...prev,
+
+            {
+
+              role: "user",
+
+              content:
+                pesanText,
+
+              image:
+                imagePreview ||
+                null,
+
+            },
+
+          ]
+        );
+
+
+        // ==================================================
+        // BERSIHKAN INPUT
+        // ==================================================
+
+        setMessage("");
+
+
+        // ==================================================
+        // KIRIM KE BACKEND
+        // ==================================================
+
+        const res =
+          await axios.post(
+            "/chat",
+            {
+
+              message:
+                pesanText,
+
+              user_id:
+                userId,
+
+              chat_id:
+                currentChatId
+                  ? Number(
+                      currentChatId
+                    )
+                  : null,
+
+              // GAMBAR
+              image:
+                imageBase64,
+
+            }
+          );
+
+
+        // ==================================================
+        // CHAT ID
+        // ==================================================
+
+        if (
+          res.data?.chat_id
+        ) {
+
+          setCurrentChatId(
+            res.data.chat_id
+          );
+
+        }
+
+
+        // ==================================================
+        // JAWABAN AI
+        // ==================================================
+
+        setMessages(
+          (prev) => [
+
+            ...prev,
+
+            {
+
+              role:
+                "assistant",
+
+              content:
+                res.data?.reply ||
+                "AI tidak memberikan jawaban.",
+
+            },
+
+          ]
+        );
+
+
+        // ==================================================
+        // HAPUS GAMBAR SETELAH TERKIRIM
+        // ==================================================
+
+        hapusGambar();
+
+
+      } catch (err) {
+
+        console.error(
+          "Kirim pesan error:",
+          err
+        );
+
+
+        let errorMessage =
+          "Server tidak dapat dihubungi.";
+
+
+        if (
+          err.response
+        ) {
+
+          errorMessage =
+            err.response?.data?.error ||
+            `Error ${err.response.status}`;
+
+        } else if (
+          err.request
+        ) {
+
+          errorMessage =
+            "Backend belum berjalan.";
+
+        }
+
+
+        setMessages(
+          (prev) => [
+
+            ...prev,
+
+            {
+
+              role:
+                "assistant",
+
+              content:
+                errorMessage,
+
+            },
+
+          ]
+        );
+
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
 
   // ==================================================
   // LOADING
   // ==================================================
+
   if (pageLoading) {
+
     return <Loading />;
+
   }
 
   // ==================================================
