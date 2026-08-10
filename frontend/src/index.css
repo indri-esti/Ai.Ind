@@ -209,7 +209,7 @@ svg {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .home-chat-input-wrapper {
@@ -220,55 +220,47 @@ svg {
 .home-plus-button {
   width: 48px;
   height: 48px;
+  min-width: 48px;
   flex: 0 0 48px;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  border: 1px solid rgba(24, 216, 255, .20);
+  border: 1px solid rgba(24, 216, 255, 0.3);
   border-radius: 16px;
 
-  background:
-    linear-gradient(
-      135deg,
-      rgba(24,216,255,.15),
-      rgba(0,143,232,.08)
-    );
+  background: linear-gradient(
+    135deg,
+    rgba(24, 216, 255, 0.18),
+    rgba(0, 143, 232, 0.12)
+  );
 
-  color: #18D8FF;
+  color: #18d8ff;
 
   cursor: pointer;
 
-  box-shadow:
-    0 8px 25px rgba(0,194,255,.08);
+  box-shadow: 0 8px 25px rgba(0, 194, 255, 0.1);
 
-  transition:
-    transform .2s ease,
-    background .2s ease,
-    box-shadow .2s ease;
+  transition: all 0.2s ease;
 }
 
 .home-plus-button:hover {
-  transform: translateY(-2px) rotate(90deg);
+  background: linear-gradient(
+    135deg,
+    rgba(24, 216, 255, 0.3),
+    rgba(0, 143, 232, 0.2)
+  );
 
-  background:
-    linear-gradient(
-      135deg,
-      rgba(24,216,255,.25),
-      rgba(0,143,232,.15)
-    );
-
-  box-shadow:
-    0 10px 30px rgba(0,194,255,.18);
+  transform: translateY(-2px);
 }
 
 .home-plus-button:active {
-  transform: scale(.94);
+  transform: scale(0.94);
 }
 
 .home-plus-button:disabled {
-  opacity: .5;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -291,12 +283,11 @@ svg {
 
   border-radius: 16px;
 
-  background: rgba(18,43,60,.85);
+  background: rgba(18, 43, 60, 0.85);
 
-  border: 1px solid rgba(24,216,255,.18);
+  border: 1px solid rgba(24, 216, 255, 0.18);
 
-  box-shadow:
-    0 10px 30px rgba(0,0,0,.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
 }
 
 .home-image-preview img {
@@ -325,7 +316,7 @@ svg {
   align-items: center;
   justify-content: center;
 
-  border: 1px solid rgba(255,255,255,.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 
   border-radius: 50%;
 
@@ -335,7 +326,7 @@ svg {
 
   cursor: pointer;
 
-  box-shadow: 0 5px 15px rgba(0,0,0,.3);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
 .home-image-label {
@@ -345,7 +336,7 @@ svg {
 
   margin-top: 5px;
 
-  color: #8A9BB5;
+  color: #8a9bb5;
 
   font-size: 10px;
 }
@@ -384,22 +375,16 @@ svg {
   }
 }
 
-.home-input-row {
-  gap: 7px;
-}
+/* ==========================================
+   MOBILE CHAT INPUT
+========================================== */
 
-.home-plus-button {
-  width: 44px;
-  height: 44px;
-  flex-basis: 44px;
-  border-radius: 14px;
-}
-
-.home-image-preview-inner {
-  max-width: 180px;
-}
-
-.home-image-preview img {
-  width: 150px;
-  max-height: 120px;
+@media (max-width: 768px) {
+  .home-plus-button {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    flex-basis: 46px;
+    border-radius: 15px;
+  }
 }

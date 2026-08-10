@@ -1,7 +1,5 @@
 import { Row, Col } from "react-bootstrap";
-
 import { FiPlus, FiX, FiImage } from "react-icons/fi";
-
 import { useState, useEffect, useRef } from "react";
 import axios from "../api";
 
@@ -201,10 +199,12 @@ setMessages((prev) => [
       );
 
       if (res.data.chat_id) {
-        setCurrentChatId(
-          res.data.chat_id
-        );
-      }
+  setCurrentChatId(
+    res.data.chat_id
+  );
+}
+
+hapusGambar();
 
       setMessages((prev) => [
         ...prev,
@@ -905,73 +905,85 @@ setMessages((prev) => [
           </div>
 
           {/* ==========================================
-              INPUT AREA
-          ========================================== */}
-          <div className="home-input-area">
-            <div className="home-input-container">
-              
-              {imagePreview && (
-  <div className="home-image-preview">
-    <div className="home-image-preview-inner">
+    INPUT AREA
+========================================== */}
+<div className="home-input-area">
+  <div className="home-input-container">
 
-      <img
-        src={imagePreview}
-        alt="Preview"
+    {/* PREVIEW GAMBAR */}
+    {imagePreview && (
+      <div className="home-image-preview">
+        <div className="home-image-preview-inner">
+
+          <img
+            src={imagePreview}
+            alt="Preview gambar"
+          />
+
+          <button
+            type="button"
+            className="home-image-remove"
+            onClick={hapusGambar}
+            title="Hapus gambar"
+          >
+            <FiX size={16} />
+          </button>
+
+          <div className="home-image-label">
+            <FiImage size={14} />
+            Gambar siap dianalisis
+          </div>
+
+        </div>
+      </div>
+    )}
+
+    {/* INPUT ROW */}
+    <div className="home-input-row">
+
+      {/* FILE INPUT TERSEMBUNYI */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={pilihGambar}
+        style={{ display: "none" }}
       />
 
+      {/* TOMBOL + */}
       <button
         type="button"
-        className="home-image-remove"
-        onClick={hapusGambar}
-        title="Hapus gambar"
+        className="home-plus-button"
+        onClick={() => {
+          fileInputRef.current?.click();
+        }}
+        disabled={loading}
+        aria-label="Tambah gambar"
+        title="Tambah gambar"
       >
-        <FiX size={16} />
+        <FiPlus size={23} strokeWidth={2.5} />
       </button>
 
-      <div className="home-image-label">
-        <FiImage size={14} />
-        Gambar siap dianalisis
+      {/* CHAT INPUT */}
+      <div className="home-chat-input-wrapper">
+        <ChatInput
+          message={message}
+          setMessage={setMessage}
+          kirimPesan={kirimPesan}
+          loading={loading}
+        />
       </div>
 
     </div>
+
+    <div className="home-disclaimer">
+      AI.Ind dapat membuat
+      kesalahan. Periksa kembali
+      informasi penting.
+    </div>
+
   </div>
-)}
-
-             <div className="home-input-row">
-
-  {/* INPUT GAMBAR */}
-  <input
-    ref={fileInputRef}
-    type="file"
-    accept="image/*"
-    onChange={pilihGambar}
-    style={{ display: "none" }}
-  />
-
-  {/* TOMBOL PLUS */}
-  <button
-    type="button"
-    className="home-plus-button"
-    onClick={() => fileInputRef.current?.click()}
-    disabled={loading}
-    title="Tambahkan gambar"
-  >
-    <FiPlus size={22} />
-  </button>
-
-  {/* CHAT INPUT */}
-  <div className="home-chat-input-wrapper">
-    <ChatInput
-      message={message}
-      setMessage={setMessage}
-      kirimPesan={kirimPesan}
-      loading={loading}
-    />
-  </div>
-
 </div>
-
-              <div className="home-disclaimer">
                 AI.Ind dapat membuat
                 kesalahan. Periksa kembali
                 informasi penting.
