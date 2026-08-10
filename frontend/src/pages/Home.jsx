@@ -940,14 +940,16 @@ hapusGambar();
 
               {/* INPUT ROW */}
              <div className="home-input-row">
-  <ChatInput
-    message={message}
-    setMessage={setMessage}
-    kirimPesan={kirimPesan}
-    loading={loading}
-    fileInputRef={fileInputRef}
-    pilihGambar={pilihGambar}
-  />
+ <ChatInput
+  message={message}
+  setMessage={setMessage}
+  kirimPesan={kirimPesan}
+  loading={loading}
+  fileInputRef={fileInputRef}
+  pilihGambar={pilihGambar}
+  imagePreview={imagePreview}
+  hapusGambar={hapusGambar}
+/>
 </div>
 
               {/* DISCLAIMER */}
