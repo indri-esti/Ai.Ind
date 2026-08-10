@@ -12,6 +12,32 @@ function ChatInput({
   imagePreview,
   hapusGambar,
 }) {
+  // ==================================================
+  // KIRIM PESAN
+  // ==================================================
+  const handleKirim = () => {
+    if (
+      loading ||
+      (!message.trim() && !imagePreview)
+    ) {
+      return;
+    }
+
+    /*
+     * kirimPesan() dipanggil terlebih dahulu supaya
+     * Home.jsx masih bisa mengambil selectedImage.
+     *
+     * Setelah itu preview input langsung dihapus.
+     * Gambar yang sudah dimasukkan ke messages tetap
+     * tampil di bubble chat.
+     */
+    kirimPesan();
+
+    setTimeout(() => {
+      hapusGambar();
+    }, 0);
+  };
+
   return (
     <div
       style={{
@@ -35,7 +61,7 @@ function ChatInput({
         {/* =========================
             PREVIEW GAMBAR
         ========================== */}
-        {imagePreview && (
+        {imagePreview && !loading && (
           <div
             style={{
               marginBottom: 8,
@@ -62,6 +88,7 @@ function ChatInput({
               }}
             />
 
+            {/* HAPUS GAMBAR */}
             <button
               type="button"
               onClick={hapusGambar}
@@ -74,13 +101,16 @@ function ChatInput({
                 width: 28,
                 height: 28,
                 borderRadius: "50%",
-                border: "1px solid rgba(255,255,255,.15)",
+                border:
+                  "1px solid rgba(255,255,255,.15)",
                 background: "#102333",
                 color: "#fff",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: loading ? "not-allowed" : "pointer",
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
                 padding: 0,
               }}
             >
@@ -106,13 +136,7 @@ function ChatInput({
         <Form
           onSubmit={(e) => {
             e.preventDefault();
-
-            if (
-              !loading &&
-              (message.trim() || imagePreview)
-            ) {
-              kirimPesan();
-            }
+            handleKirim();
           }}
         >
           <div
@@ -188,7 +212,7 @@ function ChatInput({
                       (message.trim() ||
                         imagePreview)
                     ) {
-                      kirimPesan();
+                      handleKirim();
                     }
                   }
                 }}
