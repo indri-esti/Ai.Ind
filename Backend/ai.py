@@ -7,6 +7,15 @@ from prompt import SYSTEM_PROMPT
 
 
 # ==================================================
+# MODEL VISION
+# ==================================================
+
+VISION_MODEL = (
+    "meta-llama/llama-4-scout-17b-16e-instruct"
+)
+
+
+# ==================================================
 # BERSIHKAN JAWABAN
 # ==================================================
 
@@ -17,7 +26,37 @@ def bersihkan_jawaban(teks):
 
     teks = str(teks)
 
-    # Hilangkan heading Markdown
+
+    # ==================================================
+    # HAPUS THINK / REASONING
+    # ==================================================
+
+    teks = re.sub(
+        r"<think>.*?</think>",
+        "",
+        teks,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    teks = re.sub(
+        r"<think>.*$",
+        "",
+        teks,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    teks = re.sub(
+        r"</think>",
+        "",
+        teks,
+        flags=re.IGNORECASE
+    )
+
+
+    # ==================================================
+    # HAPUS HEADING MARKDOWN
+    # ==================================================
+
     teks = re.sub(
         r"^\s*#{1,6}\s?",
         "",
@@ -25,7 +64,11 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-    # Hilangkan blockquote
+
+    # ==================================================
+    # HAPUS BLOCKQUOTE
+    # ==================================================
+
     teks = re.sub(
         r"^\s*>\s?",
         "",
@@ -33,10 +76,21 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-    # Hilangkan bold
-    teks = teks.replace("**", "")
 
-    # Hilangkan italic pada bullet
+    # ==================================================
+    # HAPUS BOLD
+    # ==================================================
+
+    teks = teks.replace(
+        "**",
+        ""
+    )
+
+
+    # ==================================================
+    # HAPUS ITALIC PADA BULLET
+    # ==================================================
+
     teks = re.sub(
         r"^\s*\*\s+",
         "",
@@ -44,7 +98,11 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-    # Hilangkan informasi safety
+
+    # ==================================================
+    # HAPUS INFORMASI SAFETY
+    # ==================================================
+
     teks = teks.replace(
         "User Safety: safe",
         ""
@@ -55,12 +113,29 @@ def bersihkan_jawaban(teks):
         ""
     )
 
-    # Rapikan baris kosong
+
+    # ==================================================
+    # HAPUS PHRASE THINKING
+    # ==================================================
+
+    teks = re.sub(
+        r"^\s*(Heres a thinking process:|Here's a thinking process:).*$",
+        "",
+        teks,
+        flags=re.MULTILINE | re.IGNORECASE
+    )
+
+
+    # ==================================================
+    # RAPikan BARIS KOSONG
+    # ==================================================
+
     teks = re.sub(
         r"\n{3,}",
         "\n\n",
         teks
     )
+
 
     return teks.strip()
 
@@ -79,22 +154,32 @@ def validasi_gambar(image):
 
     image = image.strip()
 
+
     # Groq menerima data URL seperti:
     # data:image/jpeg;base64,xxxxx
 
-    if not image.startswith("data:image/"):
+    if not image.startswith(
+        "data:image/"
+    ):
         return None
+
 
     if ";base64," not in image:
+
         return None
 
-    # Batasi ukuran Base64 supaya tidak terlalu besar.
-    # Groq mempunyai batas sekitar 4 MB untuk base64 image.
+
+    # Batas aman untuk Base64.
+    # Groq mendokumentasikan batas 4 MB
+    # untuk base64 image.
+
     if len(image) > 5_500_000:
+
         raise ValueError(
             "Ukuran gambar terlalu besar. "
             "Kompres gambar terlebih dahulu."
         )
+
 
     return image
 
@@ -103,7 +188,12 @@ def validasi_gambar(image):
 # BALAS AI
 # ==================================================
 
-def balas(pesan, history=None, image=None):
+def balas(
+    pesan,
+    history=None,
+    image=None
+):
+
 
     # ==================================================
     # CEK API KEY
@@ -122,7 +212,11 @@ def balas(pesan, history=None, image=None):
     # HISTORY
     # ==================================================
 
-    if not isinstance(history, list):
+    if not isinstance(
+        history,
+        list
+    ):
+
         history = []
 
 
@@ -132,7 +226,9 @@ def balas(pesan, history=None, image=None):
 
     try:
 
-        image = validasi_gambar(image)
+        image = validasi_gambar(
+            image
+        )
 
     except ValueError as e:
 
@@ -144,10 +240,17 @@ def balas(pesan, history=None, image=None):
     # ==================================================
 
     messages = [
+
         {
-            "role": "system",
-            "content": str(SYSTEM_PROMPT)
+            "role":
+                "system",
+
+            "content":
+                str(
+                    SYSTEM_PROMPT
+                )
         }
+
     ]
 
 
@@ -157,24 +260,46 @@ def balas(pesan, history=None, image=None):
 
     for item in history:
 
-        if not isinstance(item, dict):
+        if not isinstance(
+            item,
+            dict
+        ):
+
             continue
 
-        role = item.get("role")
-        content = item.get("content")
+
+        role =
+            item.get(
+                "role"
+            )
+
+        content =
+            item.get(
+                "content"
+            )
+
 
         if role not in [
             "user",
             "assistant"
         ]:
+
             continue
+
 
         if not content:
+
             continue
 
+
         messages.append({
-            "role": role,
-            "content": str(content)
+
+            "role":
+                role,
+
+            "content":
+                str(content)
+
         })
 
 
@@ -182,38 +307,77 @@ def balas(pesan, history=None, image=None):
     # PESAN TERBARU
     # ==================================================
 
-    # Kalau ada gambar, content harus berupa ARRAY
-    # berisi text + image_url.
     if image:
 
         user_content = [
+
             {
-                "type": "text",
-                "text": (
-                    str(pesan).strip()
-                    if pesan and str(pesan).strip()
-                    else
-                    "Tolong analisis gambar ini dan jelaskan "
-                    "apa yang terlihat di dalamnya."
-                )
+                "type":
+                    "text",
+
+                "text":
+                    (
+                        str(
+                            pesan
+                        ).strip()
+
+                        if pesan
+                        and str(
+                            pesan
+                        ).strip()
+
+                        else
+
+                        "Analisis gambar ini. "
+                        "Jelaskan secara singkat "
+                        "apa yang terlihat pada gambar."
+                    )
             },
+
             {
-                "type": "image_url",
-                "image_url": {
-                    "url": image
-                }
+                "type":
+                    "image_url",
+
+                "image_url":
+                    {
+                        "url":
+                            image
+                    }
             }
+
         ]
 
     else:
 
-        user_content = str(pesan).strip()
+        user_content = (
+            str(pesan).strip()
+        )
 
 
     messages.append({
-        "role": "user",
-        "content": user_content
+
+        "role":
+            "user",
+
+        "content":
+            user_content
+
     })
+
+
+    # ==================================================
+    # PILIH MODEL
+    # ==================================================
+
+    if image:
+
+        request_model = (
+            VISION_MODEL
+        )
+
+    else:
+
+        request_model = MODEL
 
 
     # ==================================================
@@ -237,7 +401,7 @@ def balas(pesan, history=None, image=None):
     data = {
 
         "model":
-            MODEL,
+            request_model,
 
         "messages":
             messages,
@@ -246,7 +410,7 @@ def balas(pesan, history=None, image=None):
             1200,
 
         "temperature":
-            0.7
+            0.4
     }
 
 
@@ -292,6 +456,7 @@ def balas(pesan, history=None, image=None):
                 "================================"
             )
 
+
             return (
                 f"Groq error HTTP "
                 f"{response.status_code}: "
@@ -323,13 +488,17 @@ def balas(pesan, history=None, image=None):
         # CHOICES
         # ==================================================
 
-        choices = hasil.get("choices")
+        choices =
+            hasil.get(
+                "choices"
+            )
 
 
         if not choices:
 
             print(
-                "Response AI tidak memiliki choices:",
+                "Response AI tidak memiliki "
+                "choices:",
                 hasil
             )
 
@@ -343,13 +512,17 @@ def balas(pesan, history=None, image=None):
         # MESSAGE
         # ==================================================
 
-        message = choices[0].get("message")
+        message =
+            choices[0].get(
+                "message"
+            )
 
 
         if not message:
 
             print(
-                "Response AI tidak memiliki message:",
+                "Response AI tidak memiliki "
+                "message:",
                 hasil
             )
 
@@ -363,12 +536,17 @@ def balas(pesan, history=None, image=None):
         # CONTENT
         # ==================================================
 
-        jawaban = message.get("content")
+        jawaban =
+            message.get(
+                "content"
+            )
 
 
         if (
             not jawaban
-            or not str(jawaban).strip()
+            or not str(
+                jawaban
+            ).strip()
         ):
 
             return (
@@ -377,16 +555,20 @@ def balas(pesan, history=None, image=None):
             )
 
 
-        jawaban = str(jawaban).strip()
+        jawaban =
+            str(
+                jawaban
+            ).strip()
 
 
         # ==================================================
         # BERSIHKAN JAWABAN
         # ==================================================
 
-        jawaban = bersihkan_jawaban(
-            jawaban
-        )
+        jawaban =
+            bersihkan_jawaban(
+                jawaban
+            )
 
 
         if not jawaban:
