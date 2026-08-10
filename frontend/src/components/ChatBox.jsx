@@ -2,11 +2,7 @@ import Welcome from "./Welcome";
 import ChatMessage from "./ChatMessage";
 import Typing from "./Typing";
 
-function ChatBox({
-  messages,
-  loading,
-  chatEndRef,
-}) {
+function ChatBox({ messages, loading, chatEndRef }) {
   return (
     <div
       style={{
@@ -15,12 +11,19 @@ function ChatBox({
         display: "flex",
         flexDirection: "column",
         gap: 18,
-        paddingBottom: 170,
+
+        // Memberi ruang supaya pesan terakhir tidak ketutup ChatInput
+        paddingBottom: 150,
+
+        paddingTop: 20,
+        paddingLeft: 16,
+        paddingRight: 16,
+
         scrollbarWidth: "thin",
+        width: "100%",
+        boxSizing: "border-box",
       }}
     >
-      <Welcome messages={messages} />
-
       {messages.map((msg, index) => (
         <ChatMessage
           key={index}
