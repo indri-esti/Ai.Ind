@@ -21,15 +21,11 @@ function ChatMessage({ msg }) {
       .trim();
   };
 
-
-  const content =
-    cleanContent(msg.content);
-
+  const content = cleanContent(msg.content);
 
   const hasImage =
     msg.role === "user" &&
-    msg.image;
-
+    Boolean(msg.image);
 
   return (
     <div
@@ -51,7 +47,6 @@ function ChatMessage({ msg }) {
         boxSizing: "border-box",
       }}
     >
-
       <div
         style={{
           background:
@@ -71,7 +66,15 @@ function ChatMessage({ msg }) {
 
           borderRadius: "20px",
 
-          maxWidth: "90%",
+          maxWidth:
+            hasImage
+              ? "380px"
+              : "90%",
+
+          width:
+            hasImage
+              ? "fit-content"
+              : "auto",
 
           whiteSpace:
             "pre-wrap",
@@ -112,7 +115,6 @@ function ChatMessage({ msg }) {
                 "rgba(0,0,0,.08)",
             }}
           >
-
             <img
               src={msg.image}
               alt="Gambar yang dikirim"
@@ -130,19 +132,20 @@ function ChatMessage({ msg }) {
                   "360px",
 
                 objectFit:
-                  "cover",
+                  "contain",
 
                 borderRadius:
                   "15px",
+
+                background:
+                  "rgba(0,0,0,.05)",
               }}
             />
-
           </div>
         )}
 
-
         {/* =========================
-            TEKS PESAN
+            TEKS PESAN USER
         ========================== */}
 
         {content && (

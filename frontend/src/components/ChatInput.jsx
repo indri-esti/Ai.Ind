@@ -24,18 +24,18 @@ function ChatInput({
     }
 
     /*
-     * kirimPesan() dipanggil terlebih dahulu supaya
-     * Home.jsx masih bisa mengambil selectedImage.
+     * Jangan hapus gambar di sini.
      *
-     * Setelah itu preview input langsung dihapus.
-     * Gambar yang sudah dimasukkan ke messages tetap
-     * tampil di bubble chat.
+     * Home.jsx yang bertanggung jawab untuk:
+     * 1. Mengambil selectedImage
+     * 2. Memasukkan gambar + teks ke messages
+     * 3. Mengirim gambar ke backend
+     * 4. Menghapus preview setelah berhasil diproses
+     *
+     * Dengan begitu gambar tidak muncul double
+     * dan tidak pecah antara preview dan bubble chat.
      */
     kirimPesan();
-
-    setTimeout(() => {
-      hapusGambar();
-    }, 0);
   };
 
   return (
@@ -61,7 +61,7 @@ function ChatInput({
         {/* =========================
             PREVIEW GAMBAR
         ========================== */}
-        {imagePreview && !loading && (
+        {imagePreview && (
           <div
             style={{
               marginBottom: 8,
