@@ -23,6 +23,7 @@ function Home() {
 
   const chatEndRef = useRef(null);
 
+
   // ==================================================
   // AUTO SCROLL
   // ==================================================
@@ -72,9 +73,8 @@ function Home() {
   // KIRIM PESAN
   // ==================================================
   const kirimPesan = async () => {
-    if (!message.trim() || loading) {
+    if (!message.trim() || loading)
       return;
-    }
 
     // ==========================================
     // CEK USER LOGIN
@@ -413,13 +413,15 @@ function Home() {
             }
 
             .home-messages {
-              padding: 5px 2px 135px;
+              padding:
+                5px 2px 135px;
               gap: 10px;
             }
 
             .home-welcome {
               align-items: center;
-              padding: 15px 8px 30px;
+              padding:
+                15px 8px 30px;
             }
 
             .home-welcome-content {
@@ -470,7 +472,8 @@ function Home() {
             }
 
             .home-input-area {
-              padding: 25px 10px 10px;
+              padding:
+                25px 10px 10px;
             }
 
             .home-disclaimer {
@@ -529,7 +532,8 @@ function Home() {
             }
 
             .home-input-area {
-              padding: 20px 7px 8px;
+              padding:
+                20px 7px 8px;
             }
           }
         `}
@@ -587,12 +591,15 @@ function Home() {
                             <div className="home-logo-wrapper">
                               <div
                                 style={{
-                                  position: "absolute",
+                                  position:
+                                    "absolute",
                                   inset: "-18px",
-                                  borderRadius: "38px",
+                                  borderRadius:
+                                    "38px",
                                   background:
                                     "rgba(0,194,255,.06)",
-                                  filter: "blur(18px)",
+                                  filter:
+                                    "blur(18px)",
                                 }}
                               />
 
@@ -812,7 +819,9 @@ function Home() {
                                     key={item}
                                     type="button"
                                     onClick={() =>
-                                      setMessage(item)
+                                      setMessage(
+                                        item
+                                      )
                                     }
                                     className="home-suggestion-button"
                                   >
@@ -862,7 +871,6 @@ function Home() {
 
             </div>
           </div>
-
         </div>
       </div>
     </>
@@ -870,4 +878,3 @@ function Home() {
 }
 
 export default Home;
-

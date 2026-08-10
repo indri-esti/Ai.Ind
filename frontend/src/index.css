@@ -59,7 +59,7 @@ svg {
 }
 
 .chat-input::placeholder {
-  color: #8A9BB5;
+  color: #8a9bb5;
 }
 
 /* =====================================================
@@ -92,7 +92,7 @@ svg {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #23445E;
+  background: #23445e;
   border-radius: 10px;
 }
 
@@ -117,7 +117,7 @@ svg {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #00C2FF;
+  background: #00c2ff;
   display: inline-block;
   animation: aiTyping 1.2s infinite ease-in-out;
 }
