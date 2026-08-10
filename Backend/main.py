@@ -1,4 +1,5 @@
 import os
+import re
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -15,6 +16,74 @@ CORS(app)
 # Batasi ukuran request.
 # Gambar dikirim sebagai Base64.
 app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+
+
+# ==================================================
+# BERSIHKAN JAWABAN AI
+# ==================================================
+
+def bersihkan_reply(teks):
+
+    if not teks:
+        return ""
+
+    teks = str(teks)
+
+    # ==================================================
+    # HAPUS <think>...</think>
+    # ==================================================
+
+    teks = re.sub(
+        r"<think>.*?</think>",
+        "",
+        teks,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ==================================================
+    # JIKA <think> TIDAK PUNYA PENUTUP
+    # ==================================================
+
+    teks = re.sub(
+        r"<think>.*$",
+        "",
+        teks,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # ==================================================
+    # HAPUS TAG THINK YANG TERSISA
+    # ==================================================
+
+    teks = re.sub(
+        r"</?think>",
+        "",
+        teks,
+        flags=re.IGNORECASE
+    )
+
+    # ==================================================
+    # HAPUS "THINKING PROCESS"
+    # ==================================================
+
+    teks = re.sub(
+        r"^\s*(Here'?s a thinking process:|Here is a thinking process:).*$",
+        "",
+        teks,
+        flags=re.MULTILINE | re.IGNORECASE
+    )
+
+    # ==================================================
+    # HAPUS BARIS KOSONG BERLEBIHAN
+    # ==================================================
+
+    teks = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        teks
+    )
+
+    return teks.strip()
 
 
 # ==================================================
@@ -77,7 +146,6 @@ def chat():
             silent=True
         )
 
-
         # ==================================================
         # CEK REQUEST
         # ==================================================
@@ -91,7 +159,6 @@ def chat():
 
             }), 400
 
-
         # ==================================================
         # DATA REQUEST
         # ==================================================
@@ -104,7 +171,6 @@ def chat():
 
         # Gambar Base64 / data URL
         image = data.get("image")
-
 
         # ==================================================
         # VALIDASI PESAN
@@ -129,9 +195,7 @@ def chat():
                 "Tolong analisis gambar ini."
             )
 
-
         pesan = str(pesan).strip()
-
 
         # ==================================================
         # VALIDASI LOGIN
@@ -146,7 +210,6 @@ def chat():
 
             }), 401
 
-
         try:
 
             user_id = int(user_id)
@@ -160,7 +223,6 @@ def chat():
 
             }), 400
 
-
         # ==================================================
         # DATABASE
         # ==================================================
@@ -168,7 +230,6 @@ def chat():
         conn = get_connection()
 
         cursor = conn.cursor()
-
 
         # ==================================================
         # CEK USER
@@ -185,7 +246,6 @@ def chat():
 
         user = cursor.fetchone()
 
-
         if not user:
 
             conn.close()
@@ -197,21 +257,22 @@ def chat():
 
             }), 404
 
-
         # ==================================================
         # CHAT BARU
         # ==================================================
 
         if not chat_id:
 
-            if image and pesan == "Tolong analisis gambar ini.":
+            if (
+                image
+                and pesan == "Tolong analisis gambar ini."
+            ):
 
                 title = "Analisis gambar"
 
             else:
 
                 title = pesan[:40]
-
 
             cursor.execute(
                 """
@@ -228,7 +289,6 @@ def chat():
             chat_id = cursor.lastrowid
 
             conn.commit()
-
 
         # ==================================================
         # VALIDASI CHAT ID
@@ -249,7 +309,6 @@ def chat():
 
             }), 400
 
-
         # ==================================================
         # CEK CHAT MILIK USER
         # ==================================================
@@ -268,7 +327,6 @@ def chat():
 
         chat = cursor.fetchone()
 
-
         if not chat:
 
             conn.close()
@@ -280,7 +338,6 @@ def chat():
                     "bukan milik akun ini"
 
             }), 404
-
 
         # ==================================================
         # AMBIL HISTORY CHAT
@@ -302,7 +359,6 @@ def chat():
 
         conn = None
 
-
         # ==================================================
         # UBAH HISTORY KE DICT
         # ==================================================
@@ -315,17 +371,16 @@ def chat():
 
             content = item["content"]
 
-
             if role not in [
                 "user",
                 "assistant"
             ]:
-                continue
 
+                continue
 
             if not content:
-                continue
 
+                continue
 
             history_data.append({
 
@@ -336,7 +391,6 @@ def chat():
                     str(content)
 
             })
-
 
         # ==================================================
         # KIRIM KE AI
@@ -352,6 +406,24 @@ def chat():
 
         )
 
+        # ==================================================
+        # FILTER FINAL
+        # ==================================================
+
+        jawaban = bersihkan_reply(
+            jawaban
+        )
+
+        # ==================================================
+        # CEK JAWABAN
+        # ==================================================
+
+        if not jawaban:
+
+            jawaban = (
+                "Maaf, aku belum mendapatkan "
+                "jawaban. Coba kirim lagi ya."
+            )
 
         # ==================================================
         # SIMPAN PESAN
@@ -360,7 +432,6 @@ def chat():
         conn = get_connection()
 
         cursor = conn.cursor()
-
 
         # ==================================================
         # SIMPAN PESAN USER
@@ -374,13 +445,10 @@ def chat():
             """,
             (
                 chat_id,
-
                 "user",
-
                 pesan
             )
         )
-
 
         # ==================================================
         # SIMPAN JAWABAN AI
@@ -394,20 +462,16 @@ def chat():
             """,
             (
                 chat_id,
-
                 "assistant",
-
                 str(jawaban)
             )
         )
-
 
         conn.commit()
 
         conn.close()
 
         conn = None
-
 
         # ==================================================
         # RESPONSE
@@ -445,7 +509,6 @@ def chat():
 
         })
 
-
     # ==================================================
     # REQUEST TERLALU BESAR
     # ==================================================
@@ -456,15 +519,14 @@ def chat():
 
             try:
                 conn.close()
+
             except Exception:
                 pass
-
 
         print(
             "Chat Error:",
             repr(e)
         )
-
 
         return jsonify({
 
