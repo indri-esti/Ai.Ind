@@ -1,5 +1,6 @@
 import requests
 import re
+import time
 
 
 from config import API_KEY, BASE_URL, MODEL
@@ -168,7 +169,7 @@ def validasi_gambar(image):
         return None
 
     # Batas aman untuk Base64.
-    # Groq mendokumentasikan batas 4 MB
+    # Groq mendokumentasikan batas sekitar 4 MB
     # untuk base64 image.
 
     if len(image) > 5_500_000:
@@ -250,7 +251,12 @@ def balas(
     # HISTORY CHAT
     # ==================================================
 
-    for item in history:
+    # Hanya kirim 6 pesan terakhir ke model.
+    # Riwayat lengkap tetap tersimpan di database.
+    # Ini mencegah penggunaan token membengkak.
+    history_terbaru = history[-6:]
+
+    for item in history_terbaru:
 
         if not isinstance(
             item,
@@ -412,6 +418,82 @@ def balas(
         )
 
         # ==================================================
+        # RATE LIMIT 429
+        # ==================================================
+
+        if response.status_code == 429:
+
+            print(
+                "========== GROQ RATE LIMIT =========="
+            )
+
+            print(
+                "STATUS:",
+                response.status_code
+            )
+
+            print(
+                "RESPONSE:",
+                response.text
+            )
+
+            print(
+                "======================================"
+            )
+
+            # Coba membaca waktu tunggu dari
+            # response Groq.
+            retry_seconds = 5
+
+            match = re.search(
+                r"try again in\s+([\d.]+)s",
+                response.text,
+                flags=re.IGNORECASE
+            )
+
+            if match:
+
+                try:
+
+                    retry_seconds = float(
+                        match.group(1)
+                    )
+
+                except ValueError:
+
+                    retry_seconds = 5
+
+            # Jangan menunggu terlalu lama.
+            retry_seconds = min(
+                max(
+                    retry_seconds,
+                    1
+                ),
+                10
+            )
+
+            print(
+                f"Groq rate limit. "
+                f"Menunggu {retry_seconds:.1f} detik..."
+            )
+
+            time.sleep(
+                retry_seconds
+            )
+
+            # Coba sekali lagi.
+            response = requests.post(
+
+                BASE_URL,
+
+                headers=headers,
+
+                json=data,
+
+                timeout=90
+            )
+
+        # ==================================================
         # CEK STATUS
         # ==================================================
 
@@ -434,6 +516,14 @@ def balas(
             print(
                 "================================"
             )
+
+            if response.status_code == 429:
+
+                return (
+                    "Groq sedang mencapai batas "
+                    "penggunaan token. Tunggu beberapa "
+                    "detik lalu coba lagi."
+                )
 
             return (
                 f"Groq error HTTP "
