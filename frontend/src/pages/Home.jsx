@@ -835,15 +835,18 @@ function Home() {
                       )}
 
                     {/* CHAT */}
-                    <ChatBox
-                      messages={messages}
-                      loading={false}
-                      chatEndRef={chatEndRef}
-                    />
+                    {/* CHAT */}
+{messages.length > 0 && (
+  <ChatBox
+    messages={messages}
+    loading={false}
+    chatEndRef={chatEndRef}
+  />
+)}
 
-                    {loading && <Typing />}
+{loading && <Typing />}
 
-                    <div ref={chatEndRef} />
+<div ref={chatEndRef} />
                   </div>
                 </Col>
               </Row>
