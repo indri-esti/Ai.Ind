@@ -939,42 +939,16 @@ hapusGambar();
               )}
 
               {/* INPUT ROW */}
-              <div className="home-input-row">
-
-                {/* FILE INPUT TERSEMBUNYI */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={pilihGambar}
-                  style={{ display: "none" }}
-                />
-
-                {/* TOMBOL PLUS */}
-                <button
-                  type="button"
-                  className="home-plus-button"
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                  }}
-                  disabled={loading}
-                  aria-label="Tambah gambar"
-                  title="Tambah gambar"
-                >
-                  <FiPlus size={23} strokeWidth={2.5} />
-                </button>
-
-                {/* CHAT INPUT */}
-                <div className="home-chat-input-wrapper">
-                  <ChatInput
-                    message={message}
-                    setMessage={setMessage}
-                    kirimPesan={kirimPesan}
-                    loading={loading}
-                  />
-                </div>
-
-              </div>
+             <div className="home-input-row">
+  <ChatInput
+    message={message}
+    setMessage={setMessage}
+    kirimPesan={kirimPesan}
+    loading={loading}
+    fileInputRef={fileInputRef}
+    pilihGambar={pilihGambar}
+  />
+</div>
 
               {/* DISCLAIMER */}
               <div className="home-disclaimer">

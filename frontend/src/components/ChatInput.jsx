@@ -1,11 +1,14 @@
 import { Form, Button } from "react-bootstrap";
 import { FaPaperPlane } from "react-icons/fa";
+import { FiPlus } from "react-icons/fi";
 
 function ChatInput({
   message,
   setMessage,
   kirimPesan,
   loading,
+  fileInputRef,
+  pilihGambar,
 }) {
   return (
     <div
@@ -14,18 +17,12 @@ function ChatInput({
         left: 0,
         right: 0,
         bottom: 0,
-
         background: "#081420",
-
-        // Jarak dari bawah layar
         padding: "12px 16px 14px",
-
         zIndex: 999,
-
         boxSizing: "border-box",
       }}
     >
-      {/* AREA INPUT DIBUAT BENAR-BENAR DI TENGAH */}
       <div
         style={{
           width: "100%",
@@ -46,108 +43,121 @@ function ChatInput({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-
+              gap: 8,
               width: "100%",
               boxSizing: "border-box",
-
-              background: "#13283F",
-              borderRadius: 28,
-
-              padding: "7px 8px 7px 18px",
-
-              border: "1px solid rgba(255,255,255,.08)",
-
-              boxShadow: "0 8px 25px rgba(0,0,0,.25)",
             }}
           >
-            <Form.Control
-              as="textarea"
-              rows={1}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-
-                  if (!loading && message.trim()) {
-                    kirimPesan();
-                  }
-                }
-              }}
-              placeholder="Ketik pertanyaan untuk AI.Ind..."
-              className="chat-input"
-              style={{
-                flex: 1,
-
-                resize: "none",
-                overflowY: "auto",
-
-                background: "transparent",
-                color: "#fff",
-
-                border: "none",
-                outline: "none",
-                boxShadow: "none",
-
-                fontSize: 15,
-                lineHeight: "22px",
-
-                minHeight: 40,
-                maxHeight: 110,
-
-                padding: "8px 0",
-
-                boxSizing: "border-box",
-              }}
+            {/* INPUT GAMBAR */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={pilihGambar}
+              style={{ display: "none" }}
             />
 
-            <Button
-              type="submit"
-              disabled={loading || !message.trim()}
+            {/* TOMBOL PLUS */}
+            <button
+              type="button"
+              className="home-plus-button"
+              onClick={() => {
+                fileInputRef.current?.click();
+              }}
+              disabled={loading}
+              aria-label="Tambah gambar"
+              title="Tambah gambar"
+            >
+              <FiPlus size={23} strokeWidth={2.5} />
+            </button>
+
+            {/* INPUT CHAT */}
+            <div
               style={{
-                width: 46,
-                height: 46,
-
-                minWidth: 46,
-
-                borderRadius: "50%",
-                border: "none",
-
-                background:
-                  loading || !message.trim()
-                    ? "#4B647A"
-                    : "#00C2FF",
-
+                flex: 1,
+                minWidth: 0,
                 display: "flex",
-                justifyContent: "center",
                 alignItems: "center",
-
-                flexShrink: 0,
-
-                padding: 0,
+                gap: 10,
+                background: "#13283F",
+                borderRadius: 28,
+                padding: "7px 8px 7px 18px",
+                border: "1px solid rgba(255,255,255,.08)",
+                boxShadow: "0 8px 25px rgba(0,0,0,.25)",
+                boxSizing: "border-box",
               }}
             >
-              <FaPaperPlane
-                color="#081420"
-                size={17}
+              <Form.Control
+                as="textarea"
+                rows={1}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+
+                    if (!loading && message.trim()) {
+                      kirimPesan();
+                    }
+                  }
+                }}
+                placeholder="Ketik pertanyaan untuk AI.Ind..."
+                className="chat-input"
+                style={{
+                  flex: 1,
+                  resize: "none",
+                  overflowY: "auto",
+                  background: "transparent",
+                  color: "#fff",
+                  border: "none",
+                  outline: "none",
+                  boxShadow: "none",
+                  fontSize: 15,
+                  lineHeight: "22px",
+                  minHeight: 40,
+                  maxHeight: 110,
+                  padding: "8px 0",
+                  boxSizing: "border-box",
+                }}
               />
-            </Button>
+
+              {/* KIRIM */}
+              <Button
+                type="submit"
+                disabled={loading || !message.trim()}
+                style={{
+                  width: 46,
+                  height: 46,
+                  minWidth: 46,
+                  borderRadius: "50%",
+                  border: "none",
+                  background:
+                    loading || !message.trim()
+                      ? "#4B647A"
+                      : "#00C2FF",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  flexShrink: 0,
+                  padding: 0,
+                }}
+              >
+                <FaPaperPlane
+                  color="#081420"
+                  size={17}
+                />
+              </Button>
+            </div>
           </div>
         </Form>
 
-        {/* KETERANGAN */}
         <div
           style={{
             marginTop: 8,
-
             textAlign: "center",
-
             color: "#6F849A",
             fontSize: 11,
-
             lineHeight: "16px",
-
             paddingBottom: 2,
           }}
         >
