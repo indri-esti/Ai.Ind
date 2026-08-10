@@ -26,7 +26,6 @@ def bersihkan_jawaban(teks):
 
     teks = str(teks)
 
-
     # ==================================================
     # HAPUS THINK / REASONING
     # ==================================================
@@ -52,7 +51,6 @@ def bersihkan_jawaban(teks):
         flags=re.IGNORECASE
     )
 
-
     # ==================================================
     # HAPUS HEADING MARKDOWN
     # ==================================================
@@ -63,7 +61,6 @@ def bersihkan_jawaban(teks):
         teks,
         flags=re.MULTILINE
     )
-
 
     # ==================================================
     # HAPUS BLOCKQUOTE
@@ -76,7 +73,6 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-
     # ==================================================
     # HAPUS BOLD
     # ==================================================
@@ -85,7 +81,6 @@ def bersihkan_jawaban(teks):
         "**",
         ""
     )
-
 
     # ==================================================
     # HAPUS ITALIC PADA BULLET
@@ -97,7 +92,6 @@ def bersihkan_jawaban(teks):
         teks,
         flags=re.MULTILINE
     )
-
 
     # ==================================================
     # HAPUS INFORMASI SAFETY
@@ -113,7 +107,6 @@ def bersihkan_jawaban(teks):
         ""
     )
 
-
     # ==================================================
     # HAPUS PHRASE THINKING
     # ==================================================
@@ -125,6 +118,16 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE | re.IGNORECASE
     )
 
+    # ==================================================
+    # HAPUS PHRASE THINKING LAIN
+    # ==================================================
+
+    teks = re.sub(
+        r"^\s*(Here is a thinking process:|Here is my thinking process:).*$",
+        "",
+        teks,
+        flags=re.MULTILINE | re.IGNORECASE
+    )
 
     # ==================================================
     # RAPikan BARIS KOSONG
@@ -135,7 +138,6 @@ def bersihkan_jawaban(teks):
         "\n\n",
         teks
     )
-
 
     return teks.strip()
 
@@ -154,7 +156,6 @@ def validasi_gambar(image):
 
     image = image.strip()
 
-
     # Groq menerima data URL seperti:
     # data:image/jpeg;base64,xxxxx
 
@@ -163,11 +164,8 @@ def validasi_gambar(image):
     ):
         return None
 
-
     if ";base64," not in image:
-
         return None
-
 
     # Batas aman untuk Base64.
     # Groq mendokumentasikan batas 4 MB
@@ -179,7 +177,6 @@ def validasi_gambar(image):
             "Ukuran gambar terlalu besar. "
             "Kompres gambar terlebih dahulu."
         )
-
 
     return image
 
@@ -194,7 +191,6 @@ def balas(
     image=None
 ):
 
-
     # ==================================================
     # CEK API KEY
     # ==================================================
@@ -207,7 +203,6 @@ def balas(
             "di file Backend/.env."
         )
 
-
     # ==================================================
     # HISTORY
     # ==================================================
@@ -218,7 +213,6 @@ def balas(
     ):
 
         history = []
-
 
     # ==================================================
     # VALIDASI GAMBAR
@@ -233,7 +227,6 @@ def balas(
     except ValueError as e:
 
         return str(e)
-
 
     # ==================================================
     # SYSTEM PROMPT
@@ -253,7 +246,6 @@ def balas(
 
     ]
 
-
     # ==================================================
     # HISTORY CHAT
     # ==================================================
@@ -267,17 +259,13 @@ def balas(
 
             continue
 
+        role = item.get(
+            "role"
+        )
 
-        role =
-            item.get(
-                "role"
-            )
-
-        content =
-            item.get(
-                "content"
-            )
-
+        content = item.get(
+            "content"
+        )
 
         if role not in [
             "user",
@@ -286,11 +274,9 @@ def balas(
 
             continue
 
-
         if not content:
 
             continue
-
 
         messages.append({
 
@@ -301,7 +287,6 @@ def balas(
                 str(content)
 
         })
-
 
     # ==================================================
     # PESAN TERBARU
@@ -353,7 +338,6 @@ def balas(
             str(pesan).strip()
         )
 
-
     messages.append({
 
         "role":
@@ -363,7 +347,6 @@ def balas(
             user_content
 
     })
-
 
     # ==================================================
     # PILIH MODEL
@@ -379,7 +362,6 @@ def balas(
 
         request_model = MODEL
 
-
     # ==================================================
     # HEADER GROQ
     # ==================================================
@@ -392,7 +374,6 @@ def balas(
         "Content-Type":
             "application/json"
     }
-
 
     # ==================================================
     # REQUEST DATA
@@ -413,7 +394,6 @@ def balas(
             0.4
     }
 
-
     # ==================================================
     # REQUEST KE GROQ
     # ==================================================
@@ -430,7 +410,6 @@ def balas(
 
             timeout=90
         )
-
 
         # ==================================================
         # CEK STATUS
@@ -456,13 +435,11 @@ def balas(
                 "================================"
             )
 
-
             return (
                 f"Groq error HTTP "
                 f"{response.status_code}: "
                 f"{response.text[:500]}"
             )
-
 
         # ==================================================
         # PARSE RESPONSE
@@ -483,16 +460,13 @@ def balas(
                 "Response dari AI tidak valid."
             )
 
-
         # ==================================================
         # CHOICES
         # ==================================================
 
-        choices =
-            hasil.get(
-                "choices"
-            )
-
+        choices = hasil.get(
+            "choices"
+        )
 
         if not choices:
 
@@ -507,16 +481,13 @@ def balas(
                 "Coba kirim pesan lagi."
             )
 
-
         # ==================================================
         # MESSAGE
         # ==================================================
 
-        message =
-            choices[0].get(
-                "message"
-            )
-
+        message = choices[0].get(
+            "message"
+        )
 
         if not message:
 
@@ -531,16 +502,13 @@ def balas(
                 "yang valid."
             )
 
-
         # ==================================================
         # CONTENT
         # ==================================================
 
-        jawaban =
-            message.get(
-                "content"
-            )
-
+        jawaban = message.get(
+            "content"
+        )
 
         if (
             not jawaban
@@ -554,22 +522,17 @@ def balas(
                 "jawaban. Coba kirim pertanyaan lagi."
             )
 
-
-        jawaban =
-            str(
-                jawaban
-            ).strip()
-
+        jawaban = str(
+            jawaban
+        ).strip()
 
         # ==================================================
         # BERSIHKAN JAWABAN
         # ==================================================
 
-        jawaban =
-            bersihkan_jawaban(
-                jawaban
-            )
-
+        jawaban = bersihkan_jawaban(
+            jawaban
+        )
 
         if not jawaban:
 
@@ -578,9 +541,7 @@ def balas(
                 "jawaban. Coba kirim lagi ya."
             )
 
-
         return jawaban
-
 
     # ==================================================
     # TIMEOUT
@@ -597,7 +558,6 @@ def balas(
             "Coba kirim pertanyaan lagi."
         )
 
-
     # ==================================================
     # CONNECTION ERROR
     # ==================================================
@@ -613,7 +573,6 @@ def balas(
             "server Groq. Periksa koneksi "
             "internet atau backend."
         )
-
 
     # ==================================================
     # ERROR LAIN
