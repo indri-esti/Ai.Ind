@@ -1,4 +1,4 @@
-import requests
+limport requests
 import re
 import time
 
@@ -14,23 +14,23 @@ VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 # ==================================================
-# PENGATURAN TOKEN & HISTORY
+# PENGATURAN
 # ==================================================
 
-# Maksimal karakter history yang dikirim ke model.
-# Chat yang tersimpan di frontend/database TIDAK dihapus.
+# History yang dikirim ke Groq.
+# Tidak menghapus history di frontend/database.
 MAX_HISTORY_CHARS = 12000
 
-# Maksimal karakter untuk satu pesan history.
+# Maksimal karakter satu pesan history.
 MAX_MESSAGE_CHARS = 4000
 
-# Maksimal token jawaban AI.
-MAX_OUTPUT_TOKENS = 700
+# Sebelumnya 700 sehingga jawaban mudah terpotong.
+MAX_OUTPUT_TOKENS = 1200
 
-# Jumlah percobaan ketika terkena rate limit.
+# Maksimal percobaan request.
 MAX_RETRIES = 3
 
-# Batas maksimal waktu tunggu retry.
+# Jangan menunggu terlalu lama.
 MAX_RETRY_WAIT = 65
 
 
@@ -45,10 +45,7 @@ def bersihkan_jawaban(teks):
 
     teks = str(teks)
 
-    # ==================================================
-    # HAPUS THINK / REASONING
-    # ==================================================
-
+    # Hapus think/reasoning tags
     teks = re.sub(
         r"<think>.*?</think>",
         "",
@@ -70,10 +67,7 @@ def bersihkan_jawaban(teks):
         flags=re.IGNORECASE
     )
 
-    # ==================================================
-    # HAPUS HEADING MARKDOWN
-    # ==================================================
-
+    # Hapus heading markdown
     teks = re.sub(
         r"^\s*#{1,6}\s?",
         "",
@@ -81,10 +75,7 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-    # ==================================================
-    # HAPUS BLOCKQUOTE
-    # ==================================================
-
+    # Hapus blockquote
     teks = re.sub(
         r"^\s*>\s?",
         "",
@@ -92,16 +83,10 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-    # ==================================================
-    # HAPUS BOLD
-    # ==================================================
-
+    # Hapus bold
     teks = teks.replace("**", "")
 
-    # ==================================================
-    # HAPUS ITALIC PADA BULLET
-    # ==================================================
-
+    # Hapus italic markdown pada bullet
     teks = re.sub(
         r"^\s*\*\s+",
         "",
@@ -109,26 +94,13 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE
     )
 
-    # ==================================================
-    # HAPUS INFORMASI SAFETY
-    # ==================================================
+    # Hapus informasi safety
+    teks = teks.replace("User Safety: safe", "")
+    teks = teks.replace("Response Safety: safe", "")
 
-    teks = teks.replace(
-        "User Safety: safe",
-        ""
-    )
-
-    teks = teks.replace(
-        "Response Safety: safe",
-        ""
-    )
-
-    # ==================================================
-    # HAPUS PHRASE THINKING
-    # ==================================================
-
+    # Hapus phrase thinking
     teks = re.sub(
-        r"^\s*(Heres a thinking process:|Here's a thinking process:).*$",
+        r"^\s*(Here's a thinking process:|Heres a thinking process:).*$",
         "",
         teks,
         flags=re.MULTILINE | re.IGNORECASE
@@ -141,10 +113,7 @@ def bersihkan_jawaban(teks):
         flags=re.MULTILINE | re.IGNORECASE
     )
 
-    # ==================================================
-    # HAPUS TAG REASONING LAIN
-    # ==================================================
-
+    # Hapus reasoning tag
     teks = re.sub(
         r"<analysis>.*?</analysis>",
         "",
@@ -159,10 +128,7 @@ def bersihkan_jawaban(teks):
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    # ==================================================
-    # RAPIKAN BARIS KOSONG
-    # ==================================================
-
+    # Rapikan baris kosong
     teks = re.sub(
         r"\n{3,}",
         "\n\n",
@@ -186,16 +152,12 @@ def validasi_gambar(image):
 
     image = image.strip()
 
-    # Groq menerima data URL:
-    # data:image/jpeg;base64,xxxxx
-
     if not image.startswith("data:image/"):
         return None
 
     if ";base64," not in image:
         return None
 
-    # Batas aman base64
     if len(image) > 5_500_000:
         raise ValueError(
             "Ukuran gambar terlalu besar. "
@@ -206,7 +168,7 @@ def validasi_gambar(image):
 
 
 # ==================================================
-# POTONG HISTORY UNTUK REQUEST SAJA
+# SIAPKAN HISTORY
 # ==================================================
 
 def siapkan_history(history):
@@ -217,8 +179,6 @@ def siapkan_history(history):
     hasil = []
     total_chars = 0
 
-    # Mulai dari pesan terbaru.
-    # Kita ambil sebanyak mungkin tanpa melewati batas karakter.
     for item in reversed(history):
 
         if not isinstance(item, dict):
@@ -233,30 +193,53 @@ def siapkan_history(history):
         if not content:
             continue
 
+        # History gambar tidak dikirim kembali sebagai gambar.
+        # Hanya ambil teksnya.
+        if isinstance(content, list):
+
+            teks_parts = []
+
+            for part in content:
+
+                if not isinstance(part, dict):
+                    continue
+
+                if part.get("type") == "text":
+
+                    text_part = part.get("text", "")
+
+                    if text_part:
+                        teks_parts.append(str(text_part))
+
+            content = "\n".join(teks_parts)
+
         content = str(content).strip()
 
         if not content:
             continue
 
-        # Batasi satu pesan.
+        # Batasi panjang pesan.
         if len(content) > MAX_MESSAGE_CHARS:
-            content = content[:MAX_MESSAGE_CHARS] + "\n[Pesan dipersingkat untuk konteks AI]"
+
+            content = (
+                content[:MAX_MESSAGE_CHARS]
+                + "\n[Pesan dipersingkat untuk konteks AI]"
+            )
 
         tambahan = len(content)
 
-        # Jangan sampai history terlalu besar.
         if total_chars + tambahan > MAX_HISTORY_CHARS:
 
             sisa = MAX_HISTORY_CHARS - total_chars
 
             if sisa > 200:
+
                 content = content[:sisa]
 
-                if role == "user":
-                    hasil.append({
-                        "role": role,
-                        "content": content
-                    })
+                hasil.append({
+                    "role": role,
+                    "content": content
+                })
 
             break
 
@@ -267,21 +250,51 @@ def siapkan_history(history):
 
         total_chars += tambahan
 
-    # Karena tadi diambil dari belakang,
-    # balikan lagi ke urutan normal.
+    # Kembalikan ke urutan normal.
     hasil.reverse()
 
     return hasil
 
 
 # ==================================================
-# AMBIL WAKTU RETRY DARI GROQ
+# AMBIL WAKTU RETRY
 # ==================================================
 
-def ambil_waktu_retry(teks):
+def ambil_waktu_retry(response):
 
-    if not teks:
+    """
+    Mengambil waktu tunggu dari header Retry-After
+    atau pesan error Groq.
+    """
+
+    if response is None:
         return 5
+
+    # --------------------------------------------------
+    # COBA HEADER Retry-After
+    # --------------------------------------------------
+
+    retry_after = response.headers.get("Retry-After")
+
+    if retry_after:
+
+        try:
+
+            waktu = float(retry_after)
+
+            return min(
+                max(waktu + 1, 2),
+                MAX_RETRY_WAIT
+            )
+
+        except (ValueError, TypeError):
+            pass
+
+    # --------------------------------------------------
+    # COBA RESPONSE TEXT
+    # --------------------------------------------------
+
+    teks = response.text or ""
 
     pola = [
         r"try again in\s+([\d.]+)s",
@@ -300,6 +313,7 @@ def ambil_waktu_retry(teks):
         if match:
 
             try:
+
                 waktu = float(match.group(1))
 
                 return min(
@@ -307,9 +321,10 @@ def ambil_waktu_retry(teks):
                     MAX_RETRY_WAIT
                 )
 
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
 
+    # Default
     return 5
 
 
@@ -317,10 +332,7 @@ def ambil_waktu_retry(teks):
 # REQUEST KE GROQ
 # ==================================================
 
-def request_groq(
-    headers,
-    data
-):
+def request_groq(headers, data):
 
     for attempt in range(MAX_RETRIES):
 
@@ -333,38 +345,39 @@ def request_groq(
                 timeout=90
             )
 
-            # ==========================================
+            # ==================================================
             # BERHASIL
-            # ==========================================
+            # ==================================================
 
             if response.status_code == 200:
+
                 return response
 
-            # ==========================================
-            # RATE LIMIT
-            # ==========================================
+            # ==================================================
+            # RATE LIMIT 429
+            # ==================================================
 
             if response.status_code == 429:
 
                 print(
-                    f"Groq rate limit "
-                    f"(percobaan {attempt + 1}/{MAX_RETRIES})"
+                    f"[Groq] Rate limit "
+                    f"percobaan {attempt + 1}/{MAX_RETRIES}"
                 )
 
                 print(
-                    "RESPONSE:",
+                    "[Groq] Response:",
                     response.text
                 )
 
-                # Kalau masih ada kesempatan retry.
+                # Kalau masih ada kesempatan.
                 if attempt < MAX_RETRIES - 1:
 
                     retry_seconds = ambil_waktu_retry(
-                        response.text
+                        response
                     )
 
                     print(
-                        f"Menunggu "
+                        f"[Groq] Menunggu "
                         f"{retry_seconds:.1f} detik..."
                     )
 
@@ -372,44 +385,45 @@ def request_groq(
 
                     continue
 
-                # Sudah habis retry.
+                # Jangan retry lagi.
                 return response
 
-            # ==========================================
+            # ==================================================
             # ERROR LAIN
-            # ==========================================
+            # ==================================================
 
             return response
 
         except requests.exceptions.Timeout:
 
+            print("[Groq] Timeout")
+
             if attempt < MAX_RETRIES - 1:
 
-                print(
-                    "Groq timeout. "
-                    "Mencoba kembali..."
-                )
-
                 time.sleep(2)
-
                 continue
 
-            raise
+            return None
 
         except requests.exceptions.ConnectionError:
 
+            print("[Groq] Connection Error")
+
             if attempt < MAX_RETRIES - 1:
 
-                print(
-                    "Koneksi ke Groq gagal. "
-                    "Mencoba kembali..."
-                )
-
                 time.sleep(2)
-
                 continue
 
-            raise
+            return None
+
+        except requests.exceptions.RequestException as e:
+
+            print(
+                "[Groq] Request Error:",
+                repr(e)
+            )
+
+            return None
 
     return None
 
@@ -425,15 +439,15 @@ def balas(
 ):
 
     # ==================================================
-    # CEK API KEY
+    # API KEY
     # ==================================================
 
     if not API_KEY:
 
         return (
             "API Key Groq belum ditemukan. "
-            "Pastikan GROQ_API_KEY sudah ada "
-            "di file Backend/.env."
+            "Pastikan GROQ_API_KEY sudah tersedia "
+            "di Backend/.env."
         )
 
     # ==================================================
@@ -471,33 +485,35 @@ def balas(
     ]
 
     # ==================================================
-    # HISTORY CHAT
+    # HISTORY
     # ==================================================
 
     history_terbaru = siapkan_history(
         history
     )
 
-    for item in history_terbaru:
-
-        messages.append(item)
+    messages.extend(
+        history_terbaru
+    )
 
     # ==================================================
-    # PESAN TERBARU
+    # PESAN
     # ==================================================
 
     pesan_text = ""
 
     if pesan is not None:
-        pesan_text = str(pesan).strip()
 
-    # Kalau pesan kosong tetapi ada gambar.
+        pesan_text = str(
+            pesan
+        ).strip()
+
+    # Kalau hanya gambar.
     if not pesan_text and image:
 
         pesan_text = (
-            "Analisis gambar ini. "
-            "Jelaskan apa yang terlihat "
-            "dan bantu saya memahami gambar tersebut."
+            "Analisis gambar ini dan jelaskan "
+            "apa yang terlihat dengan jelas."
         )
 
     # Kalau benar-benar kosong.
@@ -542,7 +558,7 @@ def balas(
     )
 
     # ==================================================
-    # PILIH MODEL
+    # MODEL
     # ==================================================
 
     if image:
@@ -554,7 +570,7 @@ def balas(
         request_model = MODEL
 
     # ==================================================
-    # HEADER GROQ
+    # HEADER
     # ==================================================
 
     headers = {
@@ -563,22 +579,22 @@ def balas(
     }
 
     # ==================================================
-    # REQUEST DATA
+    # DATA REQUEST
     # ==================================================
 
     data = {
         "model": request_model,
         "messages": messages,
 
-        # Lebih hemat token.
+        # Naikkan supaya jawaban tidak mudah terpotong.
         "max_tokens": MAX_OUTPUT_TOKENS,
 
-        # Jawaban tetap natural.
+        # Jawaban natural.
         "temperature": 0.4
     }
 
     # ==================================================
-    # REQUEST KE GROQ
+    # REQUEST
     # ==================================================
 
     try:
@@ -588,16 +604,74 @@ def balas(
             data
         )
 
-        # Tidak mendapatkan response.
+        # ==================================================
+        # TIDAK ADA RESPONSE
+        # ==================================================
+
         if response is None:
 
             return (
-                "AI sedang mengalami gangguan "
-                "koneksi. Silakan coba lagi."
+                "AI sedang mengalami gangguan koneksi. "
+                "Silakan coba lagi."
             )
 
         # ==================================================
-        # CEK STATUS
+        # RATE LIMIT
+        # ==================================================
+
+        if response.status_code == 429:
+
+            print(
+                "========== GROQ RATE LIMIT =========="
+            )
+
+            print(
+                response.text
+            )
+
+            print(
+                "====================================="
+            )
+
+            # PENTING:
+            # Jangan lempar error 429 ke frontend.
+            return (
+                "AI sedang sibuk karena terlalu banyak "
+                "permintaan. Tunggu sebentar lalu kirim "
+                "pesan lagi ya."
+            )
+
+        # ==================================================
+        # SERVER ERROR
+        # ==================================================
+
+        if response.status_code >= 500:
+
+            print(
+                "========== GROQ SERVER ERROR =========="
+            )
+
+            print(
+                "STATUS:",
+                response.status_code
+            )
+
+            print(
+                "RESPONSE:",
+                response.text
+            )
+
+            print(
+                "========================================"
+            )
+
+            return (
+                "Server AI sedang mengalami gangguan. "
+                "Silakan coba lagi sebentar."
+            )
+
+        # ==================================================
+        # ERROR CLIENT LAIN
         # ==================================================
 
         if response.status_code != 200:
@@ -620,41 +694,13 @@ def balas(
                 "================================"
             )
 
-            # ------------------------------------------
-            # RATE LIMIT
-            # ------------------------------------------
-
-            if response.status_code == 429:
-
-                return (
-                    "AI sedang terlalu banyak menerima "
-                    "permintaan. Tunggu sekitar satu menit "
-                    "lalu coba lagi."
-                )
-
-            # ------------------------------------------
-            # ERROR SERVER
-            # ------------------------------------------
-
-            if response.status_code >= 500:
-
-                return (
-                    "Server AI sedang mengalami gangguan. "
-                    "Silakan coba lagi sebentar."
-                )
-
-            # ------------------------------------------
-            # ERROR LAIN
-            # ------------------------------------------
-
             return (
-                f"Groq error HTTP "
-                f"{response.status_code}: "
-                f"{response.text[:500]}"
+                "AI tidak dapat memproses permintaan "
+                "saat ini. Silakan coba lagi."
             )
 
         # ==================================================
-        # PARSE RESPONSE
+        # PARSE JSON
         # ==================================================
 
         try:
@@ -674,20 +720,22 @@ def balas(
             )
 
         # ==================================================
-        # CEK ERROR DARI API
+        # ERROR DARI API
         # ==================================================
 
-        if isinstance(hasil, dict) and hasil.get("error"):
+        if isinstance(hasil, dict):
 
-            print(
-                "Groq API ERROR:",
-                hasil["error"]
-            )
+            if hasil.get("error"):
 
-            return (
-                "AI sedang mengalami kendala. "
-                "Silakan coba lagi."
-            )
+                print(
+                    "Groq API ERROR:",
+                    hasil["error"]
+                )
+
+                return (
+                    "AI sedang mengalami kendala. "
+                    "Silakan coba lagi."
+                )
 
         # ==================================================
         # CHOICES
@@ -731,20 +779,12 @@ def balas(
         # CONTENT
         # ==================================================
 
-        jawaban = message.get("content")
+        jawaban = message.get(
+            "content"
+        )
 
-        # Beberapa model bisa memberikan content kosong.
-        # Cek juga kemungkinan reasoning sebagai fallback.
-        if not jawaban:
-
-            reasoning = message.get("reasoning")
-
-            if reasoning:
-                jawaban = reasoning
-
-        # ==================================================
-        # VALIDASI JAWABAN
-        # ==================================================
+        # Jangan menggunakan reasoning sebagai jawaban.
+        # Reasoning bukan jawaban final untuk pengguna.
 
         if not jawaban:
 
@@ -763,12 +803,16 @@ def balas(
         ).strip()
 
         # ==================================================
-        # BERSIHKAN JAWABAN
+        # BERSIHKAN
         # ==================================================
 
         jawaban = bersihkan_jawaban(
             jawaban
         )
+
+        # ==================================================
+        # CEK HASIL AKHIR
+        # ==================================================
 
         if not jawaban:
 
@@ -776,10 +820,6 @@ def balas(
                 "Maaf, AI belum mendapatkan jawaban. "
                 "Coba kirim lagi ya."
             )
-
-        # ==================================================
-        # SELESAI
-        # ==================================================
 
         return jawaban
 
@@ -814,7 +854,23 @@ def balas(
         )
 
     # ==================================================
-    # ERROR LAIN
+    # REQUEST ERROR
+    # ==================================================
+
+    except requests.exceptions.RequestException as e:
+
+        print(
+            "Groq Request Exception:",
+            repr(e)
+        )
+
+        return (
+            "Koneksi ke server AI mengalami masalah. "
+            "Silakan coba lagi."
+        )
+
+    # ==================================================
+    # ERROR UMUM
     # ==================================================
 
     except Exception as e:
@@ -825,6 +881,6 @@ def balas(
         )
 
         return (
-            "Terjadi kesalahan saat "
-            "memproses pesan. Silakan coba lagi."
+            "Terjadi kesalahan saat memproses pesan. "
+            "Silakan coba lagi."
         )
