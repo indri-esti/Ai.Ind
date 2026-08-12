@@ -5,5 +5,13 @@
   "server": {
     "url": "https://ai-ind.vercel.app",
     "cleartext": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 2000,
+      "backgroundColor": "#ffffff",
+      "showSpinner": false
+    }
   }
 }

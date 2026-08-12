@@ -4,7 +4,7 @@ import { FiPlus, FiX, FiImage } from "react-icons/fi";
 
 import { useState, useEffect, useRef } from "react";
 
-import { BannerAd } from "@capgo/capacitor-admob";
+import { AdMob, BannerAd } from "@capgo/capacitor-admob";
 
 import axios from "../api";
 
@@ -67,7 +67,7 @@ function Home() {
   // ==================================================
 
   const [message, setMessage] =
-    useState("");
+    State("");
 
   const [messages, setMessages] =
     useState([]);
@@ -106,6 +106,8 @@ useEffect(() => {
 
   const tampilkanBanner = async () => {
     try {
+      await AdMob.start();
+
       banner = new BannerAd({
         adUnitId: "ca-app-pub-5699049952148750/4400311367",
         position: "bottom",
