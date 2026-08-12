@@ -1,6 +1,10 @@
 import { Row, Col } from "react-bootstrap";
+
 import { FiPlus, FiX, FiImage } from "react-icons/fi";
+
 import { useState, useEffect, useRef } from "react";
+import { BannerAd } from "@capgo/capacitor-admob";
+
 import axios from "../api";
 
 import Header from "../components/Header";
@@ -90,6 +94,41 @@ function Home() {
 
   const chatEndRef =
     useRef(null);
+    
+    
+    // ==================================================
+// ADMOB BANNER
+// ==================================================
+
+useEffect(() => {
+  let banner;
+
+  const tampilkanBanner = async () => {
+    try {
+      await AdMob.start();
+
+      banner = new BannerAd({
+        adUnitId: "ca-app-pub-5699049952148750/4400311367",
+        position: "bottom",
+      });
+
+      await banner.load();
+      await banner.show();
+
+      console.log("Banner AdMob berhasil ditampilkan");
+    } catch (error) {
+      console.error("AdMob error:", error);
+    }
+  };
+
+  tampilkanBanner();
+
+  return () => {
+    if (banner) {
+      banner.hide().catch(() => {});
+    }
+  };
+}, []);
 
 
   // ==================================================
