@@ -67,7 +67,7 @@ function Home() {
   // ==================================================
 
   const [message, setMessage] =
-    State("");
+    useState("");
 
   const [messages, setMessages] =
     useState([]);
