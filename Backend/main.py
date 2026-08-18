@@ -4,18 +4,25 @@ import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+from fastapi import FastAPI
+from starlette.middleware.wsgi import WSGIMiddleware
+
 from ai import balas
 from auth import auth
 from database import init_db, get_connection
 
 
-app = Flask(__name__)
+# ==================================================
+# FLASK APPLICATION
+# ==================================================
 
-CORS(app)
+flask_app = Flask(__name__)
+
+CORS(flask_app)
 
 # Batasi ukuran request.
 # Gambar dikirim sebagai Base64.
-app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+flask_app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
 
 
 # ==================================================
@@ -110,14 +117,14 @@ except Exception as e:
 # REGISTER AUTH
 # ==================================================
 
-app.register_blueprint(auth)
+flask_app.register_blueprint(auth)
 
 
 # ==================================================
 # HOME
 # ==================================================
 
-@app.route("/", methods=["GET"])
+@flask_app.route("/", methods=["GET"])
 def home():
 
     return jsonify({
@@ -135,7 +142,7 @@ def home():
 # CHAT
 # ==================================================
 
-@app.route("/chat", methods=["POST"])
+@flask_app.route("/chat", methods=["POST"])
 def chat():
 
     conn = None
@@ -540,7 +547,7 @@ def chat():
 # REQUEST TERLALU BESAR
 # ==================================================
 
-@app.errorhandler(413)
+@flask_app.errorhandler(413)
 def request_too_large(error):
 
     return jsonify({
@@ -556,7 +563,7 @@ def request_too_large(error):
 # ERROR 404
 # ==================================================
 
-@app.errorhandler(404)
+@flask_app.errorhandler(404)
 def not_found(error):
 
     return jsonify({
@@ -571,7 +578,7 @@ def not_found(error):
 # ERROR 500
 # ==================================================
 
-@app.errorhandler(500)
+@flask_app.errorhandler(500)
 def server_error(error):
 
     return jsonify({
@@ -583,10 +590,29 @@ def server_error(error):
 
 
 # ==================================================
+# FASTAPI APPLICATION
+# ==================================================
+
+app = FastAPI(
+    title="AI.Ind Backend"
+)
+
+
+# ==================================================
+# MOUNT FLASK KE FASTAPI
+# ==================================================
+
+app.mount(
+    "/",
+    WSGIMiddleware(flask_app)
+)
+
+
+# ==================================================
 # PYTHONANYWHERE / WSGI
 # ==================================================
 
-application = app
+application = flask_app
 
 
 # ==================================================
@@ -599,7 +625,7 @@ if __name__ == "__main__":
         "🚀 AI.Ind Backend berjalan..."
     )
 
-    app.run(
+    flask_app.run(
 
         host="0.0.0.0",
 
