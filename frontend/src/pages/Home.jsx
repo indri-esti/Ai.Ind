@@ -16,7 +16,7 @@ import Typing from "../components/Typing";
 import Sidebar from "../components/Sidebar";
 
 function Home() {
-
+  
   // ==================================================
   // BERSIHKAN RESPONSE AI
   // ==================================================
@@ -29,26 +29,31 @@ function Home() {
 
     let hasil = String(teks);
 
+    // Hapus <think>...</think>
     hasil = hasil.replace(
       /<think>[\s\S]*?<\/think>/gi,
       ""
     );
 
+    // Hapus <think> jika tidak ada penutup
     hasil = hasil.replace(
       /<think>[\s\S]*$/gi,
       ""
     );
 
+    // Hapus tag think yang tersisa
     hasil = hasil.replace(
       /<\/?think>/gi,
       ""
     );
 
+    // Hapus "Here's a thinking process..."
     hasil = hasil.replace(
       /^\s*(Here's|Heres|Here is)\s+a\s+thinking\s+process\s*:[\s\S]*$/i,
       ""
     );
 
+    // Rapikan baris kosong
     hasil = hasil.replace(
       /\n{3,}/g,
       "\n\n"
@@ -56,7 +61,6 @@ function Home() {
 
     return hasil.trim();
   };
-
 
   // ==================================================
   // STATE
@@ -91,57 +95,40 @@ function Home() {
 
   const chatEndRef =
     useRef(null);
+    
+    
+    // ==================================================
+// ADMOB BANNER
+// ==================================================
 
+useEffect(() => {
+  let banner = null;
 
-  // ==================================================
-  // ADMOB BANNER
-  // ==================================================
+  const tampilkanBanner = async () => {
+    try {
+      await AdMob.start();
 
-  useEffect(() => {
+      banner = new BannerAd({
+        adUnitId: "ca-app-pub-5699049952148750/4400311367",
+        position: "bottom",
+      });
 
-    let banner = null;
+      await banner.show();
 
-    const tampilkanBanner = async () => {
+      console.log("Banner AdMob berhasil ditampilkan");
+    } catch (error) {
+      console.error("AdMob error:", error);
+    }
+  };
 
-      try {
+  tampilkanBanner();
 
-        await AdMob.start();
-
-        banner = new BannerAd({
-          adUnitId:
-            "ca-app-pub-5699049952148750/4400311367",
-          position: "bottom",
-        });
-
-        await banner.show();
-
-        console.log(
-          "Banner AdMob berhasil ditampilkan"
-        );
-
-      } catch (error) {
-
-        console.error(
-          "AdMob error:",
-          error
-        );
-
-      }
-    };
-
-    tampilkanBanner();
-
-    return () => {
-
-      if (banner) {
-
-        banner.hide().catch(() => {});
-
-      }
-
-    };
-
-  }, []);
+  return () => {
+    if (banner) {
+      banner.hide().catch(() => {});
+    }
+  };
+}, []);
 
 
   // ==================================================
@@ -155,6 +142,8 @@ function Home() {
 
     if (!file) return;
 
+
+    // Hanya gambar
     if (!file.type.startsWith("image/")) {
 
       alert(
@@ -166,6 +155,8 @@ function Home() {
       return;
     }
 
+
+    // Batas 10 MB
     if (
       file.size >
       10 * 1024 * 1024
@@ -180,7 +171,9 @@ function Home() {
       return;
     }
 
+
     setSelectedImage(file);
+
 
     const previewUrl =
       URL.createObjectURL(file);
@@ -199,6 +192,7 @@ function Home() {
 
     setSelectedImage(null);
 
+
     if (imagePreview) {
 
       URL.revokeObjectURL(
@@ -207,7 +201,9 @@ function Home() {
 
     }
 
+
     setImagePreview(null);
+
 
     if (
       fileInputRef.current
@@ -249,10 +245,21 @@ function Home() {
 
       }, 1800);
 
+
     return () =>
       clearTimeout(timer);
 
   }, []);
+
+
+  // Bersihkan object URL ketika component dilepas
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
 
   // ==================================================
@@ -280,6 +287,7 @@ function Home() {
 
       };
 
+
       setHistory((prev) => [
 
         chat,
@@ -287,8 +295,8 @@ function Home() {
         ...prev,
 
       ]);
-
     }
+
 
     setMessages([]);
 
@@ -310,6 +318,7 @@ function Home() {
         const reader =
           new FileReader();
 
+
         reader.onload = () => {
 
           resolve(
@@ -317,6 +326,7 @@ function Home() {
           );
 
         };
+
 
         reader.onerror = () => {
 
@@ -328,13 +338,13 @@ function Home() {
 
         };
 
+
         reader.readAsDataURL(
           file
         );
 
       }
     );
-
   };
 
 
@@ -355,6 +365,7 @@ function Home() {
 
       }
 
+
       // ==================================================
       // CEK USER LOGIN
       // ==================================================
@@ -364,7 +375,9 @@ function Home() {
           "user"
         );
 
+
       let currentUser = {};
+
 
       try {
 
@@ -386,10 +399,12 @@ function Home() {
 
       }
 
+
       const userId =
         Number(
           currentUser?.id
         );
+
 
       if (
         !Number.isInteger(
@@ -402,6 +417,7 @@ function Home() {
           "USER ID TIDAK VALID:",
           currentUser
         );
+
 
         setMessages(
           (prev) => [
@@ -421,12 +437,15 @@ function Home() {
           ]
         );
 
+
         return;
       }
+
 
       try {
 
         setLoading(true);
+
 
         // ==================================================
         // PESAN
@@ -436,12 +455,14 @@ function Home() {
           message.trim() ||
           "Tolong analisis gambar ini.";
 
+
         // ==================================================
         // GAMBAR → BASE64
         // ==================================================
 
         let imageBase64 =
           null;
+
 
         if (
           selectedImage
@@ -454,35 +475,27 @@ function Home() {
 
         }
 
+
         // ==================================================
         // TAMPILKAN PESAN USER
         // ==================================================
 
         setMessages((prev) => [
+  ...prev,
+  {
+    role: "user",
+    content: pesanText,
+    image: imagePreview || null,
+  },
+]);
 
-          ...prev,
-
-          {
-
-            role:
-              "user",
-
-            content:
-              pesanText,
-
-            image:
-              imagePreview ||
-              null,
-
-          },
-
-        ]);
 
         // ==================================================
         // BERSIHKAN INPUT
         // ==================================================
 
         setMessage("");
+
 
         // ==================================================
         // KIRIM KE BACKEND
@@ -506,11 +519,13 @@ function Home() {
                     )
                   : null,
 
+              // GAMBAR
               image:
                 imageBase64,
 
             }
           );
+
 
         // ==================================================
         // CHAT ID
@@ -526,39 +541,40 @@ function Home() {
 
         }
 
+
         // ==================================================
         // JAWABAN AI
         // ==================================================
 
-        const jawabanAI =
-          bersihkanJawabanAI(
-            res.data?.reply
-          );
+        // ==================================================
+// JAWABAN AI
+// ==================================================
 
-        setMessages(
-          (prev) => [
+const jawabanAI =
+  bersihkanJawabanAI(
+    res.data?.reply
+  );
 
-            ...prev,
+setMessages(
+  (prev) => [
+    ...prev,
+    {
+      role: "assistant",
 
-            {
+      content:
+        jawabanAI ||
+        "AI tidak memberikan jawaban.",
+    },
+  ]
+);
 
-              role:
-                "assistant",
-
-              content:
-                jawabanAI ||
-                "AI tidak memberikan jawaban.",
-
-            },
-
-          ]
-        );
 
         // ==================================================
-        // HAPUS GAMBAR
+        // HAPUS GAMBAR SETELAH TERKIRIM
         // ==================================================
 
         hapusGambar();
+
 
       } catch (err) {
 
@@ -567,29 +583,25 @@ function Home() {
           err
         );
 
+
         let errorMessage =
-          "Server tidak dapat dihubungi.";
+          "Terjadi kesalahan saat menghubungi AI.";
 
-        if (
-          err.response
-        ) {
-
-          errorMessage =
+        if (err.response) {
+          const backendError =
             err.response?.data?.error ||
-            `Error ${err.response.status}`;
-
-        } else if (
-          err.request
-        ) {
-
-          // Jangan lagi mengatakan backend mati.
-          // Request sudah dikirim tetapi tidak mendapat
-          // response dari server.
+            err.response?.data?.message;
 
           errorMessage =
-            "Tidak dapat terhubung ke Backend AI.Ind. Periksa koneksi internet, URL API, atau CORS.";
-
+            backendError ||
+            `Backend mengembalikan error ${err.response.status}.`;
+        } else if (err.request) {
+          errorMessage =
+            "Backend tidak dapat dihubungi. Periksa koneksi internet atau status server.";
+        } else if (err.message) {
+          errorMessage = err.message;
         }
+
 
         setMessages(
           (prev) => [
@@ -608,6 +620,7 @@ function Home() {
 
           ]
         );
+
 
       } finally {
 
@@ -628,25 +641,14 @@ function Home() {
 
   }
 
-
   // ==================================================
   // RENDER
   // ==================================================
-
   return (
     <>
       <style>
         {`
-
-          * {
-            box-sizing: border-box;
-          }
-
           .home-page {
-            width: 100%;
-            height: 100vh;
-            min-height: 100vh;
-
             background:
               radial-gradient(
                 circle at 50% -10%,
@@ -654,252 +656,114 @@ function Home() {
                 transparent 35%
               ),
               #081420;
-
+            min-height: 100vh;
+            height: 100vh;
             color: #fff;
-
             display: flex;
-
             overflow: hidden;
           }
-
-
-          /* ==================================================
-             MAIN
-          ================================================== */
 
           .home-main {
-
             flex: 1;
-
-            width: 100%;
-            min-width: 0;
-
-            height: 100vh;
-            min-height: 0;
-
             display: flex;
             flex-direction: column;
-
+            min-width: 0;
+            height: 100vh;
             position: relative;
-
-            overflow: hidden;
           }
 
-
-          /* ==================================================
-             HEADER
-          ================================================== */
-
           .home-header {
-
-            width: 100%;
-
             position: relative;
-
             z-index: 10;
-
             flex-shrink: 0;
           }
 
           .home-header-container {
-
             width: 100%;
-
-            max-width: 1180px;
-
+            max-width: 1050px;
             margin: 0 auto;
-
-            padding:
-              14px 24px 0;
+            padding: 14px 20px 0;
           }
 
-
-          /* ==================================================
-             CHAT AREA
-          ================================================== */
-
           .home-chat-area {
-
             flex: 1;
-
-            width: 100%;
-
             min-height: 0;
-
             overflow: hidden;
           }
 
           .home-chat-container {
-
             width: 100%;
             height: 100%;
-
-            max-width: 1180px;
-
+            max-width: 1050px;
             margin: 0 auto;
-
-            padding:
-              0 24px;
+            padding: 0 20px;
           }
 
           .home-chat-column {
-
             height: 100%;
-
-            min-height: 0;
-
             display: flex;
-
             flex-direction: column;
+            min-height: 0;
           }
-
-
-          /* ==================================================
-             MESSAGES
-          ================================================== */
 
           .home-messages {
-
             flex: 1;
-
-            width: 100%;
-
             min-height: 0;
-
             overflow-y: auto;
             overflow-x: hidden;
-
-            padding:
-              10px 4px 180px;
-
+            padding: 10px 4px 155px;
             display: flex;
-
             flex-direction: column;
-
             gap: 12px;
-
             scrollbar-width: thin;
-
-            scrollbar-color:
-              #1B3445
-              transparent;
+            scrollbar-color: #1B3445 transparent;
           }
-
-          .home-messages::-webkit-scrollbar {
-
-            width: 6px;
-          }
-
-          .home-messages::-webkit-scrollbar-track {
-
-            background: transparent;
-          }
-
-          .home-messages::-webkit-scrollbar-thumb {
-
-            background: #1B3445;
-
-            border-radius: 20px;
-          }
-
-
-          /* ==================================================
-             WELCOME
-          ================================================== */
 
           .home-welcome {
-
             flex: 1;
-
             min-height: 0;
-
             width: 100%;
-
             display: flex;
-
             align-items: center;
-
             justify-content: center;
-
-            padding:
-              30px 15px 50px;
+            padding: 25px 10px 35px;
           }
 
           .home-welcome-content {
-
             width: 100%;
-
-            max-width: 700px;
-
-            margin: 0 auto;
-
+            max-width: 650px;
             text-align: center;
           }
 
-
-          /* ==================================================
-             LOGO
-          ================================================== */
-
           .home-logo-wrapper {
-
             position: relative;
-
             width: 108px;
             height: 108px;
-
-            margin:
-              0 auto 20px;
+            margin: 0 auto 20px;
           }
 
           .home-logo-box {
-
             position: relative;
-
             width: 108px;
             height: 108px;
-
             border-radius: 27px;
-
             overflow: hidden;
-
-            border:
-              1px solid
-              rgba(24,216,255,.18);
-
-            box-shadow:
-              0 15px 45px
-              rgba(0,194,255,.15);
+            border: 1px solid rgba(24,216,255,.18);
+            box-shadow: 0 15px 45px rgba(0,194,255,.15);
           }
 
           .home-logo-box svg {
-
             display: block;
-
             width: 100%;
             height: 100%;
           }
 
-
-          /* ==================================================
-             TITLE
-          ================================================== */
-
           .home-title {
-
-            margin:
-              0 0 8px;
-
-            font-size:
-              clamp(28px, 4vw, 44px);
-
+            margin: 0 0 8px;
+            font-size: clamp(26px, 5vw, 42px);
             font-weight: 800;
-
             line-height: 1.15;
-
-            letter-spacing:
-              -1.2px;
-
+            letter-spacing: -1.2px;
             background:
               linear-gradient(
                 90deg,
@@ -907,142 +771,51 @@ function Home() {
                 #00C2FF,
                 #008FE8
               );
-
-            -webkit-background-clip:
-              text;
-
-            -webkit-text-fill-color:
-              transparent;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
           }
 
           .home-subtitle {
-
-            margin:
-              0 auto 10px;
-
-            color:
-              #E7F3FA;
-
-            font-size:
-              clamp(15px, 2vw, 19px);
-
-            font-weight:
-              600;
+            margin: 0 auto 10px;
+            color: #E7F3FA;
+            font-size: clamp(15px, 3vw, 19px);
+            font-weight: 600;
           }
 
           .home-description {
-
-            width: 100%;
-
-            max-width: 560px;
-
-            margin:
-              0 auto;
-
-            color:
-              #8A9BB5;
-
-            font-size:
-              14px;
-
-            line-height:
-              1.7;
+            max-width: 540px;
+            margin: 0 auto;
+            color: #8A9BB5;
+            font-size: 14px;
+            line-height: 1.7;
           }
 
-
-          /* ==================================================
-             SUGGESTIONS
-          ================================================== */
-
           .home-suggestions {
-
-            margin-top:
-              22px;
-
-            display:
-              flex;
-
-            justify-content:
-              center;
-
-            align-items:
-              center;
-
-            flex-wrap:
-              wrap;
-
-            gap:
-              9px;
+            margin-top: 22px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 9px;
           }
 
           .home-suggestion-button {
-
-            padding:
-              9px 14px;
-
-            border-radius:
-              999px;
-
-            border:
-              1px solid
-              rgba(0,194,255,.18);
-
-            background:
-              rgba(18,43,60,.65);
-
-            color:
-              #A9C4D3;
-
-            font-size:
-              12px;
-
-            cursor:
-              pointer;
-
-            transition:
-              .2s ease;
-
-            backdrop-filter:
-              blur(10px);
-
-            white-space:
-              normal;
+            padding: 9px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,194,255,.18);
+            background: rgba(18,43,60,.65);
+            color: #A9C4D3;
+            font-size: 12px;
+            cursor: pointer;
+            transition: .2s ease;
+            backdrop-filter: blur(10px);
           }
-
-          .home-suggestion-button:hover {
-
-            transform:
-              translateY(-1px);
-
-            border-color:
-              rgba(0,194,255,.4);
-          }
-
-
-          /* ==================================================
-             INPUT
-          ================================================== */
 
           .home-input-area {
-
-            position:
-              absolute;
-
-            left:
-              0;
-
-            right:
-              0;
-
-            bottom:
-              0;
-
-            z-index:
-              20;
-
-            width:
-              100%;
-
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 20;
             background:
               linear-gradient(
                 to top,
@@ -1050,491 +823,268 @@ function Home() {
                 rgba(8,20,32,.94) 82%,
                 transparent
               );
-
-            padding:
-              35px 24px 18px;
+            padding: 35px 20px 18px;
           }
 
           .home-input-container {
-
-            width:
-              100%;
-
-            max-width:
-              1050px;
-
-            margin:
-              0 auto;
+            width: 100%;
+            max-width: 1050px;
+            margin: 0 auto;
           }
 
           .home-disclaimer {
-
-            width:
-              100%;
-
-            text-align:
-              center;
-
-            color:
-              #536B7D;
-
-            font-size:
-              10px;
-
-            line-height:
-              1.4;
-
-            margin-top:
-              7px;
-
-            padding:
-              0 5px;
+            text-align: center;
+            color: #536B7D;
+            font-size: 10px;
+            margin-top: 7px;
           }
 
-
-          /* ==================================================
-             DESKTOP BESAR
-          ================================================== */
-
-          @media (min-width: 1400px) {
-
-            .home-header-container,
-            .home-chat-container {
-
-              max-width:
-                1280px;
-            }
-
-            .home-input-container {
-
-              max-width:
-                1150px;
-            }
-
-            .home-welcome-content {
-
-              max-width:
-                760px;
-            }
-
-            .home-title {
-
-              font-size:
-                46px;
-            }
-
-            .home-description {
-
-              font-size:
-                15px;
-            }
+          .home-image-preview {
+            width: 100%;
+            margin-bottom: 8px;
           }
 
-
-          /* ==================================================
-             TABLET
-          ================================================== */
-
-          @media (max-width: 992px) {
-
-            .home-header-container {
-
-              padding:
-                12px 18px 0;
-            }
-
-            .home-chat-container {
-
-              padding:
-                0 18px;
-            }
-
-            .home-input-area {
-
-              padding:
-                30px 18px 14px;
-            }
-
-            .home-messages {
-
-              padding-bottom:
-                165px;
-            }
-
-            .home-welcome {
-
-              padding:
-                25px 12px 40px;
-            }
-
+          .home-image-preview-inner {
+            position: relative;
+            width: min(220px, 70vw);
+            min-height: 70px;
+            max-height: 150px;
+            overflow: hidden;
+            border-radius: 14px;
+            border: 1px solid rgba(24,216,255,.18);
+            background: rgba(10,31,45,.92);
           }
 
+          .home-image-preview-inner img {
+            display: block;
+            width: 100%;
+            max-height: 150px;
+            object-fit: cover;
+          }
 
-          /* ==================================================
-             HP
-          ================================================== */
+          .home-image-remove {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 50%;
+            background: rgba(5,15,24,.82);
+            color: #fff;
+            cursor: pointer;
+            z-index: 2;
+          }
+
+          .home-image-label {
+            position: absolute;
+            left: 7px;
+            right: 7px;
+            bottom: 7px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: fit-content;
+            max-width: calc(100% - 14px);
+            padding: 5px 8px;
+            border-radius: 999px;
+            background: rgba(5,15,24,.78);
+            color: #D8F6FF;
+            font-size: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .home-input-row {
+            width: 100%;
+            min-width: 0;
+          }
+
+          .home-input-row > * {
+            width: 100%;
+            min-width: 0;
+          }
 
           @media (max-width: 768px) {
-
             .home-page {
-
-              width: 100%;
-
               height: 100dvh;
-
               min-height: 100dvh;
-
-              overflow: hidden;
             }
 
             .home-main {
-
-              width: 100%;
-
               height: 100dvh;
-
-              min-height: 0;
             }
 
             .home-header-container {
-
-              padding:
-                9px 12px 0;
+              padding: 10px 12px 0;
             }
 
             .home-chat-container {
-
-              padding:
-                0 10px;
+              padding: 0 10px;
             }
 
             .home-messages {
-
               padding:
-                5px 2px 145px;
-
-              gap:
-                10px;
+                5px 2px 135px;
+              gap: 10px;
             }
 
             .home-welcome {
-
-              align-items:
-                center;
-
+              align-items: center;
               padding:
-                15px 8px 35px;
+                15px 8px 30px;
             }
 
             .home-welcome-content {
-
-              max-width:
-                100%;
+              max-width: 100%;
             }
 
             .home-logo-wrapper {
-
-              width:
-                82px;
-
-              height:
-                82px;
-
-              margin:
-                0 auto 14px;
+              width: 82px;
+              height: 82px;
+              margin-bottom: 14px;
             }
 
             .home-logo-box {
-
-              width:
-                82px;
-
-              height:
-                82px;
-
-              border-radius:
-                21px;
+              width: 82px;
+              height: 82px;
+              border-radius: 21px;
             }
 
             .home-title {
-
-              font-size:
-                clamp(
-                  24px,
-                  8vw,
-                  34px
-                );
-
-              letter-spacing:
-                -.8px;
+              font-size: clamp(
+                24px,
+                8vw,
+                34px
+              );
+              letter-spacing: -.8px;
             }
 
             .home-subtitle {
-
-              font-size:
-                14px;
-
-              line-height:
-                1.4;
-
-              padding:
-                0 8px;
+              font-size: 14px;
+              padding: 0 8px;
             }
 
             .home-description {
-
-              font-size:
-                12px;
-
-              line-height:
-                1.55;
-
-              padding:
-                0 10px;
+              font-size: 12px;
+              line-height: 1.55;
+              padding: 0 10px;
             }
 
             .home-suggestions {
-
-              margin-top:
-                16px;
-
-              gap:
-                7px;
-
-              padding:
-                0 5px;
+              margin-top: 16px;
+              gap: 7px;
+              padding: 0 5px;
             }
 
             .home-suggestion-button {
-
-              padding:
-                8px 11px;
-
-              font-size:
-                11px;
-
-              max-width:
-                100%;
+              padding: 8px 11px;
+              font-size: 11px;
             }
 
             .home-input-area {
-
               padding:
-                25px 10px 10px;
+                25px 10px calc(10px + env(safe-area-inset-bottom));
             }
 
-            .home-input-container {
+            .home-image-preview-inner {
+              width: min(180px, 62vw);
+              max-height: 115px;
+            }
 
-              max-width:
-                100%;
+            .home-image-preview-inner img {
+              max-height: 115px;
+            }
+
+            .home-image-remove {
+              width: 27px;
+              height: 27px;
+              top: 5px;
+              right: 5px;
+            }
+
+            .home-image-label {
+              font-size: 9px;
+              padding: 4px 7px;
             }
 
             .home-disclaimer {
-
-              font-size:
-                9px;
-
-              margin-top:
-                5px;
+              font-size: 9px;
+              margin-top: 5px;
             }
-
           }
 
-
-          /* ==================================================
-             HP KECIL
-          ================================================== */
-
-          @media (max-width: 480px) {
-
+          @media (max-width: 400px) {
             .home-header-container {
-
-              padding:
-                7px 8px 0;
+              padding-left: 8px;
+              padding-right: 8px;
             }
 
             .home-chat-container {
-
-              padding:
-                0 6px;
-            }
-
-            .home-messages {
-
-              padding:
-                4px 1px 138px;
-
-              gap:
-                8px;
+              padding-left: 6px;
+              padding-right: 6px;
             }
 
             .home-welcome {
-
-              padding:
-                10px 5px 25px;
+              padding-top: 8px;
+              padding-bottom: 20px;
             }
 
             .home-logo-wrapper {
-
-              width:
-                70px;
-
-              height:
-                70px;
-
-              margin-bottom:
-                10px;
+              width: 70px;
+              height: 70px;
+              margin-bottom: 10px;
             }
 
             .home-logo-box {
-
-              width:
-                70px;
-
-              height:
-                70px;
-
-              border-radius:
-                18px;
+              width: 70px;
+              height: 70px;
+              border-radius: 18px;
             }
 
             .home-title {
-
-              font-size:
-                24px;
+              font-size: 24px;
             }
 
             .home-subtitle {
-
-              font-size:
-                13px;
+              font-size: 13px;
             }
 
             .home-description {
-
-              font-size:
-                11px;
-
-              line-height:
-                1.5;
+              font-size: 11px;
             }
 
             .home-suggestions {
-
-              margin-top:
-                12px;
-
-              gap:
-                6px;
+              margin-top: 12px;
             }
 
             .home-suggestion-button {
-
-              padding:
-                7px 9px;
-
-              font-size:
-                10px;
+              padding: 7px 9px;
+              font-size: 10px;
             }
 
             .home-input-area {
-
               padding:
-                20px 7px 8px;
+                20px 7px calc(8px + env(safe-area-inset-bottom));
             }
 
-            .home-disclaimer {
-
-              font-size:
-                8px;
-
-              margin-top:
-                4px;
+            .home-image-preview-inner {
+              width: 150px;
+              max-height: 95px;
             }
 
+            .home-image-preview-inner img {
+              max-height: 95px;
+            }
           }
-
-
-          /* ==================================================
-             HP SANGAT KECIL
-          ================================================== */
-
-          @media (max-width: 360px) {
-
-            .home-title {
-
-              font-size:
-                22px;
-            }
-
-            .home-subtitle {
-
-              font-size:
-                12px;
-            }
-
-            .home-description {
-
-              font-size:
-                10px;
-            }
-
-            .home-suggestion-button {
-
-              padding:
-                6px 8px;
-
-              font-size:
-                9px;
-            }
-
-            .home-input-area {
-
-              padding:
-                18px 5px 6px;
-            }
-
-          }
-
-
-          /* ==================================================
-             LAYAR PENDEK
-          ================================================== */
-
-          @media (max-height: 700px) {
-
-            .home-welcome {
-
-              padding-top:
-                8px;
-
-              padding-bottom:
-                20px;
-            }
-
-            .home-logo-wrapper {
-
-              transform:
-                scale(.85);
-
-              margin-bottom:
-                2px;
-            }
-
-            .home-suggestions {
-
-              margin-top:
-                12px;
-            }
-
-          }
-
         `}
       </style>
 
-
       <div className="home-page">
-
         <Sidebar
           messages={messages}
           setMessages={setMessages}
@@ -1543,39 +1093,28 @@ function Home() {
           chatBaru={chatBaru}
         />
 
-
         <div className="home-main">
 
-          {/* ==================================================
+          {/* ==========================================
               HEADER
-          ================================================== */}
-
+          ========================================== */}
           <div className="home-header">
-
             <div className="home-header-container">
-
               <Header />
-
             </div>
-
           </div>
 
-
-          {/* ==================================================
+          {/* ==========================================
               CHAT AREA
-          ================================================== */}
-
+          ========================================== */}
           <div className="home-chat-area">
-
             <div className="home-chat-container">
-
               <Row
                 style={{
                   height: "100%",
                   margin: 0,
                 }}
               >
-
                 <Col
                   xs={12}
                   className="home-chat-column"
@@ -1583,301 +1122,341 @@ function Home() {
                     padding: 0,
                   }}
                 >
-
                   <div className="home-messages">
 
-                    {messages.length === 0 ? (
+                    {/* ==========================================
+                        WELCOME SCREEN
+                    ========================================== */}
+                    {messages.length === 0 &&
+                      !loading && (
+                        <div className="home-welcome">
+                          <div className="home-welcome-content">
 
-                      <div className="home-welcome">
+                            {/* LOGO */}
+                            <div className="home-logo-wrapper">
+                              <div
+                                style={{
+                                  position:
+                                    "absolute",
+                                  inset: "-18px",
+                                  borderRadius:
+                                    "38px",
+                                  background:
+                                    "rgba(0,194,255,.06)",
+                                  filter:
+                                    "blur(18px)",
+                                }}
+                              />
 
-                        <div className="home-welcome-content">
-
-                          <div className="home-logo-wrapper">
-
-                            <div className="home-logo-box">
-
-                              <svg
-                                viewBox="0 0 108 108"
-                                xmlns="http://www.w3.org/2000/svg"
-                              >
-
-                                <rect
+                              <div className="home-logo-box">
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 512 512"
                                   width="108"
                                   height="108"
-                                  rx="27"
-                                  fill="#0D2638"
-                                />
-
-                                <circle
-                                  cx="54"
-                                  cy="54"
-                                  r="30"
-                                  fill="#00C2FF"
-                                  opacity=".12"
-                                />
-
-                                <text
-                                  x="54"
-                                  y="66"
-                                  textAnchor="middle"
-                                  fontSize="38"
-                                  fontWeight="800"
-                                  fill="#18D8FF"
-                                  fontFamily="Arial, sans-serif"
                                 >
-                                  AI
-                                </text>
+                                  <defs>
+                                    <linearGradient
+                                      id="homeBg"
+                                      x1="0"
+                                      y1="0"
+                                      x2="1"
+                                      y2="1"
+                                    >
+                                      <stop
+                                        offset="0%"
+                                        stopColor="#0B1B2B"
+                                      />
+                                      <stop
+                                        offset="100%"
+                                        stopColor="#07111D"
+                                      />
+                                    </linearGradient>
 
-                              </svg>
+                                    <linearGradient
+                                      id="homeCyan"
+                                      x1="0"
+                                      y1="0"
+                                      x2="1"
+                                      y2="1"
+                                    >
+                                      <stop
+                                        offset="0%"
+                                        stopColor="#18D8FF"
+                                      />
+                                      <stop
+                                        offset="100%"
+                                        stopColor="#008FE8"
+                                      />
+                                    </linearGradient>
 
+                                    <filter
+                                      id="homeGlow"
+                                      x="-50%"
+                                      y="-50%"
+                                      width="200%"
+                                      height="200%"
+                                    >
+                                      <feGaussianBlur
+                                        stdDeviation="10"
+                                        result="blur"
+                                      />
+
+                                      <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                      </feMerge>
+                                    </filter>
+                                  </defs>
+
+                                  <rect
+                                    width="512"
+                                    height="512"
+                                    rx="110"
+                                    fill="url(#homeBg)"
+                                  />
+
+                                  <circle
+                                    cx="256"
+                                    cy="256"
+                                    r="170"
+                                    fill="#00C2FF"
+                                    opacity="0.06"
+                                  />
+
+                                  <circle
+                                    cx="256"
+                                    cy="256"
+                                    r="135"
+                                    fill="#00C2FF"
+                                    opacity="0.04"
+                                  />
+
+                                  <rect
+                                    x="244"
+                                    y="105"
+                                    width="24"
+                                    height="42"
+                                    rx="12"
+                                    fill="url(#homeCyan)"
+                                  />
+
+                                  <circle
+                                    cx="256"
+                                    cy="98"
+                                    r="9"
+                                    fill="#18D8FF"
+                                    filter="url(#homeGlow)"
+                                  />
+
+                                  <rect
+                                    x="137"
+                                    y="145"
+                                    width="238"
+                                    height="190"
+                                    rx="58"
+                                    fill="url(#homeCyan)"
+                                  />
+
+                                  <rect
+                                    x="112"
+                                    y="195"
+                                    width="25"
+                                    height="75"
+                                    rx="12"
+                                    fill="#11BCEB"
+                                  />
+
+                                  <rect
+                                    x="375"
+                                    y="195"
+                                    width="25"
+                                    height="75"
+                                    rx="12"
+                                    fill="#11BCEB"
+                                  />
+
+                                  <rect
+                                    x="153"
+                                    y="161"
+                                    width="206"
+                                    height="158"
+                                    rx="45"
+                                    fill="#0B1B2B"
+                                    opacity="0.18"
+                                  />
+
+                                  <circle
+                                    cx="207"
+                                    cy="225"
+                                    r="18"
+                                    fill="#07111D"
+                                  />
+
+                                  <circle
+                                    cx="305"
+                                    cy="225"
+                                    r="18"
+                                    fill="#07111D"
+                                  />
+
+                                  <rect
+                                    x="207"
+                                    y="271"
+                                    width="98"
+                                    height="13"
+                                    rx="6.5"
+                                    fill="#07111D"
+                                  />
+
+                                  <circle
+                                    cx="256"
+                                    cy="205"
+                                    r="5"
+                                    fill="#FFFFFF"
+                                    opacity="0.25"
+                                  />
+
+                                  <path
+                                    d="M190 365 C190 345 206 332 226 332 H286 C306 332 322 345 322 365 V382 H190Z"
+                                    fill="url(#homeCyan)"
+                                    opacity="0.9"
+                                  />
+
+                                  <path
+                                    d="M214 355 H298"
+                                    stroke="#FFFFFF"
+                                    strokeWidth="6"
+                                    strokeLinecap="round"
+                                    opacity="0.2"
+                                  />
+                                </svg>
+                              </div>
                             </div>
 
+                            {/* TITLE */}
+                            <h1 className="home-title">
+                              Selamat Datang di AI.Ind
+                            </h1>
+
+                            <p className="home-subtitle">
+                              Asisten AI Buatan
+                              Indonesia 🇮🇩
+                            </p>
+
+                            <p className="home-description">
+                              Teman cerdas untuk
+                              belajar, mencari ide,
+                              menjawab pertanyaan,
+                              dan membantu berbagai
+                              aktivitasmu.
+                            </p>
+
+                            {/* QUICK SUGGESTIONS */}
+                            <div className="home-suggestions">
+                              {[
+                                "Bantu belajar",
+                                "Cari ide",
+                                "Jelaskan sesuatu",
+                              ].map(
+                                (item) => (
+                                  <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() =>
+                                      setMessage(
+                                        item
+                                      )
+                                    }
+                                    className="home-suggestion-button"
+                                  >
+                                    {item}
+                                  </button>
+                                )
+                              )}
+                            </div>
                           </div>
-
-
-                          <h1 className="home-title">
-                            AI.Ind
-                          </h1>
-
-
-                          <p className="home-subtitle">
-                            Asisten AI untuk membantu kamu
-                          </p>
-
-
-                          <p className="home-description">
-                            Tanyakan apa saja, minta bantuan
-                            mengerjakan tugas, berdiskusi,
-                            atau kirim gambar untuk dianalisis.
-                          </p>
-
-
-                          <div className="home-suggestions">
-
-                            <button
-                              type="button"
-                              className="home-suggestion-button"
-                              onClick={() =>
-                                setMessage(
-                                  "Bantu aku mengerjakan tugas sekolah"
-                                )
-                              }
-                            >
-                              Bantu tugas
-                            </button>
-
-                            <button
-                              type="button"
-                              className="home-suggestion-button"
-                              onClick={() =>
-                                setMessage(
-                                  "Jelaskan materi ini dengan mudah"
-                                )
-                              }
-                            >
-                              Jelaskan materi
-                            </button>
-
-                            <button
-                              type="button"
-                              className="home-suggestion-button"
-                              onClick={() =>
-                                setMessage(
-                                  "Berikan ide yang menarik"
-                                )
-                              }
-                            >
-                              Cari ide
-                            </button>
-
-                          </div>
-
                         </div>
-
-                      </div>
-
-                    ) : (
-
-                      <>
-
-                        {messages.map(
-                          (item, index) => (
-
-                            <ChatBox
-                              key={
-                                item.id ||
-                                index
-                              }
-                              message={
-                                item
-                              }
-                            />
-
-                          )
-                        )}
-
-                        {loading && (
-                          <Typing />
-                        )}
-
-                        <div
-                          ref={chatEndRef}
-                        />
-
-                      </>
-
-                    )}
-
-                  </div>
-
-
-                  {/* ==================================================
-                      INPUT
-                  ================================================== */}
-
-                  <div className="home-input-area">
-
-                    <div className="home-input-container">
-
-                      {imagePreview && (
-
-                        <div
-                          style={{
-                            position:
-                              "relative",
-                            width:
-                              "fit-content",
-                            maxWidth:
-                              "100%",
-                            margin:
-                              "0 auto 10px",
-                          }}
-                        >
-
-                          <img
-                            src={
-                              imagePreview
-                            }
-                            alt="Preview"
-                            style={{
-                              display:
-                                "block",
-                              maxWidth:
-                                "180px",
-                              maxHeight:
-                                "120px",
-                              width:
-                                "auto",
-                              height:
-                                "auto",
-                              objectFit:
-                                "cover",
-                              borderRadius:
-                                "12px",
-                              border:
-                                "1px solid rgba(0,194,255,.25)",
-                            }}
-                          />
-
-                          <button
-                            type="button"
-                            onClick={
-                              hapusGambar
-                            }
-                            style={{
-                              position:
-                                "absolute",
-                              top:
-                                "-8px",
-                              right:
-                                "-8px",
-                              width:
-                                "28px",
-                              height:
-                                "28px",
-                              borderRadius:
-                                "50%",
-                              border:
-                                "1px solid rgba(255,255,255,.2)",
-                              background:
-                                "#102638",
-                              color:
-                                "#fff",
-                              display:
-                                "flex",
-                              alignItems:
-                                "center",
-                              justifyContent:
-                                "center",
-                              cursor:
-                                "pointer",
-                            }}
-                          >
-                            <FiX size={15} />
-                          </button>
-
-                        </div>
-
                       )}
 
+                    {/* CHAT */}
+                    {/* CHAT */}
+{messages.length > 0 && (
+  <ChatBox
+    messages={messages}
+    loading={false}
+    chatEndRef={chatEndRef}
+  />
+)}
 
-                      <input
-                        ref={
-                          fileInputRef
-                        }
-                        type="file"
-                        accept="image/*"
-                        onChange={
-                          pilihGambar
-                        }
-                        style={{
-                          display:
-                            "none",
-                        }}
-                      />
+{loading && <Typing />}
 
+<div ref={chatEndRef} />
+                  </div>
+                </Col>
+              </Row>
+            </div>
+          </div>
 
-                      <ChatInput
-                        message={
-                          message
-                        }
-                        setMessage={
-                          setMessage
-                        }
-                        kirimPesan={
-                          kirimPesan
-                        }
-                        loading={
-                          loading
-                        }
-                        pilihGambar={() =>
-                          fileInputRef.current?.click()
-                        }
-                      />
+          {/* ==========================================
+              INPUT AREA
+          ========================================== */}
+          <div className="home-input-area">
+            <div className="home-input-container">
 
+              {/* PREVIEW GAMBAR */}
+              {imagePreview && (
+                <div className="home-image-preview">
+                  <div className="home-image-preview-inner">
 
-                      <div className="home-disclaimer">
+                    <img
+                      src={imagePreview}
+                      alt="Preview gambar"
+                    />
 
-                        AI.Ind dapat membuat
-                        kesalahan. Periksa kembali
-                        informasi penting.
+                    <button
+                      type="button"
+                      className="home-image-remove"
+                      onClick={hapusGambar}
+                      title="Hapus gambar"
+                    >
+                      <FiX size={16} />
+                    </button>
 
-                      </div>
-
+                    <div className="home-image-label">
+                      <FiImage size={14} />
+                      Gambar siap dianalisis
                     </div>
 
                   </div>
+                </div>
+              )}
 
-                </Col>
+              {/* INPUT ROW */}
+             <div className="home-input-row">
+ <ChatInput
+  message={message}
+  setMessage={setMessage}
+  kirimPesan={kirimPesan}
+  loading={loading}
+  fileInputRef={fileInputRef}
+  pilihGambar={pilihGambar}
+  imagePreview={imagePreview}
+  hapusGambar={hapusGambar}
+/>
+</div>
 
-              </Row>
+              {/* DISCLAIMER */}
+              <div className="home-disclaimer">
+                AI.Ind dapat membuat
+                kesalahan. Periksa kembali
+                informasi penting.
+              </div>
 
             </div>
-
           </div>
 
         </div>
-
       </div>
     </>
   );
