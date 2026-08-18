@@ -1,5 +1,10 @@
 import axios from "axios";
 
-export default axios.create({
-  baseURL: "https://Indr.pythonanywhere.com",
+const api = axios.create({
+  baseURL: "https://aiind-bc6e94a5.fastapicloud.dev",
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
+
+export default api;
