@@ -4,7 +4,8 @@ import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.wsgi import WSGIMiddleware
 
 from ai import balas
@@ -594,13 +595,97 @@ def server_error(error):
 # ==================================================
 
 app = FastAPI(
-    title="AI.Ind Backend"
+    title="AI.Ind Backend",
+    version="0.1.0",
+    description="Backend AI.Ind untuk chat AI, akun pengguna, history chat, dan analisis gambar."
 )
+
+
+# ==================================================
+# FASTAPI HOME
+# ==================================================
+
+@app.get(
+    "/",
+    tags=["System"],
+    summary="Cek status backend"
+)
+async def fastapi_home():
+
+    return {
+        "status": "AI.Ind Backend Running",
+        "message": "Backend siap digunakan"
+    }
+
+
+# ==================================================
+# FASTAPI CHAT
+# ==================================================
+
+@app.post(
+    "/chat",
+    tags=["AI"],
+    summary="Kirim pesan ke AI.Ind"
+)
+async def fastapi_chat(request: Request):
+
+    try:
+
+        data = await request.json()
+
+    except Exception:
+
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error":
+                    "Request body kosong atau JSON tidak valid"
+            }
+        )
+
+    # ==================================================
+    # TERUSKAN REQUEST KE FLASK
+    # ==================================================
+
+    with flask_app.test_client() as client:
+
+        response = client.post(
+            "/chat",
+            json=data
+        )
+
+    # ==================================================
+    # AMBIL RESPONSE FLASK
+    # ==================================================
+
+    try:
+
+        response_data = response.get_json()
+
+    except Exception:
+
+        response_data = {
+            "error":
+                response.get_data(
+                    as_text=True
+                )
+        }
+
+    return JSONResponse(
+        status_code=response.status_code,
+        content=response_data
+    )
 
 
 # ==================================================
 # MOUNT FLASK KE FASTAPI
 # ==================================================
+
+# Flask tetap dipertahankan untuk route lama
+# dan endpoint auth.
+#
+# Endpoint FastAPI di atas (/ dan /chat)
+# akan diproses lebih dahulu oleh FastAPI.
 
 app.mount(
     "/",
