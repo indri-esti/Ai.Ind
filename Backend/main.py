@@ -6,6 +6,7 @@ from flask_cors import CORS
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.wsgi import WSGIMiddleware
 
 from ai import balas
@@ -598,6 +599,19 @@ app = FastAPI(
     title="AI.Ind Backend",
     version="0.1.0",
     description="Backend AI.Ind untuk chat AI, akun pengguna, history chat, dan analisis gambar."
+)
+
+
+# ==================================================
+# FASTAPI CORS
+# ==================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
