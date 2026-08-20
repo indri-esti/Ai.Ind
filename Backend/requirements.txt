@@ -12,6 +12,7 @@ google-auth==2.56.3
 idna==3.18
 itsdangerous==2.2.0
 Jinja2==3.1.6
+libsql==0.1.11
 MarkupSafe==3.0.3
 packaging==26.3
 pyasn1==0.6.4
