@@ -1462,4 +1462,4 @@ setMessages(
   );
 }
 
-export default Home;
+x
