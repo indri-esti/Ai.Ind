@@ -24,7 +24,7 @@ MAX_HISTORY_CHARS = 12000
 # Maksimal karakter satu pesan history.
 MAX_MESSAGE_CHARS = 4000
 
-# Sebelumnya 700 sehingga jawaban mudah terpotong.
+# Maksimal token jawaban.
 MAX_OUTPUT_TOKENS = 1200
 
 # Maksimal percobaan request.
@@ -95,8 +95,15 @@ def bersihkan_jawaban(teks):
     )
 
     # Hapus informasi safety
-    teks = teks.replace("User Safety: safe", "")
-    teks = teks.replace("Response Safety: safe", "")
+    teks = teks.replace(
+        "User Safety: safe",
+        ""
+    )
+
+    teks = teks.replace(
+        "Response Safety: safe",
+        ""
+    )
 
     # Hapus phrase thinking
     teks = re.sub(
@@ -159,6 +166,7 @@ def validasi_gambar(image):
         return None
 
     if len(image) > 5_500_000:
+
         raise ValueError(
             "Ukuran gambar terlalu besar. "
             "Kompres gambar terlebih dahulu."
@@ -187,7 +195,10 @@ def siapkan_history(history):
         role = item.get("role")
         content = item.get("content")
 
-        if role not in ["user", "assistant"]:
+        if role not in [
+            "user",
+            "assistant"
+        ]:
             continue
 
         if not content:
@@ -206,14 +217,23 @@ def siapkan_history(history):
 
                 if part.get("type") == "text":
 
-                    text_part = part.get("text", "")
+                    text_part = part.get(
+                        "text",
+                        ""
+                    )
 
                     if text_part:
-                        teks_parts.append(str(text_part))
+                        teks_parts.append(
+                            str(text_part)
+                        )
 
-            content = "\n".join(teks_parts)
+            content = "\n".join(
+                teks_parts
+            )
 
-        content = str(content).strip()
+        content = str(
+            content
+        ).strip()
 
         if not content:
             continue
@@ -228,9 +248,15 @@ def siapkan_history(history):
 
         tambahan = len(content)
 
-        if total_chars + tambahan > MAX_HISTORY_CHARS:
+        if (
+            total_chars + tambahan
+            > MAX_HISTORY_CHARS
+        ):
 
-            sisa = MAX_HISTORY_CHARS - total_chars
+            sisa = (
+                MAX_HISTORY_CHARS
+                - total_chars
+            )
 
             if sisa > 200:
 
@@ -274,20 +300,27 @@ def ambil_waktu_retry(response):
     # COBA HEADER Retry-After
     # --------------------------------------------------
 
-    retry_after = response.headers.get("Retry-After")
+    retry_after = response.headers.get(
+        "Retry-After"
+    )
 
     if retry_after:
 
         try:
 
-            waktu = float(retry_after)
+            waktu = float(
+                retry_after
+            )
 
             return min(
                 max(waktu + 1, 2),
                 MAX_RETRY_WAIT
             )
 
-        except (ValueError, TypeError):
+        except (
+            ValueError,
+            TypeError
+        ):
             pass
 
     # --------------------------------------------------
@@ -314,14 +347,19 @@ def ambil_waktu_retry(response):
 
             try:
 
-                waktu = float(match.group(1))
+                waktu = float(
+                    match.group(1)
+                )
 
                 return min(
                     max(waktu + 1, 2),
                     MAX_RETRY_WAIT
                 )
 
-            except (ValueError, TypeError):
+            except (
+                ValueError,
+                TypeError
+            ):
                 pass
 
     # Default
@@ -334,7 +372,9 @@ def ambil_waktu_retry(response):
 
 def request_groq(headers, data):
 
-    for attempt in range(MAX_RETRIES):
+    for attempt in range(
+        MAX_RETRIES
+    ):
 
         try:
 
@@ -372,8 +412,10 @@ def request_groq(headers, data):
                 # Kalau masih ada kesempatan.
                 if attempt < MAX_RETRIES - 1:
 
-                    retry_seconds = ambil_waktu_retry(
-                        response
+                    retry_seconds = (
+                        ambil_waktu_retry(
+                            response
+                        )
                     )
 
                     print(
@@ -381,11 +423,12 @@ def request_groq(headers, data):
                         f"{retry_seconds:.1f} detik..."
                     )
 
-                    time.sleep(retry_seconds)
+                    time.sleep(
+                        retry_seconds
+                    )
 
                     continue
 
-                # Jangan retry lagi.
                 return response
 
             # ==================================================
@@ -396,22 +439,28 @@ def request_groq(headers, data):
 
         except requests.exceptions.Timeout:
 
-            print("[Groq] Timeout")
+            print(
+                "[Groq] Timeout"
+            )
 
             if attempt < MAX_RETRIES - 1:
 
                 time.sleep(2)
+
                 continue
 
             return None
 
         except requests.exceptions.ConnectionError:
 
-            print("[Groq] Connection Error")
+            print(
+                "[Groq] Connection Error"
+            )
 
             if attempt < MAX_RETRIES - 1:
 
                 time.sleep(2)
+
                 continue
 
             return None
@@ -454,7 +503,11 @@ def balas(
     # HISTORY
     # ==================================================
 
-    if not isinstance(history, list):
+    if not isinstance(
+        history,
+        list
+    ):
+
         history = []
 
     # ==================================================
@@ -463,7 +516,9 @@ def balas(
 
     try:
 
-        image = validasi_gambar(image)
+        image = validasi_gambar(
+            image
+        )
 
     except ValueError as e:
 
@@ -488,8 +543,10 @@ def balas(
     # HISTORY
     # ==================================================
 
-    history_terbaru = siapkan_history(
-        history
+    history_terbaru = (
+        siapkan_history(
+            history
+        )
     )
 
     messages.extend(
@@ -509,7 +566,10 @@ def balas(
         ).strip()
 
     # Kalau hanya gambar.
-    if not pesan_text and image:
+    if (
+        not pesan_text
+        and image
+    ):
 
         pesan_text = (
             "Analisis gambar ini dan jelaskan "
@@ -517,7 +577,10 @@ def balas(
         )
 
     # Kalau benar-benar kosong.
-    if not pesan_text and not image:
+    if (
+        not pesan_text
+        and not image
+    ):
 
         return (
             "Silakan tulis pertanyaan atau pesan "
@@ -586,8 +649,9 @@ def balas(
         "model": request_model,
         "messages": messages,
 
-        # Naikkan supaya jawaban tidak mudah terpotong.
-        "max_tokens": MAX_OUTPUT_TOKENS,
+        # Gunakan parameter API Groq terbaru.
+        "max_completion_tokens":
+            MAX_OUTPUT_TOKENS,
 
         # Jawaban natural.
         "temperature": 0.4
@@ -633,8 +697,6 @@ def balas(
                 "====================================="
             )
 
-            # PENTING:
-            # Jangan lempar error 429 ke frontend.
             return (
                 "AI sedang sibuk karena terlalu banyak "
                 "permintaan. Tunggu sebentar lalu kirim "
@@ -723,7 +785,10 @@ def balas(
         # ERROR DARI API
         # ==================================================
 
-        if isinstance(hasil, dict):
+        if isinstance(
+            hasil,
+            dict
+        ):
 
             if hasil.get("error"):
 
@@ -741,7 +806,9 @@ def balas(
         # CHOICES
         # ==================================================
 
-        choices = hasil.get("choices")
+        choices = hasil.get(
+            "choices"
+        )
 
         if not choices:
 
@@ -764,7 +831,10 @@ def balas(
             {}
         )
 
-        if not isinstance(message, dict):
+        if not isinstance(
+            message,
+            dict
+        ):
 
             print(
                 "Message AI tidak valid:",
@@ -806,8 +876,10 @@ def balas(
         # BERSIHKAN
         # ==================================================
 
-        jawaban = bersihkan_jawaban(
-            jawaban
+        jawaban = (
+            bersihkan_jawaban(
+                jawaban
+            )
         )
 
         # ==================================================
