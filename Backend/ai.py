@@ -10,7 +10,7 @@ from prompt import SYSTEM_PROMPT
 # MODEL VISION
 # ==================================================
 
-VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+VISION_MODEL = "qwen/qwen3.6-27b"
 
 
 # ==================================================
@@ -937,22 +937,6 @@ def balas(
         )
 
         return (
-            "Koneksi ke server AI mengalami masalah. "
-            "Silakan coba lagi."
-        )
-
-    # ==================================================
-    # ERROR UMUM
-    # ==================================================
-
-    except Exception as e:
-
-        print(
-            "AI Error:",
-            repr(e)
-        )
-
-        return (
-            "Terjadi kesalahan saat memproses pesan. "
+            "Terjadi kesalahan saat menghubungi AI. "
             "Silakan coba lagi."
         )
