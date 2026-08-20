@@ -1,24 +1,134 @@
-import sqlite3
 import os
 
+import libsql
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, "users.db")
+from dotenv import load_dotenv
 
+
+# ==================================================
+# ENV
+# ==================================================
+
+load_dotenv()
+
+TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN")
+
+
+# ==================================================
+# ROW (biar bisa diakses row["kolom"] sama seperti sqlite3.Row)
+# ==================================================
+
+class Row(dict):
+
+    def __getitem__(self, key):
+        return dict.__getitem__(self, key)
+
+
+# ==================================================
+# WRAPPER CURSOR
+# ==================================================
+
+class CursorWrapper:
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, sql, params=()):
+        self._cursor.execute(sql, params)
+        return self
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    def fetchone(self):
+
+        row = self._cursor.fetchone()
+
+        return self._ubah_row(row)
+
+    def fetchall(self):
+
+        rows = self._cursor.fetchall()
+
+        return [
+            self._ubah_row(r)
+            for r in rows
+        ]
+
+    def _ubah_row(self, row):
+
+        if row is None:
+            return None
+
+        kolom = [
+            d[0]
+            for d in self._cursor.description
+        ]
+
+        return Row(
+            zip(kolom, row)
+        )
+
+
+# ==================================================
+# WRAPPER CONNECTION
+# ==================================================
+
+class ConnectionWrapper:
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return CursorWrapper(
+            self._conn.cursor()
+        )
+
+    def execute(self, sql, params=()):
+        return self.cursor().execute(sql, params)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+
+
+# ==================================================
+# KONEKSI
+# ==================================================
 
 def get_connection():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
 
-    # Aktifkan foreign key SQLite
-    conn.execute("PRAGMA foreign_keys = ON")
+    if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
 
-    return conn
+        raise RuntimeError(
+            "TURSO_DATABASE_URL / TURSO_AUTH_TOKEN belum "
+            "diset di environment variables."
+        )
 
+    conn = libsql.connect(
+        database=TURSO_DATABASE_URL,
+        auth_token=TURSO_AUTH_TOKEN,
+    )
+
+    return ConnectionWrapper(conn)
+
+
+# ==================================================
+# INIT DATABASE
+# ==================================================
 
 def init_db():
 
     conn = get_connection()
+
     cursor = conn.cursor()
 
     # =========================
@@ -85,4 +195,5 @@ def init_db():
     """)
 
     conn.commit()
+
     conn.close()

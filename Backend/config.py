@@ -26,7 +26,7 @@ GROQ_BASE_URL = (
 
 # Model Groq
 # Mendukung text + image input
-MODEL = "llama-3.1-8b-instant"
+MODEL = "openai/gpt-oss-20b"
 
 # ==================================================
 # GOOGLE
