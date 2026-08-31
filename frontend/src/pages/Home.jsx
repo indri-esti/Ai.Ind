@@ -593,8 +593,8 @@ function Home() {
   // IMAGE
   // ==========================================
   const pilihGambar = (event) => {
-    const file =
-      event.target.files?.[0];
+    const input = event?.target;
+    const file = input?.files?.[0];
 
     if (!file) return;
 
@@ -614,6 +614,10 @@ function Home() {
 
       event.target.value = "";
       return;
+    }
+
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
     }
 
     setSelectedImage(file);
@@ -1143,7 +1147,8 @@ function Home() {
           left: 0;
           right: 0;
           bottom: 0;
-          z-index: 20;
+          z-index: 100;
+          pointer-events: auto;
           padding: 40px 22px 18px;
           background:
             linear-gradient(
@@ -1163,11 +1168,25 @@ function Home() {
         .home-input-row {
           width: 100%;
           min-width: 0;
+          position: relative;
+          z-index: 101;
+          pointer-events: auto;
         }
 
         .home-input-row > * {
           width: 100%;
           min-width: 0;
+          position: relative;
+          z-index: 102;
+          pointer-events: auto;
+        }
+
+        .home-input-row button,
+        .home-input-row label,
+        .home-input-row input,
+        .home-input-row [role="button"] {
+          pointer-events: auto !important;
+          touch-action: manipulation;
         }
 
         .home-disclaimer {
