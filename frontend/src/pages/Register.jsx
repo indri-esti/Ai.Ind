@@ -162,15 +162,16 @@ function Register() {
               overflow: "hidden",
             }}
           >
-            <img
-              src="/robot.png"
-              alt="AI.Ind Robot"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
+             <img
+  src="/logo.svg"
+  alt="AI.Ind"
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    display: "block",
+  }}
+/>
           </div>
 
           <h1
