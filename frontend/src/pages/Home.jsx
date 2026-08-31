@@ -801,9 +801,9 @@ function Home() {
 
           .home-header-container {
             width: 100%;
-            max-width: 1100px;
-            margin: auto;
-            padding: 10px 22px 0;
+            max-width: none;
+            margin: 0;
+            padding: 0;
           }
 
           .home-chat-area {
@@ -1059,8 +1059,9 @@ function Home() {
 
           @media (max-width: 767px) {
             .home-header-container {
-              padding:
-                8px 10px 0;
+              padding: 0;
+              margin: 0;
+              max-width: none;
             }
 
             .home-chat-container {
