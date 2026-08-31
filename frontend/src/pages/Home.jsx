@@ -22,6 +22,15 @@ import Sidebar from "../components/Sidebar";
 
 import Welcome from "../components/Welcome";
 
+// ==========================================
+// DEBUG TOGGLE
+// Set ke false untuk mematikan sementara banner
+// AdMob (untuk tes apakah itu penyebab tombol +
+// tidak bisa diklik). Jangan lupa kembalikan ke
+// true setelah selesai tes.
+// ==========================================
+const AKTIFKAN_ADMOB = false;
+
 function Home() {
   // ==========================================
   // BERSIHKAN RESPONSE AI
@@ -669,7 +678,13 @@ function Home() {
       }
     };
 
-    tampilkanBanner();
+    if (AKTIFKAN_ADMOB) {
+      tampilkanBanner();
+    } else {
+      console.log(
+        "AdMob dimatikan sementara (mode debug)"
+      );
+    }
 
     return () => {
       document.removeEventListener(
