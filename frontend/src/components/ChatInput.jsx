@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Button } from "react-bootstrap";
 import { FaPaperPlane } from "react-icons/fa";
 import { FiPlus } from "react-icons/fi";
@@ -12,12 +13,29 @@ function ChatInput({
   imagePreview,
   hapusGambar,
 }) {
+  const [plusPressed, setPlusPressed] = useState(false);
+
   const handleKirim = () => {
     if (loading) return;
 
     if (!message.trim() && !imagePreview) return;
 
     kirimPesan();
+  };
+
+  const tekanPlus = () => {
+    if (loading) return;
+
+    setPlusPressed(true);
+
+    setTimeout(() => {
+      setPlusPressed(false);
+    }, 220);
+  };
+
+  const selesaiPilihGambar = (e) => {
+    setPlusPressed(false);
+    pilihGambar(e);
   };
 
   return (
@@ -27,33 +45,93 @@ function ChatInput({
         maxWidth: "900px",
         margin: "0 auto",
         position: "relative",
-        zIndex: 20,
+        zIndex: 99999,
+        isolation: "isolate",
       }}
     >
       <style>{`
-        .home-plus-button {
-          transition:
-            background-color 0.15s ease,
-            box-shadow 0.15s ease;
-          -webkit-tap-highlight-color: transparent;
-          -webkit-touch-callout: none;
+        .home-plus-wrapper {
+          position: relative;
+          width: 46px;
+          height: 46px;
+          min-width: 46px;
+          min-height: 46px;
+          flex-shrink: 0;
+          z-index: 99999;
+          isolation: isolate;
         }
 
-        .home-plus-button:active {
-          background-color: #1c3550 !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        .home-plus-button {
+          position: absolute;
+          inset: 0;
+          width: 46px;
+          height: 46px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          background: #13283F;
+          border: 1px solid rgba(255,255,255,.09);
+          color: #D7F6FF;
+
+          box-shadow: 0 8px 24px rgba(0,0,0,.24);
+
+          padding: 0;
+          margin: 0;
+
+          pointer-events: none;
+
+          transition:
+            transform 0.16s ease,
+            background-color 0.16s ease,
+            box-shadow 0.16s ease;
+        }
+
+        .home-plus-button.pressed {
+          transform: scale(0.78) rotate(90deg);
+          background: #00C2FF !important;
+          color: #081420 !important;
+          box-shadow:
+            0 0 0 5px rgba(0,194,255,.15),
+            0 5px 16px rgba(0,194,255,.35);
         }
 
         .home-plus-icon {
-          transition: transform 0.15s ease;
           display: flex;
           align-items: center;
           justify-content: center;
           pointer-events: none;
         }
 
-        .home-plus-button:active .home-plus-icon {
-          transform: scale(0.82) rotate(90deg);
+        .home-plus-file {
+          position: absolute !important;
+          inset: 0 !important;
+          width: 46px !important;
+          height: 46px !important;
+          min-width: 46px !important;
+          min-height: 46px !important;
+
+          opacity: 0 !important;
+
+          cursor: pointer !important;
+
+          z-index: 100000 !important;
+
+          pointer-events: auto !important;
+
+          margin: 0 !important;
+          padding: 0 !important;
+
+          touch-action: manipulation !important;
+
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none !important;
+        }
+
+        .home-plus-file:disabled {
+          pointer-events: none !important;
+          cursor: not-allowed !important;
         }
 
         .send-btn {
@@ -98,71 +176,39 @@ function ChatInput({
           }}
         >
           {/* =====================================================
-              PLUS / UPLOAD GAMBAR
+              PLUS BUTTON
               ===================================================== */}
-          <label
-            htmlFor="chat-image-input"
-            className="home-plus-button"
-            aria-label="Tambah gambar"
-            title="Tambah gambar"
-            style={{
-              position: "relative",
-              width: 46,
-              height: 46,
-              minWidth: 46,
-              minHeight: 46,
-              borderRadius: "50%",
-              flexShrink: 0,
+          <div className="home-plus-wrapper">
+            <button
+              type="button"
+              tabIndex="-1"
+              aria-hidden="true"
+              className={`home-plus-button${
+                plusPressed ? " pressed" : ""
+              }`}
+            >
+              <span className="home-plus-icon">
+                <FiPlus
+                  size={23}
+                  strokeWidth={2.5}
+                />
+              </span>
+            </button>
 
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-
-              background: "#13283F",
-              border: "1px solid rgba(255,255,255,.09)",
-              color: "#D7F6FF",
-
-              boxShadow: "0 8px 24px rgba(0,0,0,.24)",
-
-              opacity: loading ? 0.5 : 1,
-              cursor: loading ? "not-allowed" : "pointer",
-
-              padding: 0,
-              margin: 0,
-
-              WebkitTapHighlightColor: "transparent",
-              touchAction: "manipulation",
-              userSelect: "none",
-              WebkitUserSelect: "none",
-
-              pointerEvents: loading ? "none" : "auto",
-            }}
-          >
-            <span className="home-plus-icon">
-              <FiPlus size={23} strokeWidth={2.5} />
-            </span>
-          </label>
-
-          {/* =====================================================
-              FILE INPUT
-              ===================================================== */}
-          <input
-            id="chat-image-input"
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={pilihGambar}
-            disabled={loading}
-            aria-label="Pilih gambar"
-            style={{
-              position: "absolute",
-              width: 1,
-              height: 1,
-              opacity: 0,
-              overflow: "hidden",
-              pointerEvents: "none",
-            }}
-          />
+            {/* INPUT FILE LANGSUNG DI ATAS TOMBOL */}
+            <input
+              id="chat-image-input"
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={selesaiPilihGambar}
+              onPointerDown={tekanPlus}
+              onTouchStart={tekanPlus}
+              disabled={loading}
+              aria-label="Tambah gambar"
+              className="home-plus-file"
+            />
+          </div>
 
           {/* =====================================================
               INPUT CHAT
@@ -193,7 +239,10 @@ function ChatInput({
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
 
-                  if (!loading && (message.trim() || imagePreview)) {
+                  if (
+                    !loading &&
+                    (message.trim() || imagePreview)
+                  ) {
                     handleKirim();
                   }
                 }
@@ -225,7 +274,8 @@ function ChatInput({
               type="submit"
               className="send-btn"
               disabled={
-                loading || (!message.trim() && !imagePreview)
+                loading ||
+                (!message.trim() && !imagePreview)
               }
               style={{
                 width: 46,
@@ -236,7 +286,8 @@ function ChatInput({
                 border: "none",
 
                 background:
-                  loading || (!message.trim() && !imagePreview)
+                  loading ||
+                  (!message.trim() && !imagePreview)
                     ? "#4B647A"
                     : "#00C2FF",
 
