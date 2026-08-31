@@ -23,11 +23,12 @@ import Sidebar from "../components/Sidebar";
 import Welcome from "../components/Welcome";
 
 // ==========================================
-// ADMOB
+// DEBUG TOGGLE
+// Set ke false untuk mematikan sementara banner
+// AdMob (untuk tes apakah itu penyebab tombol +
+// tidak bisa diklik). Jangan lupa kembalikan ke
+// true setelah selesai tes.
 // ==========================================
-// Untuk memastikan tombol + tidak tertutup native
-// AdMob saat debugging, sementara false.
-// Kalau tombol + sudah stabil, bisa ubah ke true.
 const AKTIFKAN_ADMOB = false;
 
 function Home() {
@@ -74,7 +75,6 @@ function Home() {
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-
   const fileInputRef = useRef(null);
 
   const [history, setHistory] = useState([]);
@@ -83,7 +83,7 @@ function Home() {
   const [currentChatId, setCurrentChatId] = useState(null);
 
   // ==========================================
-  // REF
+  // REF HISTORY
   // ==========================================
   const activeHistoryIdRef = useRef(null);
   const historyLoadedRef = useRef(false);
@@ -560,17 +560,16 @@ function Home() {
   }, []);
 
   // ==========================================
-  // VIEWPORT HEIGHT
+  // FIX VIEWPORT HEIGHT (100dvh sering "nyangkut"
+  // saat WebView native di-resize, misalnya oleh
+  // banner AdMob). Kita hitung ulang manual dan
+  // simpan sebagai CSS variable --app-height.
   // ==========================================
   useEffect(() => {
     const setViewportHeight = () => {
-      const height =
-        window.visualViewport?.height ||
-        window.innerHeight;
-
       document.documentElement.style.setProperty(
         "--app-height",
-        `${height}px`
+        `${window.innerHeight}px`
       );
     };
 
@@ -586,11 +585,6 @@ function Home() {
       setViewportHeight
     );
 
-    window.visualViewport?.addEventListener(
-      "resize",
-      setViewportHeight
-    );
-
     return () => {
       window.removeEventListener(
         "resize",
@@ -599,11 +593,6 @@ function Home() {
 
       window.removeEventListener(
         "orientationchange",
-        setViewportHeight
-      );
-
-      window.visualViewport?.removeEventListener(
-        "resize",
         setViewportHeight
       );
     };
@@ -615,22 +604,21 @@ function Home() {
   useEffect(() => {
     let banner = null;
 
-    const resetBannerHeight = () => {
-      document.documentElement.style.setProperty(
-        "--admob-banner-height",
-        "0px"
-      );
-    };
+    // Banner AdMob adalah native view yang duduk DI
+    // ATAS WebView (bukan elemen HTML), jadi bisa
+    // menutupi tombol + dan kirim secara fisik meski
+    // z-index CSS sudah benar. Untuk itu kita cadangkan
+    // ruang di bawah lewat CSS variable --admob-banner-height.
 
-    resetBannerHeight();
-
+    // 1) Fallback aman: begitu terdeteksi jalan di
+    //    Android/iOS native, langsung cadangkan ruang
+    //    seukuran banner standar (~60px) sebagai jaga-jaga.
     const platform =
       window.Capacitor?.getPlatform?.();
 
     if (
-      AKTIFKAN_ADMOB &&
-      (platform === "android" ||
-        platform === "ios")
+      platform === "android" ||
+      platform === "ios"
     ) {
       document.documentElement.style.setProperty(
         "--admob-banner-height",
@@ -638,6 +626,8 @@ function Home() {
       );
     }
 
+    // 2) Begitu ukuran banner ASLI diketahui dari plugin,
+    //    timpa nilai fallback di atas dengan nilai yang tepat.
     const handleBannerSize = (event) => {
       const height =
         event?.detail?.size?.height ||
@@ -664,6 +654,7 @@ function Home() {
         banner = new BannerAd({
           adUnitId:
             "ca-app-pub-5699049952148750/4400311367",
+
           position: "bottom",
         });
 
@@ -678,7 +669,12 @@ function Home() {
           error
         );
 
-        resetBannerHeight();
+        // Gagal tampil (mis. testing di browser biasa) ->
+        // pastikan tidak ada ruang kosong yang dicadangkan.
+        document.documentElement.style.setProperty(
+          "--admob-banner-height",
+          "0px"
+        );
       }
     };
 
@@ -686,7 +682,7 @@ function Home() {
       tampilkanBanner();
     } else {
       console.log(
-        "AdMob dimatikan sementara untuk debugging tombol +."
+        "AdMob dimatikan sementara (mode debug)"
       );
     }
 
@@ -696,7 +692,10 @@ function Home() {
         handleBannerSize
       );
 
-      resetBannerHeight();
+      document.documentElement.style.setProperty(
+        "--admob-banner-height",
+        "0px"
+      );
 
       if (banner) {
         banner.hide().catch(() => {});
@@ -763,7 +762,6 @@ function Home() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth",
-      block: "end",
     });
   }, [messages, loading]);
 
@@ -797,7 +795,6 @@ function Home() {
     setCurrentChatId(null);
     activeHistoryIdRef.current = null;
     hapusGambar();
-    setMessage("");
   };
 
   // ==========================================
@@ -874,6 +871,9 @@ function Home() {
       return;
     }
 
+    // ======================================
+    // SIMPAN DATA PESAN SEBELUM STATE BERUBAH
+    // ======================================
     const pesanText =
       message.trim() ||
       "Tolong analisis gambar ini.";
@@ -884,11 +884,15 @@ function Home() {
     const previewAtSend =
       imagePreview;
 
+    // ID unik untuk pesan user
     const userMessageId =
       `user_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2, 8)}`;
 
+    // ======================================
+    // BUAT HISTORY ID JIKA BELUM ADA
+    // ======================================
     if (!activeHistoryIdRef.current) {
       activeHistoryIdRef.current =
         `local_${Date.now()}_${Math.random()
@@ -899,10 +903,19 @@ function Home() {
     try {
       setLoading(true);
 
+      // ======================================
+      // GAMBAR USER LANGSUNG MASUK CHAT
+      // ======================================
       const userMessage = {
         id: userMessageId,
         role: "user",
         content: pesanText,
+
+        /*
+         * Untuk sementara gunakan preview.
+         * Setelah Base64 selesai, akan diganti
+         * dengan Base64 agar aman untuk history.
+         */
         image: previewAtSend || null,
       };
 
@@ -911,8 +924,12 @@ function Home() {
         userMessage,
       ]);
 
+      // Kosongkan input teks SEKARANG
       setMessage("");
 
+      // ======================================
+      // SCROLL LANGSUNG KE PESAN USER
+      // ======================================
       requestAnimationFrame(() => {
         chatEndRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -920,12 +937,18 @@ function Home() {
         });
       });
 
+      // ======================================
+      // UBAH GAMBAR KE BASE64
+      // ======================================
       let imageBase64 = null;
 
       if (imageFile) {
         imageBase64 =
           await fileToBase64(imageFile);
 
+        // ====================================
+        // GANTI PREVIEW DENGAN BASE64
+        // ====================================
         setMessages((prev) =>
           prev.map((item) =>
             item.id === userMessageId
@@ -938,10 +961,16 @@ function Home() {
         );
       }
 
+      // ======================================
+      // HAPUS PREVIEW INPUT
+      // ======================================
       if (imageFile) {
         hapusGambar();
       }
 
+      // ======================================
+      // BACKEND
+      // ======================================
       const res = await axios.post(
         "/chat",
         {
@@ -957,6 +986,9 @@ function Home() {
         }
       );
 
+      // ======================================
+      // CHAT ID BACKEND
+      // ======================================
       if (
         res.data?.chat_id !== undefined &&
         res.data?.chat_id !== null
@@ -966,6 +998,9 @@ function Home() {
         );
       }
 
+      // ======================================
+      // JAWABAN AI
+      // ======================================
       const jawabanAI =
         bersihkanJawabanAI(
           res.data?.reply
@@ -986,6 +1021,9 @@ function Home() {
         },
       ]);
 
+      // ======================================
+      // SCROLL KE JAWABAN AI
+      // ======================================
       requestAnimationFrame(() => {
         chatEndRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1046,18 +1084,12 @@ function Home() {
   return (
     <>
       <style>{`
-        * {
-          box-sizing: border-box;
-        }
-
         .home-page {
-          width: 100%;
-          min-height: var(--app-height, 100dvh);
-          height: var(--app-height, 100dvh);
+          min-height: 100dvh;
+          height: 100dvh;
           display: flex;
           overflow: hidden;
           color: #fff;
-
           background:
             radial-gradient(
               circle at 50% -20%,
@@ -1070,18 +1102,17 @@ function Home() {
         .home-main {
           flex: 1;
           min-width: 0;
-          min-height: 0;
-          height: 100%;
+          height: 100dvh;
+          height: var(--app-height, 100dvh);
           display: flex;
           flex-direction: column;
           position: relative;
-          overflow: hidden;
         }
 
         .home-header {
-          flex: 0 0 auto;
+          flex-shrink: 0;
           position: relative;
-          z-index: 30;
+          z-index: 10;
         }
 
         .home-header-container {
@@ -1091,17 +1122,10 @@ function Home() {
           padding: 0;
         }
 
-        /*
-         * PENTING:
-         * Area chat sekarang menjadi satu-satunya bagian
-         * yang scroll.
-         */
         .home-chat-area {
-          flex: 1 1 auto;
+          flex: 1;
           min-height: 0;
           overflow: hidden;
-          position: relative;
-          z-index: 1;
         }
 
         .home-chat-container {
@@ -1124,32 +1148,20 @@ function Home() {
           min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
-
-          /*
-           * Tidak perlu padding 165px lagi karena
-           * input sekarang bukan absolute overlay.
-           */
-          padding: 12px 4px 20px;
-
+          padding: 12px 4px 165px;
           display: flex;
           flex-direction: column;
           gap: 12px;
-
           scrollbar-width: thin;
           scrollbar-color: #1B3445 transparent;
-
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior: contain;
         }
 
         .home-welcome {
           flex: 1;
           min-height: 0;
-
           display: flex;
           justify-content: center;
           align-items: center;
-
           padding: 25px 10px 40px;
         }
 
@@ -1180,11 +1192,8 @@ function Home() {
           height: 96px;
           border-radius: 27px;
           overflow: hidden;
-
           border: 1px solid rgba(24,216,255,.2);
-
-          box-shadow:
-            0 18px 55px rgba(0,194,255,.15);
+          box-shadow: 0 18px 55px rgba(0,194,255,.15);
         }
 
         .home-logo-box img {
@@ -1224,29 +1233,21 @@ function Home() {
 
         .home-suggestions {
           margin-top: 22px;
-
           display: flex;
           justify-content: center;
           flex-wrap: wrap;
-
           gap: 8px;
         }
 
         .home-suggestion-button {
           padding: 9px 14px;
-
           border: 1px solid rgba(0,194,255,.13);
           border-radius: 999px;
-
           background: rgba(13,35,49,.72);
           color: #8EACBC;
-
           font-size: 11px;
           cursor: pointer;
-
           transition: .2s ease;
-
-          touch-action: manipulation;
         }
 
         .home-suggestion-button:hover {
@@ -1256,210 +1257,115 @@ function Home() {
           transform: translateY(-1px);
         }
 
-        /*
-         * ==========================================
-         * INPUT AREA — FIX UTAMA TOMBOL +
-         * ==========================================
-         *
-         * Sebelumnya:
-         * position: absolute
-         *
-         * Itu berisiko membuat ChatBox/area scroll
-         * bertumpuk dengan ChatInput di Android WebView.
-         *
-         * Sekarang:
-         * position: relative
-         * flex-shrink: 0
-         *
-         * Jadi ChatInput benar-benar mendapat area
-         * sendiri dan tidak tertutup elemen lain.
-         */
         .home-input-area {
-          position: relative;
-
-          flex: 0 0 auto;
-          flex-shrink: 0;
-
-          width: 100%;
-
-          z-index: 50;
-
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 100;
           pointer-events: auto;
-
-          padding-top: 18px;
+          padding-top: 40px;
           padding-left: 22px;
           padding-right: 22px;
-
-          /*
-           * Safe area + ruang native AdMob.
-           */
-          padding-bottom:
-            calc(
-              18px +
-              env(safe-area-inset-bottom, 0px) +
-              var(--admob-banner-height, 0px)
-            );
-
+          padding-bottom: calc(18px + var(--admob-banner-height, 0px));
           background:
             linear-gradient(
               to top,
-              #081420 72%,
-              rgba(8,20,32,.97) 88%,
-              rgba(8,20,32,.75)
+              #081420 68%,
+              rgba(8,20,32,.92) 82%,
+              transparent
             );
-
-          isolation: isolate;
         }
 
         .home-input-container {
           width: 100%;
           max-width: 1100px;
           margin: auto;
-
-          position: relative;
-          z-index: 51;
-
-          pointer-events: auto;
         }
 
         .home-input-row {
           width: 100%;
           min-width: 0;
-
           position: relative;
-          z-index: 52;
-
+          z-index: 101;
           pointer-events: auto;
         }
 
         .home-input-row > * {
           width: 100%;
           min-width: 0;
-
           position: relative;
-          z-index: 53;
-
+          z-index: 102;
           pointer-events: auto;
         }
 
-        /*
-         * Ini sengaja dibuat sangat eksplisit.
-         * Semua kontrol ChatInput harus menerima touch.
-         */
         .home-input-row button,
         .home-input-row label,
         .home-input-row input,
-        .home-input-row textarea,
         .home-input-row [role="button"] {
           pointer-events: auto !important;
           touch-action: manipulation;
         }
 
-        .home-input-row input[type="file"] {
-          pointer-events: auto;
-        }
-
         .home-disclaimer {
           margin-top: 7px;
-
           text-align: center;
-
           color: #435C6D;
           font-size: 9px;
         }
 
         .home-image-preview {
           margin-bottom: 9px;
-
-          position: relative;
-          z-index: 54;
-
-          pointer-events: auto;
         }
 
         .home-image-preview-inner {
           position: relative;
-
           width: min(210px, 70vw);
           max-height: 140px;
-
           overflow: hidden;
-
           border-radius: 15px;
           border: 1px solid rgba(24,216,255,.18);
-
           background: rgba(10,31,45,.95);
         }
 
         .home-image-preview-inner img {
           display: block;
-
           width: 100%;
           max-height: 140px;
-
           object-fit: cover;
         }
 
         .home-image-remove {
           position: absolute;
-
           top: 6px;
           right: 6px;
-
           width: 29px;
           height: 29px;
-
           border: 0;
           border-radius: 50%;
-
           background: rgba(5,15,24,.82);
           color: #fff;
-
           display: flex;
           align-items: center;
           justify-content: center;
-
           cursor: pointer;
-
-          z-index: 55;
-
-          pointer-events: auto !important;
-          touch-action: manipulation;
         }
 
         .home-image-label {
           position: absolute;
-
           left: 7px;
           bottom: 7px;
-
           display: flex;
           align-items: center;
           gap: 5px;
-
           padding: 5px 8px;
-
           border-radius: 999px;
-
           background: rgba(5,15,24,.78);
           color: #D8F6FF;
-
           font-size: 9px;
-
-          pointer-events: none;
         }
 
-        /*
-         * ==========================================
-         * MOBILE
-         * ==========================================
-         */
         @media (max-width: 767px) {
-          .home-page {
-            min-height: var(--app-height, 100dvh);
-            height: var(--app-height, 100dvh);
-          }
-
           .home-header-container {
             padding: 0;
             margin: 0;
@@ -1471,7 +1377,7 @@ function Home() {
           }
 
           .home-messages {
-            padding: 6px 2px 12px;
+            padding: 6px 2px 145px;
             gap: 10px;
           }
 
@@ -1515,43 +1421,19 @@ function Home() {
             font-size: 10px;
           }
 
-          /*
-           * Input benar-benar berada di bawah chat,
-           * bukan menumpuk di atas ChatBox.
-           */
           .home-input-area {
-            padding-top: 12px;
+            padding-top: 28px;
             padding-left: 8px;
             padding-right: 8px;
-
-            padding-bottom:
-              calc(
-                9px +
-                env(safe-area-inset-bottom, 0px) +
-                var(--admob-banner-height, 0px)
-              );
+            padding-bottom: calc(
+              9px +
+              env(safe-area-inset-bottom) +
+              var(--admob-banner-height, 0px)
+            );
           }
 
           .home-disclaimer {
             font-size: 8px;
-            margin-top: 5px;
-          }
-        }
-
-        /*
-         * ==========================================
-         * HP SANGAT KECIL
-         * ==========================================
-         */
-        @media (max-width: 380px) {
-          .home-input-area {
-            padding-left: 6px;
-            padding-right: 6px;
-          }
-
-          .home-chat-container {
-            padding-left: 5px;
-            padding-right: 5px;
           }
         }
       `}</style>
@@ -1566,14 +1448,12 @@ function Home() {
         />
 
         <main className="home-main">
-          {/* HEADER */}
           <div className="home-header">
             <div className="home-header-container">
               <Header />
             </div>
           </div>
 
-          {/* CHAT */}
           <div className="home-chat-area">
             <div className="home-chat-container">
               <Row
@@ -1615,7 +1495,6 @@ function Home() {
             </div>
           </div>
 
-          {/* INPUT */}
           <div className="home-input-area">
             <div className="home-input-container">
               {imagePreview && (
@@ -1670,3 +1549,4 @@ function Home() {
 }
 
 export default Home;
+
