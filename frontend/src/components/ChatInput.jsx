@@ -13,25 +13,67 @@ function ChatInput({
   hapusGambar,
 }) {
   const handleKirim = () => {
-    // Jangan kirim kalau sedang loading
     if (loading) return;
 
-    // Jangan kirim kalau tidak ada teks dan tidak ada gambar
     if (!message.trim() && !imagePreview) return;
 
-    /*
-     * Penting:
-     * Jangan hapus imagePreview di sini.
-     *
-     * Home.jsx yang akan:
-     * 1. mengambil gambar yang dipilih
-     * 2. langsung memasukkan pesan user ke messages
-     * 3. membuat bubble gambar di chat
-     * 4. otomatis scroll ke pesan terbaru
-     * 5. mengirim request ke backend
-     * 6. membersihkan preview setelah pesan berhasil
-     */
     kirimPesan();
+  };
+
+  // ============================================================
+  // PLUS / UPLOAD GAMBAR
+  // ============================================================
+  const handlePlusMouseDown = (e) => {
+    if (loading) {
+      e.preventDefault();
+      return;
+    }
+
+    /*
+     * Jangan biarkan browser memindahkan fokus dari textarea
+     * terlebih dahulu ketika tombol + disentuh.
+     *
+     * Ini penting terutama di Android/WebView ketika keyboard
+     * sedang terbuka.
+     */
+    e.preventDefault();
+  };
+
+  const handlePlusTouchStart = (e) => {
+    if (loading) {
+      e.preventDefault();
+      return;
+    }
+
+    /*
+     * Menjaga gesture touch tetap dianggap sebagai tap tombol,
+     * bukan gesture untuk menutup keyboard.
+     */
+    e.preventDefault();
+
+    // Buka file picker secara langsung.
+    if (fileInputRef?.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handlePlusClick = (e) => {
+    if (loading) {
+      e.preventDefault();
+      return;
+    }
+
+    /*
+     * Pada perangkat touch, file picker sudah dibuka oleh
+     * onTouchStart. Jangan membuka dua kali.
+     */
+    if (e.detail === 0) {
+      return;
+    }
+
+    if (fileInputRef?.current) {
+      fileInputRef.current.click();
+    }
   };
 
   return (
@@ -44,46 +86,60 @@ function ChatInput({
         zIndex: 20,
       }}
     >
-      {/*
-        Animasi tombol + dan tombol kirim.
-        PENTING: transform (scale/rotate) TIDAK dipasang di
-        label/button itu sendiri, karena elemen yang jadi target
-        tap tidak boleh berpindah posisi saat ditekan -- kalau
-        area tapnya bergeser dari bawah jari, touchscreen bisa
-        menganggap itu gesture batal, bukan tap, sehingga perlu
-        ditahan dulu baru terhitung klik. Makanya animasi dipasang
-        di elemen ikon DI DALAM label/button, bukan di label/button-nya.
-      */}
       <style>{`
         .home-plus-button {
-          transition: background-color 0.15s ease, box-shadow 0.15s ease;
+          transition:
+            background-color 0.15s ease,
+            box-shadow 0.15s ease;
+          -webkit-tap-highlight-color: transparent;
+          -webkit-touch-callout: none;
         }
+
         .home-plus-button:active {
-          background-color: #1c3550;
-          box-shadow: 0 4px 12px rgba(0,0,0,.3);
+          background-color: #1c3550 !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
         }
+
         .home-plus-icon {
           transition: transform 0.15s ease;
           display: flex;
+          align-items: center;
+          justify-content: center;
           pointer-events: none;
         }
+
         .home-plus-button:active .home-plus-icon {
           transform: scale(0.82) rotate(90deg);
         }
+
         .home-plus-button.disabled {
           pointer-events: none;
         }
 
         .send-btn {
           transition: background-color 0.15s ease;
+          -webkit-tap-highlight-color: transparent;
         }
+
         .send-icon {
           transition: transform 0.12s ease;
           display: flex;
+          align-items: center;
+          justify-content: center;
           pointer-events: none;
         }
+
         .send-btn:active:not(:disabled) .send-icon {
           transform: scale(0.82);
+        }
+
+        .chat-input {
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .chat-input:focus {
+          outline: none !important;
+          box-shadow: none !important;
         }
       `}</style>
 
@@ -101,57 +157,77 @@ function ChatInput({
             width: "100%",
           }}
         >
-          {/* PLUS BUTTON */}
-          <label
-            htmlFor="chat-image-input"
+          {/* =====================================================
+              PLUS BUTTON
+              ===================================================== */}
+          <button
+            type="button"
             className={`home-plus-button${loading ? " disabled" : ""}`}
+            aria-label="Tambah gambar"
+            title="Tambah gambar"
+            disabled={loading}
+            onMouseDown={handlePlusMouseDown}
+            onTouchStart={handlePlusTouchStart}
+            onClick={handlePlusClick}
             style={{
               position: "relative",
               width: 46,
               height: 46,
               minWidth: 46,
+              minHeight: 46,
               borderRadius: "50%",
               flexShrink: 0,
+
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+
               background: "#13283F",
               border: "1px solid rgba(255,255,255,.09)",
               color: "#D7F6FF",
+
               boxShadow: "0 8px 24px rgba(0,0,0,.24)",
+
               opacity: loading ? 0.5 : 1,
               cursor: loading ? "not-allowed" : "pointer",
+
+              padding: 0,
+              margin: 0,
+
               WebkitTapHighlightColor: "transparent",
               touchAction: "manipulation",
               userSelect: "none",
-              margin: 0,
+              WebkitUserSelect: "none",
             }}
           >
-            {/* ICON (yang dianimasikan, bukan label-nya) */}
             <span className="home-plus-icon">
               <FiPlus size={23} strokeWidth={2.5} />
             </span>
+          </button>
 
-            {/*
-              Input file disembunyikan total (display: none).
-              Klik pada <label> di atas otomatis akan memicu
-              file picker native, tanpa perlu trik overlay
-              transparan yang rawan gagal di beberapa browser/Android.
-            */}
-            <input
-              id="chat-image-input"
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={pilihGambar}
-              disabled={loading}
-              aria-label="Tambah gambar"
-              title="Tambah gambar"
-              style={{ display: "none" }}
-            />
-          </label>
+          {/* =====================================================
+              FILE INPUT
+              ===================================================== */}
+          <input
+            id="chat-image-input"
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={pilihGambar}
+            disabled={loading}
+            aria-label="Pilih gambar"
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              opacity: 0,
+              pointerEvents: "none",
+            }}
+          />
 
-          {/* INPUT CHAT */}
+          {/* =====================================================
+              INPUT CHAT
+              ===================================================== */}
           <div
             style={{
               flex: 1,
@@ -203,32 +279,44 @@ function ChatInput({
               }}
             />
 
-            {/* KIRIM */}
+            {/* =================================================
+                KIRIM
+                ================================================= */}
             <Button
               type="submit"
               className="send-btn"
-              disabled={loading || (!message.trim() && !imagePreview)}
+              disabled={
+                loading || (!message.trim() && !imagePreview)
+              }
               style={{
                 width: 46,
                 height: 46,
                 minWidth: 46,
+                minHeight: 46,
                 borderRadius: "50%",
                 border: "none",
+
                 background:
                   loading || (!message.trim() && !imagePreview)
                     ? "#4B647A"
                     : "#00C2FF",
+
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
+
                 flexShrink: 0,
                 padding: 0,
+
                 touchAction: "manipulation",
                 WebkitTapHighlightColor: "transparent",
               }}
             >
               <span className="send-icon">
-                <FaPaperPlane color="#081420" size={17} />
+                <FaPaperPlane
+                  color="#081420"
+                  size={17}
+                />
               </span>
             </Button>
           </div>
