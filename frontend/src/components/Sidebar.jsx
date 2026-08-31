@@ -20,7 +20,6 @@ import {
 } from "react-icons/fa";
 
 function Sidebar({
-  messages,
   setMessages,
   history = [],
   setHistory,
@@ -78,7 +77,6 @@ function Sidebar({
   const getChatKey = (chat) => {
     if (!chat) return null;
 
-    // ID backend
     if (
       chat.chatId !== undefined &&
       chat.chatId !== null
@@ -86,7 +84,6 @@ function Sidebar({
       return `backend_${String(chat.chatId)}`;
     }
 
-    // ID lokal
     if (
       chat.id !== undefined &&
       chat.id !== null
@@ -94,7 +91,6 @@ function Sidebar({
       return `local_${String(chat.id)}`;
     }
 
-    // Berdasarkan pesan pertama
     if (
       Array.isArray(chat.messages) &&
       chat.messages.length > 0
@@ -189,9 +185,6 @@ function Sidebar({
       const currentUpdated =
         Number(normalizedChat.updatedAt || 0);
 
-      /*
-       * Pilih data yang lebih lengkap / lebih baru.
-       */
       if (
         currentLength > existingLength ||
         currentUpdated > existingUpdated
@@ -208,7 +201,7 @@ function Sidebar({
   };
 
   // =====================================================
-  // HISTORY YANG SUDAH BERSIH
+  // HISTORY BERSIH
   // =====================================================
 
   const uniqueHistory = useMemo(() => {
@@ -241,11 +234,7 @@ function Sidebar({
           setUser(null);
         }
       } catch (error) {
-        console.log(
-          "User error:",
-          error
-        );
-
+        console.log("User error:", error);
         setUser(null);
       }
     };
@@ -343,7 +332,6 @@ function Sidebar({
       touch.clientY -
       touchStartY.current;
 
-    // Jangan ganggu scroll vertikal
     if (
       Math.abs(diffY) >
       Math.abs(diffX)
@@ -351,7 +339,6 @@ function Sidebar({
       return;
     }
 
-    // Buka dari kiri
     if (
       !open &&
       touchStartX.current < 45 &&
@@ -365,7 +352,6 @@ function Sidebar({
       return;
     }
 
-    // Tutup sidebar
     if (
       open &&
       diffX < -70
@@ -402,14 +388,6 @@ function Sidebar({
       e.stopPropagation();
     }
 
-    /*
-     * Jangan setHistory([]).
-     * Jangan hapus localStorage.
-     *
-     * Home yang mengosongkan chat aktif.
-     * History lama tetap tersimpan.
-     */
-
     if (typeof chatBaru === "function") {
       chatBaru();
     }
@@ -434,9 +412,6 @@ function Sidebar({
 
     const now = Date.now();
 
-    /*
-     * Anti double click / double event
-     */
     if (openingChatRef.current) {
       return;
     }
@@ -464,17 +439,8 @@ function Sidebar({
         ? [...chat.messages]
         : [];
 
-    /*
-     * Set messages hanya satu kali.
-     */
     setMessages(chatMessages);
 
-    /*
-     * Home akan:
-     * - mengambil historyId
-     * - mengambil chatId backend
-     * - mengunci percakapan aktif
-     */
     window.dispatchEvent(
       new CustomEvent(
         "aiind-load-chat",
@@ -536,17 +502,8 @@ function Sidebar({
         }
       );
 
-    /*
-     * Hanya update state.
-     *
-     * Home adalah satu-satunya tempat
-     * yang menyimpan history ke localStorage.
-     */
     setHistory(newHistory);
 
-    /*
-     * Beritahu Home bahwa history berubah.
-     */
     window.dispatchEvent(
       new CustomEvent(
         "aiind-history-updated",
@@ -557,6 +514,264 @@ function Sidebar({
         }
       )
     );
+  };
+
+  // =====================================================
+  // PROFILE
+  // =====================================================
+
+  const handleProfile = () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const nama =
+      user.nama ||
+      user.name ||
+      "Pengguna";
+
+    const email =
+      user.email ||
+      "Email belum tersedia";
+
+    Swal.fire({
+      title: "",
+      width: 390,
+
+      background: "#0B1D2A",
+      color: "#fff",
+
+      confirmButtonText: "Tutup",
+      confirmButtonColor: "#00C2FF",
+
+      html: `
+        <div style="
+          text-align:left;
+          padding:5px;
+        ">
+
+          <div style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            margin-bottom:22px;
+          ">
+
+            <div style="
+              width:76px;
+              height:76px;
+              border-radius:50%;
+
+              display:flex;
+              align-items:center;
+              justify-content:center;
+
+              background:
+                linear-gradient(
+                  135deg,
+                  rgba(0,194,255,.22),
+                  rgba(0,194,255,.05)
+                );
+
+              border:
+                1px solid
+                rgba(0,194,255,.25);
+
+              color:#00C2FF;
+
+              font-size:29px;
+              font-weight:800;
+
+              margin-bottom:12px;
+            ">
+              ${String(nama)
+                .charAt(0)
+                .toUpperCase()}
+            </div>
+
+            <div style="
+              color:#F1FAFF;
+              font-size:20px;
+              font-weight:800;
+            ">
+              ${String(nama)
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")}
+            </div>
+
+            <div style="
+              color:#71899A;
+              font-size:12px;
+              margin-top:4px;
+            ">
+              Profil AI.Ind
+            </div>
+
+          </div>
+
+          <div style="
+            background:rgba(255,255,255,.035);
+            border:
+              1px solid
+              rgba(255,255,255,.06);
+
+            border-radius:15px;
+            overflow:hidden;
+          ">
+
+            <!-- EMAIL -->
+
+            <div style="
+              display:flex;
+              align-items:center;
+              gap:12px;
+              padding:15px 13px;
+              border-bottom:
+                1px solid
+                rgba(255,255,255,.05);
+            ">
+
+              <div style="
+                width:36px;
+                height:36px;
+                min-width:36px;
+                border-radius:10px;
+
+                display:flex;
+                align-items:center;
+                justify-content:center;
+
+                background:
+                  rgba(0,194,255,.08);
+
+                color:#00C2FF;
+                font-size:16px;
+              ">
+                ✉
+              </div>
+
+              <div style="
+                min-width:0;
+                flex:1;
+              ">
+
+                <div style="
+                  color:#5F788A;
+                  font-size:10px;
+                  font-weight:700;
+                  letter-spacing:.6px;
+                  margin-bottom:4px;
+                ">
+                  EMAIL
+                </div>
+
+                <div style="
+                  color:#DDEBF2;
+                  font-size:13px;
+                  font-weight:600;
+                  word-break:break-all;
+                ">
+                  ${String(email)
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")}
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- PASSWORD -->
+
+            <div style="
+              display:flex;
+              align-items:center;
+              gap:12px;
+              padding:15px 13px;
+            ">
+
+              <div style="
+                width:36px;
+                height:36px;
+                min-width:36px;
+                border-radius:10px;
+
+                display:flex;
+                align-items:center;
+                justify-content:center;
+
+                background:
+                  rgba(0,194,255,.08);
+
+                color:#00C2FF;
+                font-size:16px;
+              ">
+                🔒
+              </div>
+
+              <div style="
+                min-width:0;
+                flex:1;
+              ">
+
+                <div style="
+                  color:#5F788A;
+                  font-size:10px;
+                  font-weight:700;
+                  letter-spacing:.6px;
+                  margin-bottom:4px;
+                ">
+                  PASSWORD
+                </div>
+
+                <div style="
+                  color:#DDEBF2;
+                  font-size:15px;
+                  font-weight:700;
+                  letter-spacing:3px;
+                ">
+                  ••••••••
+                </div>
+
+                <div style="
+                  color:#536B7D;
+                  font-size:9px;
+                  margin-top:4px;
+                ">
+                  Password disimpan dalam bentuk
+                  terenkripsi di sistem.
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <div style="
+            margin-top:14px;
+            padding:11px 12px;
+            border-radius:11px;
+
+            background:
+              rgba(0,194,255,.045);
+
+            border:
+              1px solid
+              rgba(0,194,255,.08);
+
+            color:#668394;
+            font-size:10px;
+            line-height:1.6;
+          ">
+            🔐 Demi keamanan, password asli tidak
+            ditampilkan kembali. Sistem hanya menyimpan
+            password dalam bentuk hash.
+          </div>
+
+        </div>
+      `,
+    });
   };
 
   // =====================================================
@@ -573,6 +788,7 @@ function Sidebar({
       title: "Ganti Akun?",
       text:
         "Kamu akan keluar dari akun saat ini.",
+
       icon: "warning",
 
       background: "#0B1D2A",
@@ -593,6 +809,7 @@ function Sidebar({
         "#334155",
 
       reverseButtons: true,
+
     }).then((result) => {
       if (result.isConfirmed) {
         setMessages([]);
@@ -622,8 +839,10 @@ function Sidebar({
   const handleLogout = () => {
     Swal.fire({
       title: "Keluar Akun?",
+
       text:
         "Apakah kamu yakin ingin keluar?",
+
       icon: "warning",
 
       background: "#0B1D2A",
@@ -644,6 +863,7 @@ function Sidebar({
         "#334155",
 
       reverseButtons: true,
+
     }).then((result) => {
       if (result.isConfirmed) {
         setMessages([]);
@@ -679,6 +899,7 @@ function Sidebar({
           line-height:1.8;
           color:#A9C4D3;
         ">
+
           <strong style="
             color:#00C2FF;
             font-size:17px;
@@ -709,6 +930,7 @@ function Sidebar({
           ">
             Versi 1.0.0
           </small>
+
         </div>
       `,
 
@@ -731,13 +953,10 @@ function Sidebar({
   return (
     <>
       <style>{`
+
         * {
           box-sizing: border-box;
         }
-
-        /* ==========================================
-           SIDEBAR
-        ========================================== */
 
         .ai-sidebar {
           width: 274px;
@@ -763,48 +982,34 @@ function Sidebar({
             rgba(255,255,255,.07);
 
           z-index: 1000;
-
           overflow: hidden;
         }
 
-        /* ==========================================
-           TOP
-        ========================================== */
-
         .ai-sidebar-top {
           flex-shrink: 0;
-
-          padding:
-            22px
-            18px
-            16px;
+          padding: 22px 18px 16px;
         }
 
         .ai-brand-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-
           gap: 10px;
         }
 
         .ai-brand {
           display: flex;
           align-items: center;
-
           gap: 12px;
-
           min-width: 0;
         }
 
         .ai-brand-logo {
           width: 46px;
           height: 46px;
-
           min-width: 46px;
 
           border-radius: 14px;
-
           object-fit: cover;
 
           box-shadow:
@@ -814,7 +1019,6 @@ function Sidebar({
 
         .ai-brand-name {
           margin: 0;
-
           color: #fff;
 
           font-size: 20px;
@@ -829,26 +1033,17 @@ function Sidebar({
 
         .ai-brand-sub {
           margin-top: 3px;
-
           color: #6F8798;
 
           font-size: 11px;
-
           white-space: nowrap;
         }
 
-        /* ==========================================
-           NEW CHAT
-        ========================================== */
-
         .ai-new-chat {
           width: 100%;
-
           margin-top: 22px;
 
-          padding:
-            12px
-            15px;
+          padding: 12px 15px;
 
           border:
             1px solid
@@ -867,7 +1062,6 @@ function Sidebar({
 
           display: flex;
           align-items: center;
-
           gap: 10px;
 
           font-size: 13px;
@@ -907,30 +1101,20 @@ function Sidebar({
         .ai-new-chat-icon {
           width: 29px;
           height: 29px;
-
           min-width: 29px;
 
           border-radius: 9px;
 
-          background:
-            #00C2FF;
-
-          color:
-            #06131C;
+          background: #00C2FF;
+          color: #06131C;
 
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
-        /* ==========================================
-           HISTORY
-        ========================================== */
-
         .ai-history {
-          flex:
-            1 1 0;
-
+          flex: 1 1 0;
           min-height: 0;
 
           width: 100%;
@@ -978,22 +1162,10 @@ function Sidebar({
             999px;
         }
 
-        .ai-history::-webkit-scrollbar-thumb:hover {
-          background:
-            #2A5065;
-        }
-
-        /* ==========================================
-           HISTORY TITLE
-        ========================================== */
-
         .ai-history-title {
           display: flex;
-
           align-items: center;
-
-          justify-content:
-            space-between;
+          justify-content: space-between;
 
           padding:
             10px
@@ -1052,10 +1224,6 @@ function Sidebar({
           font-size:
             10px;
         }
-
-        /* ==========================================
-           EMPTY
-        ========================================== */
 
         .ai-empty {
           padding:
@@ -1126,10 +1294,6 @@ function Sidebar({
           line-height:
             1.5;
         }
-
-        /* ==========================================
-           HISTORY ITEM
-        ========================================== */
 
         .ai-history-item {
           display:
@@ -1261,10 +1425,6 @@ function Sidebar({
             9px;
         }
 
-        /* ==========================================
-           DELETE
-        ========================================== */
-
         .ai-delete {
           width:
             29px;
@@ -1325,10 +1485,6 @@ function Sidebar({
             #ff6b6b;
         }
 
-        /* ==========================================
-           BOTTOM
-        ========================================== */
-
         .ai-sidebar-bottom {
           flex-shrink:
             0;
@@ -1343,10 +1499,6 @@ function Sidebar({
           background:
             rgba(5,14,21,.5);
         }
-
-        /* ==========================================
-           USER
-        ========================================== */
 
         .ai-user-card {
           display:
@@ -1370,6 +1522,30 @@ function Sidebar({
           border:
             1px solid
             rgba(255,255,255,.045);
+
+          cursor:
+            pointer;
+
+          transition:
+            background .18s ease,
+            border-color .18s ease,
+            transform .15s ease;
+        }
+
+        .ai-user-card:hover {
+          background:
+            rgba(0,194,255,.06);
+
+          border-color:
+            rgba(0,194,255,.14);
+
+          transform:
+            translateY(-1px);
+        }
+
+        .ai-user-card:active {
+          transform:
+            scale(.985);
         }
 
         .ai-user-icon {
@@ -1428,9 +1604,16 @@ function Sidebar({
             ellipsis;
         }
 
-        /* ==========================================
-           MENU
-        ========================================== */
+        .ai-profile-hint {
+          color:
+            #4F6878;
+
+          font-size:
+            9px;
+
+          margin-top:
+            2px;
+        }
 
         .ai-menu {
           display:
@@ -1463,9 +1646,6 @@ function Sidebar({
           transition:
             background .16s ease,
             color .16s ease;
-
-          -webkit-tap-highlight-color:
-            transparent;
         }
 
         .ai-menu:hover {
@@ -1533,20 +1713,13 @@ function Sidebar({
             3px;
         }
 
-        /* ==========================================
-           CLOSE
-        ========================================== */
-
         .ai-mobile-close {
           display:
             none;
         }
 
-        /* ==========================================
-           MOBILE
-        ========================================== */
-
         @media (max-width: 767px) {
+
           .ai-sidebar {
             position:
               fixed;
@@ -1724,12 +1897,9 @@ function Sidebar({
           style={{
             position: "fixed",
             inset: 0,
-            background:
-              "rgba(0,0,0,.48)",
-            backdropFilter:
-              "blur(3px)",
-            WebkitBackdropFilter:
-              "blur(3px)",
+            background: "rgba(0,0,0,.48)",
+            backdropFilter: "blur(3px)",
+            WebkitBackdropFilter: "blur(3px)",
             zIndex: 998,
           }}
         />
@@ -1775,13 +1945,17 @@ function Sidebar({
           handleTouchEnd(e);
         }}
       >
+
         {/* ==================================================
             TOP
         ================================================== */}
 
         <div className="ai-sidebar-top">
+
           <div className="ai-brand-row">
+
             <div className="ai-brand">
+
               <img
                 src="/logo.svg"
                 alt="AI.Ind"
@@ -1789,6 +1963,7 @@ function Sidebar({
               />
 
               <div>
+
                 <h2 className="ai-brand-name">
                   AI
                   <span>.Ind</span>
@@ -1797,7 +1972,9 @@ function Sidebar({
                 <div className="ai-brand-sub">
                   Asisten AI buatan Indonesia 🇮🇩
                 </div>
+
               </div>
+
             </div>
 
             {mobile && (
@@ -1812,6 +1989,7 @@ function Sidebar({
                 <FiX size={17} />
               </button>
             )}
+
           </div>
 
           <button
@@ -1819,6 +1997,7 @@ function Sidebar({
             className="ai-new-chat"
             onClick={handleChatBaru}
           >
+
             <span className="ai-new-chat-icon">
               <FiPlus size={17} />
             </span>
@@ -1826,20 +2005,19 @@ function Sidebar({
             <span>
               Percakapan baru
             </span>
+
           </button>
+
         </div>
 
         {/* ==================================================
             HISTORY
         ================================================== */}
 
-        <div
-          className="ai-history"
-          onTouchStart={() => {}}
-          onTouchMove={() => {}}
-          onTouchEnd={() => {}}
-        >
+        <div className="ai-history">
+
           <div className="ai-history-title">
+
             <span>
               Riwayat percakapan
             </span>
@@ -1849,14 +2027,15 @@ function Sidebar({
                 {uniqueHistory.length}
               </span>
             )}
+
           </div>
 
           {uniqueHistory.length === 0 ? (
+
             <div className="ai-empty">
+
               <div className="ai-empty-icon">
-                <FiMessageSquare
-                  size={20}
-                />
+                <FiMessageSquare size={20} />
               </div>
 
               <p>
@@ -1867,10 +2046,14 @@ function Sidebar({
                 Pesan yang kamu kirim
                 akan otomatis tersimpan
               </small>
+
             </div>
+
           ) : (
+
             uniqueHistory.map(
               (chat, index) => {
+
                 const chatKey =
                   getChatKey(chat);
 
@@ -1885,6 +2068,7 @@ function Sidebar({
                       )
                     }
                   >
+
                     <div className="ai-history-icon">
                       <FiMessageSquare
                         size={15}
@@ -1892,6 +2076,7 @@ function Sidebar({
                     </div>
 
                     <div className="ai-history-text">
+
                       <div className="ai-history-name">
                         {chat.title ||
                           "Percakapan baru"}
@@ -1904,6 +2089,7 @@ function Sidebar({
                           ? `${chat.messages.length} pesan`
                           : "Percakapan"}
                       </div>
+
                     </div>
 
                     <button
@@ -1918,15 +2104,16 @@ function Sidebar({
                       }
                       aria-label="Hapus percakapan"
                     >
-                      <FaTrash
-                        size={11}
-                      />
+                      <FaTrash size={11} />
                     </button>
+
                   </div>
                 );
               }
             )
+
           )}
+
         </div>
 
         {/* ==================================================
@@ -1934,15 +2121,37 @@ function Sidebar({
         ================================================== */}
 
         <div className="ai-sidebar-bottom">
-          <div className="ai-user-card">
+
+          {/* ==================================================
+              USER CARD
+          ================================================== */}
+
+          <div
+            className="ai-user-card"
+            onClick={handleProfile}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" ||
+                e.key === " "
+              ) {
+                e.preventDefault();
+                handleProfile();
+              }
+            }}
+          >
+
             <FaUserCircle
               size={32}
               className="ai-user-icon"
             />
 
             <div className="ai-user-info">
+
               <div className="ai-user-name">
                 {user?.nama ||
+                  user?.name ||
                   "Belum Login"}
               </div>
 
@@ -1950,6 +2159,13 @@ function Sidebar({
                 {user?.email ||
                   "Masuk untuk menggunakan AI.Ind"}
               </div>
+
+              {user && (
+                <div className="ai-profile-hint">
+                  Klik untuk melihat profil
+                </div>
+              )}
+
             </div>
 
             {user && (
@@ -1958,9 +2174,12 @@ function Sidebar({
                 color="#00C2FF"
               />
             )}
+
           </div>
 
-          {/* PENGATURAN */}
+          {/* ==================================================
+              PENGATURAN
+          ================================================== */}
 
           <div
             className="ai-menu"
@@ -1970,6 +2189,7 @@ function Sidebar({
               )
             }
           >
+
             <FaCog size={14} />
 
             <span
@@ -1981,59 +2201,86 @@ function Sidebar({
             </span>
 
             {settingOpen ? (
-              <FiChevronUp
-                size={14}
-              />
+              <FiChevronUp size={14} />
             ) : (
-              <FiChevronDown
-                size={14}
-              />
+              <FiChevronDown size={14} />
             )}
+
           </div>
 
           {settingOpen && (
             <div className="ai-submenu">
+
+              {/* PROFILE */}
+
+              <div
+                className="ai-submenu-item"
+                onClick={handleProfile}
+              >
+
+                <FaUserCircle
+                  color="#00C2FF"
+                />
+
+                Profil Akun
+
+              </div>
+
+              {/* GANTI AKUN */}
+
               <div
                 className="ai-submenu-item"
                 onClick={
                   handleChangeAccount
                 }
               >
+
                 <FaUserCircle
-                  color="#00C2FF"
+                  color="#7DD3FC"
                 />
 
                 Ganti Akun
+
               </div>
+
+              {/* LOGOUT */}
 
               <div
                 className="ai-submenu-item"
                 style={{
-                  color:
-                    "#ff6b6b",
+                  color: "#ff6b6b",
                 }}
                 onClick={
                   handleLogout
                 }
               >
+
                 <FaSignOutAlt />
 
                 Keluar
+
               </div>
+
             </div>
           )}
 
-          {/* ABOUT */}
+          {/* ==================================================
+              ABOUT
+          ================================================== */}
 
           <div
             className="ai-menu ai-about"
             onClick={handleAbout}
           >
+
             <FiInfo size={15} />
 
             Tentang AI.Ind
+
           </div>
+
         </div>
+
       </aside>
     </>
   );
