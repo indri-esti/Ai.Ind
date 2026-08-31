@@ -61,12 +61,16 @@ function ChatInput({
           isolation: isolate;
         }
 
-        .home-plus-button {
+        .home-plus-label {
           position: absolute;
           inset: 0;
           width: 46px;
           height: 46px;
+          min-width: 46px;
+          min-height: 46px;
+
           border-radius: 50%;
+
           display: flex;
           align-items: center;
           justify-content: center;
@@ -80,15 +84,22 @@ function ChatInput({
           padding: 0;
           margin: 0;
 
-          pointer-events: none;
+          cursor: pointer;
+          user-select: none;
+          -webkit-user-select: none;
+
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
 
           transition:
             transform 0.16s ease,
             background-color 0.16s ease,
             box-shadow 0.16s ease;
+
+          z-index: 2;
         }
 
-        .home-plus-button.pressed {
+        .home-plus-label.pressed {
           transform: scale(0.78) rotate(90deg);
           background: #00C2FF !important;
           color: #081420 !important;
@@ -106,37 +117,40 @@ function ChatInput({
 
         .home-plus-file {
           position: absolute !important;
-          inset: 0 !important;
-          width: 46px !important;
-          height: 46px !important;
-          min-width: 46px !important;
-          min-height: 46px !important;
+
+          width: 1px !important;
+          height: 1px !important;
 
           opacity: 0 !important;
 
-          cursor: pointer !important;
+          overflow: hidden !important;
 
-          z-index: 100000 !important;
+          clip: rect(0, 0, 0, 0) !important;
+          clip-path: inset(50%) !important;
 
-          pointer-events: auto !important;
+          white-space: nowrap !important;
 
-          margin: 0 !important;
+          border: 0 !important;
           padding: 0 !important;
+          margin: -1px !important;
 
-          touch-action: manipulation !important;
-
-          -webkit-tap-highlight-color: transparent !important;
-          -webkit-touch-callout: none !important;
+          z-index: -1 !important;
         }
 
         .home-plus-file:disabled {
           pointer-events: none !important;
-          cursor: not-allowed !important;
+        }
+
+        .home-plus-label.disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          pointer-events: none;
         }
 
         .send-btn {
           transition: background-color 0.15s ease;
           -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
         }
 
         .send-icon {
@@ -159,6 +173,19 @@ function ChatInput({
           outline: none !important;
           box-shadow: none !important;
         }
+
+        @media (max-width: 576px) {
+          .home-plus-wrapper {
+            width: 46px;
+            height: 46px;
+            min-width: 46px;
+          }
+
+          .home-plus-label {
+            width: 46px;
+            height: 46px;
+          }
+        }
       `}</style>
 
       <Form
@@ -179,13 +206,31 @@ function ChatInput({
               PLUS BUTTON
               ===================================================== */}
           <div className="home-plus-wrapper">
-            <button
-              type="button"
-              tabIndex="-1"
-              aria-hidden="true"
-              className={`home-plus-button${
+
+            {/* INPUT FILE */}
+            <input
+              id="chat-image-input"
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={selesaiPilihGambar}
+              disabled={loading}
+              aria-label="Tambah gambar"
+              className="home-plus-file"
+            />
+
+            {/* TOMBOL PLUS */}
+            <label
+              htmlFor="chat-image-input"
+              className={`home-plus-label${
                 plusPressed ? " pressed" : ""
-              }`}
+              }${loading ? " disabled" : ""}`}
+              onPointerDown={tekanPlus}
+              onTouchStart={tekanPlus}
+              onClick={() => {
+                if (loading) return;
+              }}
+              aria-label="Tambah gambar"
             >
               <span className="home-plus-icon">
                 <FiPlus
@@ -193,21 +238,7 @@ function ChatInput({
                   strokeWidth={2.5}
                 />
               </span>
-            </button>
-
-            {/* INPUT FILE LANGSUNG DI ATAS TOMBOL */}
-            <input
-              id="chat-image-input"
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={selesaiPilihGambar}
-              onPointerDown={tekanPlus}
-              onTouchStart={tekanPlus}
-              disabled={loading}
-              aria-label="Tambah gambar"
-              className="home-plus-file"
-            />
+            </label>
           </div>
 
           {/* =====================================================
