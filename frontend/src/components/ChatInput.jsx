@@ -59,30 +59,92 @@ function ChatInput({
           {/* INPUT FILE */}
           <input
             ref={fileInputRef}
+            id="aiind-image-input"
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
             onChange={pilihGambar}
-            style={{ display: "none" }}
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: "hidden",
+              clip: "rect(0, 0, 0, 0)",
+              whiteSpace: "nowrap",
+              border: 0,
+              opacity: 0,
+              pointerEvents: "none",
+            }}
           />
 
           {/* PLUS */}
-          <button
-            type="button"
+          <label
+            htmlFor="aiind-image-input"
             className="home-plus-button"
-            onClick={() => {
-              if (!loading) {
-                fileInputRef.current?.click();
-              }
-            }}
-            disabled={loading}
             aria-label="Tambah gambar"
             title="Tambah gambar"
+            style={{
+              width: 46,
+              height: 46,
+              minWidth: 46,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              cursor: loading ? "not-allowed" : "pointer",
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              WebkitTapHighlightColor: "transparent",
+              touchAction: "manipulation",
+              background:
+                "rgba(19,40,63,.95)",
+              border:
+                "1px solid rgba(255,255,255,.09)",
+              color: "#D7F6FF",
+              boxShadow:
+                "0 8px 24px rgba(0,0,0,.24)",
+              transition:
+                "transform .15s ease, background .15s ease, border-color .15s ease",
+              opacity: loading ? 0.5 : 1,
+              pointerEvents: loading
+                ? "none"
+                : "auto",
+            }}
+            onTouchStart={(e) => {
+              if (loading) {
+                e.preventDefault();
+                return;
+              }
+
+              e.currentTarget.style.transform =
+                "scale(.92)";
+            }}
+            onTouchEnd={(e) => {
+              e.currentTarget.style.transform =
+                "scale(1)";
+            }}
+            onMouseDown={(e) => {
+              if (!loading) {
+                e.currentTarget.style.transform =
+                  "scale(.92)";
+              }
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform =
+                "scale(1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform =
+                "scale(1)";
+            }}
           >
             <FiPlus
               size={23}
               strokeWidth={2.5}
             />
-          </button>
+          </label>
 
           {/* INPUT CHAT */}
           <div
@@ -170,6 +232,9 @@ function ChatInput({
                 alignItems: "center",
                 flexShrink: 0,
                 padding: 0,
+                touchAction: "manipulation",
+                WebkitTapHighlightColor:
+                  "transparent",
               }}
             >
               <FaPaperPlane
