@@ -42,6 +42,37 @@ function ChatInput({
         margin: "0 auto",
       }}
     >
+      {/*
+        Animasi tombol + dan tombol kirim.
+        Ditaruh sebagai <style> lokal biar tidak perlu ubah file CSS terpisah.
+      */}
+      <style>{`
+        .home-plus-button {
+          transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .home-plus-button:active {
+          transform: scale(0.88);
+          background-color: #1c3550;
+          box-shadow: 0 4px 12px rgba(0,0,0,.3);
+        }
+        .home-plus-button svg {
+          transition: transform 0.2s ease;
+        }
+        .home-plus-button:active svg {
+          transform: rotate(90deg);
+        }
+        .home-plus-button.disabled {
+          pointer-events: none;
+        }
+
+        .send-btn {
+          transition: transform 0.12s ease, background-color 0.15s ease;
+        }
+        .send-btn:active:not(:disabled) {
+          transform: scale(0.88);
+        }
+      `}</style>
+
       <Form
         onSubmit={(e) => {
           e.preventDefault();
@@ -57,8 +88,9 @@ function ChatInput({
           }}
         >
           {/* PLUS BUTTON */}
-          <div
-            className="home-plus-button"
+          <label
+            htmlFor="chat-image-input"
+            className={`home-plus-button${loading ? " disabled" : ""}`}
             style={{
               position: "relative",
               width: 46,
@@ -70,16 +102,15 @@ function ChatInput({
               alignItems: "center",
               justifyContent: "center",
               background: "#13283F",
-              border:
-                "1px solid rgba(255,255,255,.09)",
+              border: "1px solid rgba(255,255,255,.09)",
               color: "#D7F6FF",
-              boxShadow:
-                "0 8px 24px rgba(0,0,0,.24)",
-              overflow: "hidden",
+              boxShadow: "0 8px 24px rgba(0,0,0,.24)",
               opacity: loading ? 0.5 : 1,
-              WebkitTapHighlightColor:
-                "transparent",
+              cursor: loading ? "not-allowed" : "pointer",
+              WebkitTapHighlightColor: "transparent",
               touchAction: "manipulation",
+              userSelect: "none",
+              margin: 0,
             }}
           >
             {/* ICON */}
@@ -88,19 +119,17 @@ function ChatInput({
               strokeWidth={2.5}
               style={{
                 pointerEvents: "none",
-                position: "relative",
-                zIndex: 1,
               }}
             />
 
-            {/* 
-              INPUT FILE TRANSPARAN
-              
-              Input sengaja menutupi SELURUH tombol +.
-              Jadi tap pertama langsung diterima oleh
-              native file picker Android.
+            {/*
+              Input file disembunyikan total (display: none).
+              Klik pada <label> di atas otomatis akan memicu
+              file picker native, tanpa perlu trik overlay
+              transparan yang rawan gagal di beberapa browser/Android.
             */}
             <input
+              id="chat-image-input"
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
@@ -108,27 +137,9 @@ function ChatInput({
               disabled={loading}
               aria-label="Tambah gambar"
               title="Tambah gambar"
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                margin: 0,
-                padding: 0,
-                opacity: 0,
-                cursor: loading
-                  ? "not-allowed"
-                  : "pointer",
-                zIndex: 10,
-                display: "block",
-                border: 0,
-                outline: 0,
-                touchAction: "manipulation",
-                WebkitTapHighlightColor:
-                  "transparent",
-              }}
+              style={{ display: "none" }}
             />
-          </div>
+          </label>
 
           {/* INPUT CHAT */}
           <div
@@ -141,10 +152,8 @@ function ChatInput({
               background: "#13283F",
               borderRadius: 28,
               padding: "7px 8px 7px 18px",
-              border:
-                "1px solid rgba(255,255,255,.08)",
-              boxShadow:
-                "0 8px 25px rgba(0,0,0,.25)",
+              border: "1px solid rgba(255,255,255,.08)",
+              boxShadow: "0 8px 25px rgba(0,0,0,.25)",
               boxSizing: "border-box",
             }}
           >
@@ -156,17 +165,10 @@ function ChatInput({
                 setMessage(e.target.value);
               }}
               onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey
-                ) {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
 
-                  if (
-                    !loading &&
-                    (message.trim() ||
-                      imagePreview)
-                  ) {
+                  if (!loading && (message.trim() || imagePreview)) {
                     handleKirim();
                   }
                 }
@@ -194,11 +196,8 @@ function ChatInput({
             {/* KIRIM */}
             <Button
               type="submit"
-              disabled={
-                loading ||
-                (!message.trim() &&
-                  !imagePreview)
-              }
+              className="send-btn"
+              disabled={loading || (!message.trim() && !imagePreview)}
               style={{
                 width: 46,
                 height: 46,
@@ -206,9 +205,7 @@ function ChatInput({
                 borderRadius: "50%",
                 border: "none",
                 background:
-                  loading ||
-                  (!message.trim() &&
-                    !imagePreview)
+                  loading || (!message.trim() && !imagePreview)
                     ? "#4B647A"
                     : "#00C2FF",
                 display: "flex",
@@ -217,14 +214,10 @@ function ChatInput({
                 flexShrink: 0,
                 padding: 0,
                 touchAction: "manipulation",
-                WebkitTapHighlightColor:
-                  "transparent",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
-              <FaPaperPlane
-                color="#081420"
-                size={17}
-              />
+              <FaPaperPlane color="#081420" size={17} />
             </Button>
           </div>
         </div>
