@@ -10,14 +10,14 @@ import {
   FiX,
   FiInfo,
   FiCheck,
+  FiUser,
+  FiSettings,
+  FiLogOut,
+  FiTrash2,
+  FiMail,
+  FiLock,
+  FiUserCheck,
 } from "react-icons/fi";
-
-import {
-  FaTrash,
-  FaCog,
-  FaSignOutAlt,
-  FaUserCircle,
-} from "react-icons/fa";
 
 function Sidebar({
   setMessages,
@@ -648,7 +648,7 @@ function Sidebar({
                 color:#00C2FF;
                 font-size:16px;
               ">
-                ✉
+                <span class="ai-swal-icon-mail"></span>
               </div>
 
               <div style="
@@ -706,7 +706,7 @@ function Sidebar({
                 color:#00C2FF;
                 font-size:16px;
               ">
-                🔒
+                <span class="ai-swal-icon-lock"></span>
               </div>
 
               <div style="
@@ -764,13 +764,41 @@ function Sidebar({
             font-size:10px;
             line-height:1.6;
           ">
-            🔐 Demi keamanan, password asli tidak
+            Demi keamanan, password asli tidak
             ditampilkan kembali. Sistem hanya menyimpan
             password dalam bentuk hash.
           </div>
 
         </div>
       `,
+
+      didOpen: () => {
+        const mail =
+          document.querySelector(
+            ".ai-swal-icon-mail"
+          );
+
+        const lock =
+          document.querySelector(
+            ".ai-swal-icon-lock"
+          );
+
+        if (mail) {
+          mail.innerHTML =
+            `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+              <path d="m3 7 9 6 9-6"></path>
+            </svg>`;
+        }
+
+        if (lock) {
+          lock.innerHTML =
+            `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="10" width="16" height="11" rx="2"></rect>
+              <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+            </svg>`;
+        }
+      },
     });
   };
 
@@ -909,7 +937,7 @@ function Sidebar({
 
           <br>
 
-          Asisten AI buatan Indonesia 🇮🇩
+          Asisten AI buatan Indonesia
 
           <br><br>
 
@@ -1691,6 +1719,10 @@ function Sidebar({
 
           -webkit-tap-highlight-color:
             transparent;
+
+          transition:
+            background .16s ease,
+            color .16s ease;
         }
 
         .ai-submenu-item:hover {
@@ -1970,7 +2002,7 @@ function Sidebar({
                 </h2>
 
                 <div className="ai-brand-sub">
-                  Asisten AI buatan Indonesia 🇮🇩
+                  Asisten AI buatan Indonesia
                 </div>
 
               </div>
@@ -2104,7 +2136,7 @@ function Sidebar({
                       }
                       aria-label="Hapus percakapan"
                     >
-                      <FaTrash size={11} />
+                      <FiTrash2 size={13} />
                     </button>
 
                   </div>
@@ -2142,8 +2174,9 @@ function Sidebar({
             }}
           >
 
-            <FaUserCircle
-              size={32}
+            <FiUser
+              size={28}
+              strokeWidth={1.8}
               className="ai-user-icon"
             />
 
@@ -2172,6 +2205,7 @@ function Sidebar({
               <FiCheck
                 size={14}
                 color="#00C2FF"
+                strokeWidth={2.5}
               />
             )}
 
@@ -2190,7 +2224,10 @@ function Sidebar({
             }
           >
 
-            <FaCog size={14} />
+            <FiSettings
+              size={15}
+              strokeWidth={1.9}
+            />
 
             <span
               style={{
@@ -2201,9 +2238,13 @@ function Sidebar({
             </span>
 
             {settingOpen ? (
-              <FiChevronUp size={14} />
+              <FiChevronUp
+                size={14}
+              />
             ) : (
-              <FiChevronDown size={14} />
+              <FiChevronDown
+                size={14}
+              />
             )}
 
           </div>
@@ -2218,7 +2259,8 @@ function Sidebar({
                 onClick={handleProfile}
               >
 
-                <FaUserCircle
+                <FiUser
+                  size={14}
                   color="#00C2FF"
                 />
 
@@ -2235,7 +2277,8 @@ function Sidebar({
                 }
               >
 
-                <FaUserCircle
+                <FiUserCheck
+                  size={14}
                   color="#7DD3FC"
                 />
 
@@ -2255,7 +2298,7 @@ function Sidebar({
                 }
               >
 
-                <FaSignOutAlt />
+                <FiLogOut size={14} />
 
                 Keluar
 
@@ -2273,7 +2316,10 @@ function Sidebar({
             onClick={handleAbout}
           >
 
-            <FiInfo size={15} />
+            <FiInfo
+              size={15}
+              strokeWidth={1.9}
+            />
 
             Tentang AI.Ind
 
