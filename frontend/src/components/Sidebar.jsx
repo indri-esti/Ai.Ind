@@ -28,13 +28,17 @@ function Sidebar({
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
+
   const [mobile, setMobile] = useState(
     window.innerWidth < 768
   );
+
   const [open, setOpen] = useState(
     window.innerWidth >= 768
   );
-  const [settingOpen, setSettingOpen] = useState(false);
+
+  const [settingOpen, setSettingOpen] =
+    useState(false);
 
   // ==========================================
   // SWIPE
@@ -43,19 +47,33 @@ function Sidebar({
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
+  // Mencegah satu chat terbuka dua kali
+  const lastOpenedChatRef = useRef(null);
+  const lastOpenedTimeRef = useRef(0);
+
   const handleTouchStart = (e) => {
     if (!mobile) return;
 
-    const touch = e.touches[0];
+    const touch = e.touches?.[0];
+
+    if (!touch) return;
 
     touchStartX.current = touch.clientX;
     touchStartY.current = touch.clientY;
   };
 
   const handleTouchMove = (e) => {
-    if (!mobile || touchStartX.current === null) return;
+    if (
+      !mobile ||
+      touchStartX.current === null ||
+      touchStartY.current === null
+    ) {
+      return;
+    }
 
-    const touch = e.touches[0];
+    const touch = e.touches?.[0];
+
+    if (!touch) return;
 
     const diffX =
       touch.clientX - touchStartX.current;
@@ -63,28 +81,39 @@ function Sidebar({
     const diffY =
       touch.clientY - touchStartY.current;
 
-    // Abaikan kalau gerakannya lebih dominan vertikal
-    if (Math.abs(diffY) > Math.abs(diffX)) {
+    // Kalau gerakan vertikal, jangan dianggap swipe sidebar
+    if (
+      Math.abs(diffY) >
+      Math.abs(diffX)
+    ) {
       return;
     }
 
-    // Dari kiri → kanan = buka
+    // ======================================
+    // KIRI -> KANAN = BUKA
+    // ======================================
+
     if (
       !open &&
-      touchStartX.current < 35 &&
+      touchStartX.current < 45 &&
       diffX > 55
     ) {
       setOpen(true);
+
       touchStartX.current = null;
       touchStartY.current = null;
     }
 
-    // Kanan → kiri = tutup
+    // ======================================
+    // KANAN -> KIRI = TUTUP
+    // ======================================
+
     if (
       open &&
       diffX < -70
     ) {
       setOpen(false);
+
       touchStartX.current = null;
       touchStartY.current = null;
     }
@@ -110,7 +139,9 @@ function Sidebar({
 
     if (!identifier) return null;
 
-    return `history_${String(identifier).toLowerCase()}`;
+    return `history_${String(
+      identifier
+    ).toLowerCase()}`;
   };
 
   // ==========================================
@@ -262,20 +293,74 @@ function Sidebar({
   // ==========================================
 
   const handleOpenChat = (chat) => {
-    setMessages(
+    if (!chat) return;
+
+    /*
+      Cegah satu history terbuka dua kali
+      akibat double click / event touch Android.
+    */
+
+    const chatKey =
+      chat.id ||
+      chat.chatId ||
+      chat.title;
+
+    const now = Date.now();
+
+    if (
+      lastOpenedChatRef.current === chatKey &&
+      now - lastOpenedTimeRef.current < 500
+    ) {
+      return;
+    }
+
+    lastOpenedChatRef.current =
+      chatKey;
+
+    lastOpenedTimeRef.current =
+      now;
+
+    // ======================================
+    // LOAD PESAN
+    // ======================================
+
+    const chatMessages =
       Array.isArray(chat.messages)
         ? chat.messages
-        : []
-    );
+        : [];
 
-    // Backend chat ID
+    setMessages(chatMessages);
+
+    // ======================================
+    // KIRIM CHAT ID BACKEND
+    // ======================================
+
     if (chat.chatId) {
       window.dispatchEvent(
         new CustomEvent(
           "aiind-load-chat",
           {
             detail: {
-              chatId: chat.chatId,
+              chatId:
+                Number(chat.chatId),
+
+              // ID history lokal
+              historyId:
+                chat.id || null,
+            },
+          }
+        )
+      );
+    } else {
+      window.dispatchEvent(
+        new CustomEvent(
+          "aiind-load-chat",
+          {
+            detail: {
+              chatId: null,
+
+              historyId:
+                chat.id || null,
             },
           }
         )
@@ -332,15 +417,27 @@ function Sidebar({
 
     Swal.fire({
       title: "Ganti Akun?",
-      text: "Kamu akan keluar dari akun saat ini.",
+      text:
+        "Kamu akan keluar dari akun saat ini.",
       icon: "warning",
+
       background: "#0B1D2A",
       color: "#fff",
+
       showCancelButton: true,
-      confirmButtonText: "Ganti Akun",
-      cancelButtonText: "Batal",
-      confirmButtonColor: "#00C2FF",
-      cancelButtonColor: "#334155",
+
+      confirmButtonText:
+        "Ganti Akun",
+
+      cancelButtonText:
+        "Batal",
+
+      confirmButtonColor:
+        "#00C2FF",
+
+      cancelButtonColor:
+        "#334155",
+
       borderRadius: "18px",
     }).then((result) => {
       if (result.isConfirmed) {
@@ -366,15 +463,27 @@ function Sidebar({
   const handleLogout = () => {
     Swal.fire({
       title: "Keluar Akun?",
-      text: "Apakah kamu yakin ingin keluar?",
+      text:
+        "Apakah kamu yakin ingin keluar?",
       icon: "warning",
+
       background: "#0B1D2A",
       color: "#fff",
+
       showCancelButton: true,
-      confirmButtonText: "Keluar",
-      cancelButtonText: "Batal",
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#334155",
+
+      confirmButtonText:
+        "Keluar",
+
+      cancelButtonText:
+        "Batal",
+
+      confirmButtonColor:
+        "#ef4444",
+
+      cancelButtonColor:
+        "#334155",
+
       borderRadius: "18px",
     }).then((result) => {
       if (result.isConfirmed) {
@@ -400,6 +509,7 @@ function Sidebar({
   const handleAbout = () => {
     Swal.fire({
       title: "AI.Ind",
+
       html: `
         <div style="
           line-height:1.8;
@@ -408,25 +518,36 @@ function Sidebar({
           <strong style="color:#00C2FF">
             AI.Ind
           </strong>
+
           <br>
+
           Asisten AI buatan Indonesia 🇮🇩
+
           <br><br>
+
           <span style="color:#71899A">
             Teman cerdas untuk membantu
             belajar, mencari ide,
             pemrograman, dan berbagai
             aktivitas lainnya.
           </span>
+
           <br><br>
+
           <small style="color:#536B7D">
             Versi 1.0.0
           </small>
         </div>
       `,
+
       icon: "info",
+
       background: "#0B1D2A",
       color: "#fff",
-      confirmButtonColor: "#00C2FF",
+
+      confirmButtonColor:
+        "#00C2FF",
+
       borderRadius: "18px",
     });
   };
@@ -439,83 +560,159 @@ function Sidebar({
     <>
       <style>
         {`
+
+          /* =====================================
+             SIDEBAR UTAMA
+          ===================================== */
+
           .ai-sidebar {
             width: 274px;
             height: 100dvh;
+            max-height: 100dvh;
+
             flex-shrink: 0;
+
             background:
               linear-gradient(
                 180deg,
                 #0A1B28 0%,
                 #07151F 100%
               );
+
             border-right:
               1px solid rgba(255,255,255,.07);
+
             display: flex;
             flex-direction: column;
+
             position: relative;
+
             z-index: 1000;
+
             overflow: hidden;
+
+            box-sizing: border-box;
           }
 
+
+          /* =====================================
+             TOP
+          ===================================== */
+
           .ai-sidebar-top {
+            flex-shrink: 0;
             padding: 22px 18px 16px;
           }
+
 
           .ai-brand {
             display: flex;
             align-items: center;
             gap: 12px;
+
+            min-width: 0;
           }
+
 
           .ai-brand-logo {
             width: 46px;
             height: 46px;
+
+            min-width: 46px;
+
             border-radius: 14px;
+
             object-fit: cover;
+
             box-shadow:
-              0 8px 28px rgba(0,194,255,.14);
+              0 8px 28px
+              rgba(0,194,255,.14);
           }
+
 
           .ai-brand-name {
             margin: 0;
+
             color: #fff;
+
             font-size: 20px;
             font-weight: 800;
+
             letter-spacing: -.5px;
           }
+
 
           .ai-brand-name span {
             color: #00C2FF;
           }
 
+
           .ai-brand-sub {
             margin-top: 3px;
+
             color: #6F8798;
+
             font-size: 11px;
+
+            white-space: nowrap;
           }
+
+
+          .ai-brand-row {
+            display: flex;
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 10px;
+          }
+
+
+          /* =====================================
+             NEW CHAT
+          ===================================== */
 
           .ai-new-chat {
             width: 100%;
+
             margin-top: 22px;
+
             padding: 12px 15px;
-            border: 1px solid rgba(0,194,255,.18);
+
+            border:
+              1px solid
+              rgba(0,194,255,.18);
+
             border-radius: 14px;
+
             background:
               linear-gradient(
                 135deg,
                 rgba(0,194,255,.16),
                 rgba(0,143,232,.08)
               );
+
             color: #DDF8FF;
+
             display: flex;
             align-items: center;
+
             gap: 10px;
+
             font-size: 13px;
             font-weight: 700;
+
             cursor: pointer;
-            transition: .2s ease;
+
+            transition:
+              background .2s ease,
+              border-color .2s ease,
+              transform .2s ease;
+
+            -webkit-tap-highlight-color:
+              transparent;
           }
+
 
           .ai-new-chat:hover {
             background:
@@ -524,303 +721,693 @@ function Sidebar({
                 rgba(0,194,255,.25),
                 rgba(0,143,232,.12)
               );
+
             border-color:
               rgba(0,194,255,.35);
-            transform: translateY(-1px);
+
+            transform:
+              translateY(-1px);
           }
+
+
+          .ai-new-chat:active {
+            transform:
+              scale(.98);
+          }
+
 
           .ai-new-chat-icon {
             width: 28px;
             height: 28px;
+
+            min-width: 28px;
+
             border-radius: 9px;
+
             background: #00C2FF;
+
             color: #06131C;
+
             display: flex;
             align-items: center;
             justify-content: center;
           }
 
+
+          /* =====================================
+             HISTORY
+          ===================================== */
+
           .ai-history {
-            flex: 1;
+            flex: 1 1 auto;
+
             min-height: 0;
+
+            width: 100%;
+
             overflow-y: auto;
-            padding: 4px 12px 15px;
+            overflow-x: hidden;
+
+            padding:
+              4px 12px
+              15px;
+
+            box-sizing: border-box;
+
             scrollbar-width: thin;
+
             scrollbar-color:
-              #1C3849 transparent;
+              #1C3849
+              transparent;
+
+            -webkit-overflow-scrolling:
+              touch;
+
+            overscroll-behavior:
+              contain;
+
+            touch-action:
+              pan-y;
           }
+
+
+          .ai-history::-webkit-scrollbar {
+            width: 5px;
+          }
+
+
+          .ai-history::-webkit-scrollbar-track {
+            background: transparent;
+          }
+
+
+          .ai-history::-webkit-scrollbar-thumb {
+            background:
+              #1C3849;
+
+            border-radius: 999px;
+          }
+
 
           .ai-history-title {
             display: flex;
-            justify-content: space-between;
+
+            justify-content:
+              space-between;
+
             align-items: center;
-            padding: 10px 7px 9px;
+
+            padding:
+              10px 7px 9px;
+
             color: #60798B;
+
             font-size: 10px;
+
             font-weight: 800;
+
             letter-spacing: 1.2px;
-            text-transform: uppercase;
+
+            text-transform:
+              uppercase;
+
+            position: sticky;
+
+            top: 0;
+
+            z-index: 2;
+
+            background:
+              linear-gradient(
+                180deg,
+                #091A27 80%,
+                rgba(9,26,39,0)
+              );
           }
+
 
           .ai-history-count {
             min-width: 20px;
+
             padding: 3px 6px;
+
             border-radius: 20px;
-            background: rgba(255,255,255,.04);
+
+            background:
+              rgba(255,255,255,.04);
+
             color: #587285;
+
             text-align: center;
+
             font-size: 10px;
           }
 
+
+          /* =====================================
+             EMPTY
+          ===================================== */
+
           .ai-empty {
-            padding: 32px 15px;
+            padding:
+              32px 15px;
+
             text-align: center;
+
             color: #4F697B;
           }
+
 
           .ai-empty-icon {
             width: 44px;
             height: 44px;
-            margin: 0 auto 11px;
+
+            margin:
+              0 auto 11px;
+
             border-radius: 14px;
-            background: rgba(0,194,255,.06);
+
+            background:
+              rgba(0,194,255,.06);
+
             color: #00C2FF;
+
             display: flex;
             align-items: center;
             justify-content: center;
           }
 
+
           .ai-empty p {
             margin: 0;
+
             font-size: 12px;
           }
 
+
           .ai-empty small {
             display: block;
+
             margin-top: 5px;
+
             color: #3E5667;
+
             font-size: 10px;
+
+            line-height: 1.5;
           }
+
+
+          /* =====================================
+             HISTORY ITEM
+          ===================================== */
 
           .ai-history-item {
             display: flex;
+
             align-items: center;
+
             gap: 7px;
+
             padding: 7px;
+
             margin-bottom: 4px;
+
+            border:
+              1px solid transparent;
+
             border-radius: 13px;
-            border: 1px solid transparent;
-            background: transparent;
+
+            background:
+              transparent;
+
             cursor: pointer;
-            transition: .18s ease;
+
+            transition:
+              background .18s ease,
+              border-color .18s ease;
+
+            -webkit-tap-highlight-color:
+              transparent;
+
+            user-select: none;
+
+            touch-action: manipulation;
           }
 
+
           .ai-history-item:hover {
-            background: rgba(255,255,255,.035);
+            background:
+              rgba(255,255,255,.035);
+
             border-color:
               rgba(255,255,255,.045);
           }
 
+
+          .ai-history-item:active {
+            background:
+              rgba(0,194,255,.08);
+
+            transform:
+              scale(.995);
+          }
+
+
           .ai-history-icon {
             width: 34px;
             height: 34px;
+
             min-width: 34px;
+
             border-radius: 10px;
-            background: rgba(0,194,255,.07);
+
+            background:
+              rgba(0,194,255,.07);
+
             color: #00C2FF;
+
             display: flex;
             align-items: center;
             justify-content: center;
           }
 
+
           .ai-history-text {
             flex: 1;
+
             min-width: 0;
           }
 
+
           .ai-history-name {
             color: #D8EAF2;
+
             font-size: 12px;
+
             line-height: 1.35;
+
             white-space: nowrap;
+
             overflow: hidden;
+
             text-overflow: ellipsis;
           }
 
+
           .ai-history-meta {
             margin-top: 3px;
+
             color: #506A7B;
+
             font-size: 9px;
           }
+
+
+          /* =====================================
+             DELETE
+          ===================================== */
 
           .ai-delete {
             width: 28px;
             height: 28px;
+
+            min-width: 28px;
+
             border: 0;
+
             border-radius: 9px;
-            background: transparent;
+
+            background:
+              transparent;
+
             color: #506979;
+
             display: flex;
+
             align-items: center;
             justify-content: center;
+
             cursor: pointer;
+
             opacity: 0;
-            transition: .18s ease;
+
+            transition:
+              background .18s ease,
+              color .18s ease,
+              opacity .18s ease;
+
+            -webkit-tap-highlight-color:
+              transparent;
           }
 
-          .ai-history-item:hover .ai-delete {
+
+          .ai-history-item:hover
+          .ai-delete {
             opacity: 1;
           }
 
+
           .ai-delete:hover {
-            background: rgba(239,68,68,.1);
+            background:
+              rgba(239,68,68,.1);
+
             color: #ff6b6b;
           }
 
+
+          .ai-delete:active {
+            transform:
+              scale(.9);
+          }
+
+
+          /* =====================================
+             BOTTOM
+          ===================================== */
+
           .ai-sidebar-bottom {
             flex-shrink: 0;
-            padding: 12px;
+
+            padding:
+              12px;
+
             border-top:
-              1px solid rgba(255,255,255,.06);
+              1px solid
+              rgba(255,255,255,.06);
+
             background:
               rgba(5,14,21,.35);
+
+            box-sizing: border-box;
           }
+
 
           .ai-user-card {
             display: flex;
+
             align-items: center;
+
             gap: 10px;
+
             padding: 10px;
+
             border-radius: 13px;
-            background: rgba(255,255,255,.025);
+
+            background:
+              rgba(255,255,255,.025);
+
             border:
-              1px solid rgba(255,255,255,.045);
+              1px solid
+              rgba(255,255,255,.045);
           }
+
 
           .ai-user-icon {
             color: #00C2FF;
+
             flex-shrink: 0;
           }
 
+
           .ai-user-info {
             min-width: 0;
+
             flex: 1;
           }
 
+
           .ai-user-name {
             color: #EAF8FF;
+
             font-size: 12px;
+
             font-weight: 700;
+
             white-space: nowrap;
+
             overflow: hidden;
+
             text-overflow: ellipsis;
           }
+
 
           .ai-user-email {
             margin-top: 2px;
+
             color: #60798B;
+
             font-size: 9px;
+
             white-space: nowrap;
+
             overflow: hidden;
+
             text-overflow: ellipsis;
           }
 
+
+          /* =====================================
+             MENU
+          ===================================== */
+
           .ai-menu {
             display: flex;
+
             align-items: center;
+
             gap: 10px;
-            padding: 9px 8px;
+
+            padding:
+              9px 8px;
+
             margin-top: 5px;
+
             border-radius: 10px;
+
             color: #71899A;
+
             font-size: 12px;
+
             cursor: pointer;
-            transition: .18s ease;
+
+            transition:
+              background .18s ease,
+              color .18s ease;
+
+            -webkit-tap-highlight-color:
+              transparent;
           }
 
+
           .ai-menu:hover {
-            background: rgba(255,255,255,.035);
+            background:
+              rgba(255,255,255,.035);
+
             color: #C9E5F0;
           }
 
+
+          .ai-menu:active {
+            background:
+              rgba(0,194,255,.06);
+          }
+
+
           .ai-submenu {
             margin-left: 24px;
+
             margin-bottom: 3px;
           }
 
+
           .ai-submenu-item {
             display: flex;
+
             align-items: center;
+
             gap: 9px;
+
             padding: 8px;
+
             border-radius: 9px;
+
             color: #8197A6;
+
             font-size: 11px;
+
             cursor: pointer;
+
+            -webkit-tap-highlight-color:
+              transparent;
           }
 
+
           .ai-submenu-item:hover {
-            background: rgba(255,255,255,.035);
+            background:
+              rgba(255,255,255,.035);
+
             color: #fff;
           }
 
+
           .ai-about {
             border-top:
-              1px solid rgba(255,255,255,.05);
+              1px solid
+              rgba(255,255,255,.05);
+
             padding-top: 9px;
+
             margin-top: 3px;
           }
+
+
+          /* =====================================
+             MOBILE CLOSE
+          ===================================== */
 
           .ai-mobile-close {
             display: none;
           }
 
+
+          /* =====================================
+             MOBILE
+          ===================================== */
+
           @media (max-width: 767px) {
+
             .ai-sidebar {
               position: fixed;
+
               top: 0;
               left: 0;
-              width: min(290px, 82vw);
+
+              width:
+                min(290px, 82vw);
+
+              height: 100dvh;
+
+              max-height: 100dvh;
+
               transform:
                 translateX(
                   ${open ? "0" : "-105%"}
                 );
+
               transition:
-                transform .28s cubic-bezier(.22,.61,.36,1);
+                transform
+                .28s
+                cubic-bezier(
+                  .22,
+                  .61,
+                  .36,
+                  1
+                );
+
               box-shadow:
-                ${open
-                  ? "12px 0 45px rgba(0,0,0,.38)"
-                  : "none"};
-              touch-action: pan-y;
+                ${
+                  open
+                    ? "12px 0 45px rgba(0,0,0,.38)"
+                    : "none"
+                };
+
+              touch-action:
+                pan-y;
+
+              overscroll-behavior:
+                contain;
             }
+
+
+            .ai-sidebar-top {
+              padding:
+                calc(
+                  18px +
+                  env(safe-area-inset-top)
+                )
+                16px
+                15px;
+            }
+
+
+            .ai-history {
+              padding:
+                4px 10px
+                calc(
+                  18px +
+                  env(safe-area-inset-bottom)
+                );
+
+              overflow-y: auto;
+
+              touch-action:
+                pan-y;
+
+              -webkit-overflow-scrolling:
+                touch;
+            }
+
 
             .ai-mobile-close {
               width: 30px;
               height: 30px;
+
+              min-width: 30px;
+
               border: 0;
+
               border-radius: 9px;
-              background: rgba(255,255,255,.04);
+
+              background:
+                rgba(255,255,255,.04);
+
               color: #7690A1;
+
               display: flex;
+
               align-items: center;
               justify-content: center;
+
               cursor: pointer;
+
+              -webkit-tap-highlight-color:
+                transparent;
             }
 
-            .ai-brand-row {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-            }
 
             .ai-delete {
               opacity: 1;
+            }
+
+
+            .ai-history-item {
+              padding:
+                8px 7px;
+
+              margin-bottom: 5px;
+
+              min-height: 50px;
+            }
+
+
+            .ai-history-title {
+              padding:
+                10px 7px;
+            }
+
+
+            .ai-new-chat {
+              min-height: 48px;
             }
           }
         `}
       </style>
 
-      {/* AREA SWIPE */}
+      {/* ========================================
+          AREA SWIPE
+      ======================================== */}
+
       {mobile && (
         <div
           onTouchStart={handleTouchStart}
@@ -828,44 +1415,89 @@ function Sidebar({
           onTouchEnd={handleTouchEnd}
           style={{
             position: "fixed",
+
             top: 0,
             left: 0,
-            width: open ? "100%" : "38px",
+
+            width:
+              open
+                ? "100%"
+                : "42px",
+
             height: "100%",
-            zIndex: open ? 997 : 997,
-            pointerEvents: open
-              ? "none"
-              : "auto",
-            touchAction: "pan-y",
+
+            zIndex: 997,
+
+            pointerEvents:
+              open
+                ? "none"
+                : "auto",
+
+            touchAction:
+              "pan-y",
+
+            WebkitTapHighlightColor:
+              "transparent",
           }}
         />
       )}
 
-      {/* OVERLAY */}
+      {/* ========================================
+          OVERLAY
+      ======================================== */}
+
       {mobile && open && (
         <div
-          onClick={() => setOpen(false)}
+          onClick={() =>
+            setOpen(false)
+          }
           style={{
             position: "fixed",
+
             inset: 0,
-            background: "rgba(0,0,0,.48)",
-            backdropFilter: "blur(3px)",
+
+            background:
+              "rgba(0,0,0,.48)",
+
+            backdropFilter:
+              "blur(3px)",
+
+            WebkitBackdropFilter:
+              "blur(3px)",
+
             zIndex: 998,
           }}
         />
       )}
 
-      {/* SIDEBAR */}
+      {/* ========================================
+          SIDEBAR
+      ======================================== */}
+
       <aside
         className="ai-sidebar"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+
+        onTouchStart={
+          handleTouchStart
+        }
+
+        onTouchMove={
+          handleTouchMove
+        }
+
+        onTouchEnd={
+          handleTouchEnd
+        }
       >
+
         {/* TOP */}
+
         <div className="ai-sidebar-top">
+
           <div className="ai-brand-row">
+
             <div className="ai-brand">
+
               <img
                 src="/logo.svg"
                 alt="AI.Ind"
@@ -874,55 +1506,125 @@ function Sidebar({
 
               <div>
                 <h2 className="ai-brand-name">
-                  AI<span>.Ind</span>
+                  AI
+                  <span>
+                    .Ind
+                  </span>
                 </h2>
 
                 <div className="ai-brand-sub">
                   Asisten AI buatan Indonesia 🇮🇩
                 </div>
               </div>
+
             </div>
 
             {mobile && (
               <button
+                type="button"
                 className="ai-mobile-close"
-                onClick={() => setOpen(false)}
+                onClick={() =>
+                  setOpen(false)
+                }
                 aria-label="Tutup sidebar"
               >
                 <FiX size={17} />
               </button>
             )}
+
           </div>
 
+
           <button
+            type="button"
             className="ai-new-chat"
-            onClick={handleChatBaru}
+            onClick={
+              handleChatBaru
+            }
           >
             <span className="ai-new-chat-icon">
               <FiPlus size={17} />
             </span>
 
-            <span>Percakapan baru</span>
+            <span>
+              Percakapan baru
+            </span>
           </button>
+
         </div>
 
-        {/* HISTORY */}
-        <div className="ai-history">
+
+        {/* ======================================
+            HISTORY
+        ====================================== */}
+
+        <div
+          className="ai-history"
+          onTouchStart={(e) => {
+            /*
+              Biarkan scroll history bekerja.
+              Hanya mulai swipe sidebar jika
+              gesture dimulai dari area yang
+              bukan history.
+            */
+            if (
+              e.target.closest(
+                ".ai-history-item"
+              )
+            ) {
+              return;
+            }
+
+            handleTouchStart(e);
+          }}
+          onTouchMove={(e) => {
+            if (
+              e.target.closest(
+                ".ai-history-item"
+              )
+            ) {
+              return;
+            }
+
+            handleTouchMove(e);
+          }}
+          onTouchEnd={(e) => {
+            if (
+              e.target.closest(
+                ".ai-history-item"
+              )
+            ) {
+              return;
+            }
+
+            handleTouchEnd(e);
+          }}
+        >
+
           <div className="ai-history-title">
-            <span>Riwayat percakapan</span>
+
+            <span>
+              Riwayat percakapan
+            </span>
 
             {history.length > 0 && (
               <span className="ai-history-count">
                 {history.length}
               </span>
             )}
+
           </div>
+
 
           {!history ||
           history.length === 0 ? (
+
             <div className="ai-empty">
+
               <div className="ai-empty-icon">
-                <FiMessageSquare size={20} />
+                <FiMessageSquare
+                  size={20}
+                />
               </div>
 
               <p>
@@ -933,25 +1635,37 @@ function Sidebar({
                 Pesan yang kamu kirim
                 akan otomatis tersimpan
               </small>
+
             </div>
+
           ) : (
+
             history.map(
               (chat, index) => (
+
                 <div
                   key={
                     chat.id ||
+                    chat.chatId ||
                     `${chat.title}-${index}`
                   }
+
                   className="ai-history-item"
+
                   onClick={() =>
                     handleOpenChat(chat)
                   }
                 >
+
                   <div className="ai-history-icon">
-                    <FiMessageSquare size={15} />
+                    <FiMessageSquare
+                      size={15}
+                    />
                   </div>
 
+
                   <div className="ai-history-text">
+
                     <div className="ai-history-name">
                       {chat.title ||
                         "Percakapan baru"}
@@ -964,35 +1678,55 @@ function Sidebar({
                         ? `${chat.messages.length} pesan`
                         : "Percakapan"}
                     </div>
+
                   </div>
 
+
                   <button
+                    type="button"
                     className="ai-delete"
+
                     onClick={(e) =>
                       handleDeleteHistory(
                         e,
                         index
                       )
                     }
-                    aria-label="Hapus percakapan"
+
+                    aria-label={
+                      "Hapus percakapan"
+                    }
                   >
-                    <FaTrash size={11} />
+                    <FaTrash
+                      size={11}
+                    />
                   </button>
+
                 </div>
+
               )
             )
+
           )}
+
         </div>
 
-        {/* BOTTOM */}
+
+        {/* ======================================
+            BOTTOM
+        ====================================== */}
+
         <div className="ai-sidebar-bottom">
+
           <div className="ai-user-card">
+
             <FaUserCircle
               size={32}
               className="ai-user-icon"
             />
 
             <div className="ai-user-info">
+
               <div className="ai-user-name">
                 {user?.nama ||
                   "Belum Login"}
@@ -1002,69 +1736,113 @@ function Sidebar({
                 {user?.email ||
                   "Masuk untuk menggunakan AI.Ind"}
               </div>
+
             </div>
+
           </div>
+
+
+          {/* PENGATURAN */}
 
           <div
             className="ai-menu"
+
             onClick={() =>
               setSettingOpen(
                 !settingOpen
               )
             }
           >
+
             <FaCog size={14} />
 
-            <span style={{ flex: 1 }}>
+            <span
+              style={{
+                flex: 1,
+              }}
+            >
               Pengaturan
             </span>
 
             {settingOpen ? (
-              <FiChevronUp size={14} />
+              <FiChevronUp
+                size={14}
+              />
             ) : (
-              <FiChevronDown size={14} />
+              <FiChevronDown
+                size={14}
+              />
             )}
+
           </div>
 
+
           {settingOpen && (
+
             <div className="ai-submenu">
+
               <div
                 className="ai-submenu-item"
+
                 onClick={
                   handleChangeAccount
                 }
               >
+
                 <FaUserCircle
                   color="#00C2FF"
                 />
+
                 Ganti Akun
+
               </div>
+
 
               <div
                 className="ai-submenu-item"
+
                 style={{
-                  color: "#ff6b6b",
+                  color:
+                    "#ff6b6b",
                 }}
-                onClick={handleLogout}
+
+                onClick={
+                  handleLogout
+                }
               >
+
                 <FaSignOutAlt />
+
                 Keluar
+
               </div>
+
             </div>
+
           )}
+
+
+          {/* ABOUT */}
 
           <div
             className="ai-menu ai-about"
-            onClick={handleAbout}
+
+            onClick={
+              handleAbout
+            }
           >
+
             <FiInfo size={15} />
+
             Tentang AI.Ind
+
           </div>
+
         </div>
+
       </aside>
     </>
   );
 }
 
 export default Sidebar;
-
