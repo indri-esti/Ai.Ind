@@ -7,7 +7,11 @@ function ChatBox({ messages, loading, chatEndRef }) {
     <div
       style={{
         flex: 1,
-        overflowY: "auto",
+
+        // Scroll utama ditangani oleh .home-messages di Home.jsx
+        overflowY: "visible",
+        overflowX: "visible",
+
         display: "flex",
         flexDirection: "column",
         gap: 18,
@@ -22,6 +26,12 @@ function ChatBox({ messages, loading, chatEndRef }) {
         scrollbarWidth: "thin",
         width: "100%",
         boxSizing: "border-box",
+
+        // Jangan membuat area ChatBox mengganggu tombol input
+        position: "relative",
+        zIndex: 1,
+        pointerEvents: "auto",
+        touchAction: "pan-y",
       }}
     >
       {messages.map((msg, index) => (
