@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  FaRobot,
   FaEye,
   FaEyeSlash,
 } from "react-icons/fa";
@@ -80,88 +79,146 @@ function Login() {
 
   const inputStyle = {
     width: "100%",
-    padding: "14px",
-    borderRadius: "10px",
-    border: "1px solid #1B3445",
-    background: "#122B3C",
+    padding: "14px 15px",
+    borderRadius: "12px",
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(18,43,60,0.85)",
     color: "#fff",
     outline: "none",
     boxSizing: "border-box",
+    fontSize: "14px",
+    transition: "0.2s",
   };
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: "#081420",
+        background:
+          "radial-gradient(circle at top, #12344a 0%, #081420 42%, #050c13 100%)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        padding: "20px",
+        padding: "24px",
+        fontFamily:
+          "Inter, Poppins, Arial, sans-serif",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Background glow */}
+      <div
+        style={{
+          position: "absolute",
+          width: "320px",
+          height: "320px",
+          borderRadius: "50%",
+          background: "rgba(0,194,255,0.08)",
+          filter: "blur(80px)",
+          top: "-120px",
+          left: "-100px",
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          width: "280px",
+          height: "280px",
+          borderRadius: "50%",
+          background: "rgba(0,194,255,0.06)",
+          filter: "blur(80px)",
+          bottom: "-100px",
+          right: "-80px",
+        }}
+      />
+
       <div
         style={{
           width: "100%",
-          maxWidth: "420px",
-          background: "#0B1D2A",
-          border: "1px solid #1B3445",
-          borderRadius: "18px",
-          padding: "35px",
+          maxWidth: "430px",
+          background:
+            "linear-gradient(145deg, rgba(11,29,42,0.97), rgba(7,22,33,0.97))",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "24px",
+          padding: "38px",
           boxShadow:
-            "0 0 25px rgba(0,194,255,.15)",
+            "0 25px 70px rgba(0,0,0,0.45), 0 0 35px rgba(0,194,255,0.08)",
+          position: "relative",
+          zIndex: 1,
+          backdropFilter: "blur(20px)",
         }}
       >
+        {/* Header */}
         <div
           style={{
             textAlign: "center",
-            marginBottom: "30px",
+            marginBottom: "32px",
           }}
         >
           <div
             style={{
-              width: "80px",
-              height: "80px",
-              borderRadius: "50%",
-              background: "#122B3C",
+              width: "100px",
+              height: "100px",
+              borderRadius: "28px",
+              background:
+                "linear-gradient(145deg, #0c2638, #071723)",
+              border:
+                "1px solid rgba(0,194,255,0.16)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               margin: "0 auto",
+              boxShadow:
+                "0 15px 35px rgba(0,0,0,0.3), 0 0 25px rgba(0,194,255,0.10)",
+              overflow: "hidden",
             }}
           >
-            <FaRobot
-              size={42}
-              color="#00C2FF"
-            />
+            <img
+  src="/logo.svg"
+  alt="AI.Ind"
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    display: "block",
+  }}
+/>
           </div>
 
-          <h2
+          <h1
             style={{
-              color: "#00C2FF",
-              marginTop: "20px",
-              marginBottom: "8px",
+              color: "#fff",
+              marginTop: "22px",
+              marginBottom: "7px",
+              fontSize: "28px",
+              fontWeight: "800",
+              letterSpacing: "-0.5px",
             }}
           >
-            AI.Ind
-          </h2>
+            AI<span style={{ color: "#00C2FF" }}>.Ind</span>
+          </h1>
 
           <p
             style={{
               color: "#8A9BB5",
               margin: 0,
+              fontSize: "14px",
             }}
           >
-            Selamat Datang Kembali
+            Selamat datang kembali 
           </p>
         </div>
 
-        <div style={{ marginBottom: "18px" }}>
+        {/* Email */}
+        <div style={{ marginBottom: "20px" }}>
           <label
             style={{
-              color: "#fff",
+              color: "#EAF4FA",
               display: "block",
-              marginBottom: "8px",
+              marginBottom: "9px",
+              fontSize: "14px",
+              fontWeight: "600",
             }}
           >
             Email
@@ -169,21 +226,35 @@ function Login() {
 
           <input
             type="email"
-            placeholder="Masukkan email"
+            placeholder="Masukkan email kamu"
             value={email}
             onChange={(e) =>
               setEmail(e.target.value)
             }
             style={inputStyle}
+            onFocus={(e) => {
+              e.target.style.border =
+                "1px solid #00C2FF";
+              e.target.style.boxShadow =
+                "0 0 0 3px rgba(0,194,255,0.10)";
+            }}
+            onBlur={(e) => {
+              e.target.style.border =
+                "1px solid rgba(255,255,255,0.08)";
+              e.target.style.boxShadow = "none";
+            }}
           />
         </div>
 
-        <div style={{ marginBottom: "22px" }}>
+        {/* Password */}
+        <div style={{ marginBottom: "24px" }}>
           <label
             style={{
-              color: "#fff",
+              color: "#EAF4FA",
               display: "block",
-              marginBottom: "8px",
+              marginBottom: "9px",
+              fontSize: "14px",
+              fontWeight: "600",
             }}
           >
             Password
@@ -193,10 +264,13 @@ function Login() {
             style={{
               display: "flex",
               alignItems: "center",
-              background: "#122B3C",
-              border: "1px solid #1B3445",
-              borderRadius: "10px",
+              background:
+                "rgba(18,43,60,0.85)",
+              border:
+                "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "12px",
               paddingRight: "15px",
+              transition: "0.2s",
             }}
           >
             <input
@@ -205,7 +279,7 @@ function Login() {
                   ? "text"
                   : "password"
               }
-              placeholder="Masukkan password"
+              placeholder="Masukkan password kamu"
               value={password}
               onChange={(e) =>
                 setPassword(e.target.value)
@@ -215,6 +289,7 @@ function Login() {
                 flex: 1,
                 border: "none",
                 background: "transparent",
+                boxShadow: "none",
               }}
             />
 
@@ -225,6 +300,9 @@ function Login() {
               style={{
                 cursor: "pointer",
                 color: "#8A9BB5",
+                display: "flex",
+                padding: "5px",
+                fontSize: "16px",
               }}
             >
               {showPassword ? (
@@ -236,28 +314,48 @@ function Login() {
           </div>
         </div>
 
+        {/* Login Button */}
         <button
           onClick={handleLogin}
           style={{
             width: "100%",
             padding: "14px",
             border: "none",
-            borderRadius: "10px",
-            background: "#00C2FF",
-            color: "#081420",
-            fontWeight: "700",
+            borderRadius: "12px",
+            background:
+              "linear-gradient(135deg, #00C2FF, #009FE3)",
+            color: "#04131D",
+            fontWeight: "800",
             cursor: "pointer",
-            fontSize: "16px",
+            fontSize: "15px",
+            boxShadow:
+              "0 8px 22px rgba(0,194,255,0.20)",
+            transition: "0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform =
+              "translateY(-2px)";
+            e.currentTarget.style.boxShadow =
+              "0 12px 28px rgba(0,194,255,0.30)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform =
+              "translateY(0)";
+            e.currentTarget.style.boxShadow =
+              "0 8px 22px rgba(0,194,255,0.20)";
           }}
         >
           Login
         </button>
 
+        {/* Register */}
         <p
           style={{
             textAlign: "center",
             color: "#8A9BB5",
-            marginTop: "18px",
+            marginTop: "22px",
+            marginBottom: 0,
+            fontSize: "14px",
           }}
         >
           Belum punya akun?{" "}
@@ -266,19 +364,29 @@ function Login() {
             style={{
               color: "#00C2FF",
               textDecoration: "none",
-              fontWeight: "600",
+              fontWeight: "700",
             }}
           >
             Daftar
           </Link>
         </p>
 
+        {/* Footer */}
+        <div
+          style={{
+            height: "1px",
+            background:
+              "rgba(255,255,255,0.06)",
+            margin: "26px 0 20px",
+          }}
+        />
+
         <p
           style={{
             textAlign: "center",
-            color: "#8A9BB5",
-            marginTop: "25px",
-            fontSize: "14px",
+            color: "#61758A",
+            margin: 0,
+            fontSize: "12px",
           }}
         >
           © 2026 AI.Ind • Buatan Indonesia 🇮🇩
