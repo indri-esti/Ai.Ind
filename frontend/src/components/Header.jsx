@@ -1,98 +1,172 @@
 function Header() {
+  const isMobile = window.innerWidth < 768;
+
   return (
-    <div
+    <header
       style={{
+        width: "100%",
+        minWidth: 0,
+        boxSizing: "border-box",
+
         display: "flex",
         alignItems: "center",
+        justifyContent: "flex-start",
 
-        padding:
-          window.innerWidth < 768
-            ? "18px 20px 18px 78px"
-            : "18px 28px",
+        padding: isMobile
+          ? "16px 20px 16px 78px"
+          : "18px 28px",
 
         borderBottom: "1px solid rgba(255,255,255,0.07)",
 
         background:
-          "linear-gradient(180deg, rgba(8,20,32,0.98), rgba(8,20,32,0.92))",
+          "linear-gradient(180deg, rgba(8,20,32,0.99), rgba(8,20,32,0.94))",
 
         position: "relative",
+        flexShrink: 0,
+        alignSelf: "stretch",
+
         overflow: "hidden",
+
+        boxSizing: "border-box",
+
+        zIndex: 10,
       }}
     >
-      {/* Glow biru */}
+      {/* =========================
+          GLOW BIRU
+      ========================= */}
       <div
         style={{
           position: "absolute",
-          top: "-60px",
-          left: "10%",
-          width: "220px",
-          height: "120px",
+
+          top: "-70px",
+          left: isMobile ? "15%" : "8%",
+
+          width: isMobile ? "200px" : "260px",
+          height: "130px",
+
           background: "rgba(0,194,255,0.08)",
-          filter: "blur(50px)",
+
+          filter: "blur(55px)",
+
           pointerEvents: "none",
         }}
       />
 
+      {/* =========================
+          HEADER CONTENT
+      ========================= */}
       <div
         style={{
           position: "relative",
-          zIndex: 1,
+          zIndex: 2,
+
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+
+          width: "fit-content",
+
+          margin: 0,
+          padding: 0,
         }}
       >
-        {/* Judul */}
+        {/* LOGO / TITLE */}
         <h2
           style={{
             margin: 0,
+            padding: 0,
+
             color: "#00C2FF",
-            fontSize: window.innerWidth < 768 ? 25 : 28,
+
+            fontSize: isMobile ? "25px" : "28px",
+
             fontWeight: 750,
+
             letterSpacing: "-0.8px",
-            lineHeight: 1.2,
+
+            lineHeight: 1.15,
+
+            whiteSpace: "nowrap",
           }}
         >
           AI.Ind
         </h2>
 
-        {/* Subjudul */}
+        {/* =========================
+            SUBTITLE
+        ========================= */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 7,
-            marginTop: 6,
+
+            gap: "7px",
+
+            marginTop: "7px",
+
             color: "#8A9BB5",
-            fontSize: 13,
+
+            fontSize: isMobile ? "13px" : "14px",
+
             fontWeight: 400,
+
+            lineHeight: 1.2,
+
+            whiteSpace: "nowrap",
           }}
         >
+          {/* STATUS DOT */}
           <span
             style={{
-              width: 6,
-              height: 6,
+              display: "inline-block",
+
+              width: "6px",
+              height: "6px",
+
+              minWidth: "6px",
+
               borderRadius: "50%",
+
               background: "#00C2FF",
-              boxShadow: "0 0 9px rgba(0,194,255,0.7)",
+
+              boxShadow:
+                "0 0 8px rgba(0,194,255,0.75)",
             }}
           />
 
-          Asisten AI buatan Indonesia
+          <span>
+            Asisten AI buatan Indonesia
+          </span>
         </div>
       </div>
 
-      {/* Aksen biru */}
+      {/* =========================
+          BLUE ACCENT LINE
+      ========================= */}
       <div
         style={{
           position: "absolute",
+
           bottom: 0,
-          left: window.innerWidth < 768 ? 78 : 28,
-          width: 45,
-          height: 2,
-          borderRadius: 10,
+
+          left: isMobile ? "78px" : "28px",
+
+          width: isMobile ? "45px" : "48px",
+
+          height: "2px",
+
+          borderRadius: "10px",
+
           background: "#00C2FF",
-          boxShadow: "0 0 12px rgba(0,194,255,0.5)",
+
+          boxShadow:
+            "0 0 12px rgba(0,194,255,0.55)",
+
+          zIndex: 3,
         }}
       />
-    </div>
+    </header>
   );
 }
 
