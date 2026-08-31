@@ -20,62 +20,6 @@ function ChatInput({
     kirimPesan();
   };
 
-  // ============================================================
-  // PLUS / UPLOAD GAMBAR
-  // ============================================================
-  const handlePlusMouseDown = (e) => {
-    if (loading) {
-      e.preventDefault();
-      return;
-    }
-
-    /*
-     * Jangan biarkan browser memindahkan fokus dari textarea
-     * terlebih dahulu ketika tombol + disentuh.
-     *
-     * Ini penting terutama di Android/WebView ketika keyboard
-     * sedang terbuka.
-     */
-    e.preventDefault();
-  };
-
-  const handlePlusTouchStart = (e) => {
-    if (loading) {
-      e.preventDefault();
-      return;
-    }
-
-    /*
-     * Menjaga gesture touch tetap dianggap sebagai tap tombol,
-     * bukan gesture untuk menutup keyboard.
-     */
-    e.preventDefault();
-
-    // Buka file picker secara langsung.
-    if (fileInputRef?.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handlePlusClick = (e) => {
-    if (loading) {
-      e.preventDefault();
-      return;
-    }
-
-    /*
-     * Pada perangkat touch, file picker sudah dibuka oleh
-     * onTouchStart. Jangan membuka dua kali.
-     */
-    if (e.detail === 0) {
-      return;
-    }
-
-    if (fileInputRef?.current) {
-      fileInputRef.current.click();
-    }
-  };
-
   return (
     <div
       style={{
@@ -110,10 +54,6 @@ function ChatInput({
 
         .home-plus-button:active .home-plus-icon {
           transform: scale(0.82) rotate(90deg);
-        }
-
-        .home-plus-button.disabled {
-          pointer-events: none;
         }
 
         .send-btn {
@@ -158,17 +98,13 @@ function ChatInput({
           }}
         >
           {/* =====================================================
-              PLUS BUTTON
+              PLUS / UPLOAD GAMBAR
               ===================================================== */}
-          <button
-            type="button"
-            className={`home-plus-button${loading ? " disabled" : ""}`}
+          <label
+            htmlFor="chat-image-input"
+            className="home-plus-button"
             aria-label="Tambah gambar"
             title="Tambah gambar"
-            disabled={loading}
-            onMouseDown={handlePlusMouseDown}
-            onTouchStart={handlePlusTouchStart}
-            onClick={handlePlusClick}
             style={{
               position: "relative",
               width: 46,
@@ -198,12 +134,14 @@ function ChatInput({
               touchAction: "manipulation",
               userSelect: "none",
               WebkitUserSelect: "none",
+
+              pointerEvents: loading ? "none" : "auto",
             }}
           >
             <span className="home-plus-icon">
               <FiPlus size={23} strokeWidth={2.5} />
             </span>
-          </button>
+          </label>
 
           {/* =====================================================
               FILE INPUT
@@ -221,6 +159,7 @@ function ChatInput({
               width: 1,
               height: 1,
               opacity: 0,
+              overflow: "hidden",
               pointerEvents: "none",
             }}
           />
