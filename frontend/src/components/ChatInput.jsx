@@ -12,29 +12,24 @@ function ChatInput({
   imagePreview,
   hapusGambar,
 }) {
-  // ==================================================
-  // KIRIM PESAN
-  // ==================================================
   const handleKirim = () => {
-    if (
-      loading ||
-      (!message.trim() && !imagePreview)
-    ) {
-      return;
-    }
+    // Jangan kirim kalau sedang loading
+    if (loading) return;
+
+    // Jangan kirim kalau tidak ada teks dan tidak ada gambar
+    if (!message.trim() && !imagePreview) return;
 
     /*
-     * Gambar TIDAK dihapus di sini.
+     * Penting:
+     * Jangan hapus imagePreview di sini.
      *
-     * Home.jsx yang menangani:
-     * 1. Mengambil selectedImage
-     * 2. Mengubah gambar ke Base64
-     * 3. Memasukkan gambar + teks ke messages
-     * 4. Mengirim gambar ke backend
-     * 5. Menghapus preview setelah gambar masuk ke pesan
-     *
-     * Dengan begitu gambar hanya muncul satu kali
-     * di bubble pesan user dan tidak double.
+     * Home.jsx yang akan:
+     * 1. mengambil gambar yang dipilih
+     * 2. langsung memasukkan pesan user ke messages
+     * 3. membuat bubble gambar di chat
+     * 4. otomatis scroll ke pesan terbaru
+     * 5. mengirim request ke backend
+     * 6. membersihkan preview setelah pesan berhasil
      */
     kirimPesan();
   };
@@ -111,9 +106,9 @@ function ChatInput({
               as="textarea"
               rows={1}
               value={message}
-              onChange={(e) =>
-                setMessage(e.target.value)
-              }
+              onChange={(e) => {
+                setMessage(e.target.value);
+              }}
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&

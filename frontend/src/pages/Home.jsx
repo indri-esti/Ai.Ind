@@ -1,53 +1,56 @@
-
 import { Row, Col } from "react-bootstrap";
+
 import { FiX, FiImage } from "react-icons/fi";
+
 import { useState, useEffect, useRef } from "react";
+
 import { AdMob, BannerAd } from "@capgo/capacitor-admob";
+
 import axios from "../api";
 
 import Header from "../components/Header";
+
 import ChatBox from "../components/ChatBox";
+
 import ChatInput from "../components/ChatInput";
+
 import Loading from "../components/Loading";
+
 import Typing from "../components/Typing";
+
 import Sidebar from "../components/Sidebar";
+
 import Welcome from "../components/Welcome";
 
 function Home() {
   // ==========================================
   // BERSIHKAN RESPONSE AI
   // ==========================================
-
   const bersihkanJawabanAI = (teks) => {
     if (!teks) return "";
 
     let hasil = String(teks);
 
-    // <think> ... </think>
     hasil = hasil.replace(
       /<think>[\s\S]*?<\/think>/gi,
       ""
     );
 
-    // <think> yang belum ditutup
     hasil = hasil.replace(
       /<think>[\s\S]*$/gi,
       ""
     );
 
-    // Tag think sisa
     hasil = hasil.replace(
       /<\/?think>/gi,
       ""
     );
 
-    // Thinking process bahasa Inggris
     hasil = hasil.replace(
       /^(Here's|Heres|Here is)\s+a\s+thinking\s+process\s*:[\s\S]*$/i,
       ""
     );
 
-    // Rapikan baris kosong
     hasil = hasil.replace(
       /\n{3,}/g,
       "\n\n"
@@ -59,12 +62,10 @@ function Home() {
   // ==========================================
   // STATE
   // ==========================================
-
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-
   const fileInputRef = useRef(null);
 
   const [history, setHistory] = useState([]);
@@ -75,19 +76,14 @@ function Home() {
   // ==========================================
   // REF HISTORY
   // ==========================================
-
   const activeHistoryIdRef = useRef(null);
-
   const historyLoadedRef = useRef(false);
-
   const historySaveTimeoutRef = useRef(null);
-
   const chatEndRef = useRef(null);
 
   // ==========================================
   // USER KEY
   // ==========================================
-
   const getUserKey = (user) => {
     if (!user) return null;
 
@@ -109,11 +105,9 @@ function Home() {
   // ==========================================
   // CHAT KEY
   // ==========================================
-
   const getChatKey = (chat) => {
     if (!chat) return null;
 
-    // Prioritas pertama: ID backend
     if (
       chat.chatId !== undefined &&
       chat.chatId !== null
@@ -121,7 +115,6 @@ function Home() {
       return `backend_${String(chat.chatId)}`;
     }
 
-    // ID lokal
     if (
       chat.id !== undefined &&
       chat.id !== null
@@ -129,7 +122,6 @@ function Home() {
       return `local_${String(chat.id)}`;
     }
 
-    // Fallback berdasarkan pesan pertama
     if (
       Array.isArray(chat.messages) &&
       chat.messages.length > 0
@@ -160,7 +152,6 @@ function Home() {
   // ==========================================
   // CLEAN HISTORY
   // ==========================================
-
   const cleanHistory = (list) => {
     if (!Array.isArray(list)) {
       return [];
@@ -227,7 +218,6 @@ function Home() {
         normalized.updatedAt || 0
       );
 
-      // Pilih percakapan yang paling lengkap / terbaru
       if (
         currentLength > existingLength ||
         currentTime > existingTime
@@ -246,7 +236,6 @@ function Home() {
   // ==========================================
   // LOAD USER HISTORY
   // ==========================================
-
   useEffect(() => {
     const loadHistory = () => {
       try {
@@ -260,7 +249,6 @@ function Home() {
         }
 
         const user = JSON.parse(savedUser);
-
         const userKey = getUserKey(user);
 
         if (!userKey) {
@@ -279,12 +267,10 @@ function Home() {
         }
 
         const parsed = JSON.parse(savedHistory);
-
         const cleaned = cleanHistory(parsed);
 
         setHistory(cleaned);
 
-        // Rapikan localStorage jika ada duplikat
         localStorage.setItem(
           userKey,
           JSON.stringify(cleaned)
@@ -298,7 +284,6 @@ function Home() {
         );
 
         setHistory([]);
-
         historyLoadedRef.current = true;
       }
     };
@@ -331,7 +316,6 @@ function Home() {
   // ==========================================
   // HISTORY UPDATE DARI SIDEBAR
   // ==========================================
-
   useEffect(() => {
     const handleHistoryUpdate = (event) => {
       const incoming =
@@ -363,9 +347,7 @@ function Home() {
   // ==========================================
   // AUTO SAVE HISTORY
   // ==========================================
-
   useEffect(() => {
-    // Jangan save sebelum load selesai
     if (!historyLoadedRef.current) {
       return;
     }
@@ -391,10 +373,8 @@ function Home() {
       return;
     }
 
-    // Bersihkan duplikat sebelum save
     const cleaned = cleanHistory(history);
 
-    // Jangan save terlalu sering
     if (historySaveTimeoutRef.current) {
       clearTimeout(
         historySaveTimeoutRef.current
@@ -428,9 +408,7 @@ function Home() {
   // ==========================================
   // AUTO SAVE CHAT AKTIF
   // ==========================================
-
   useEffect(() => {
-    // Jangan membuat history kalau belum ada pesan
     if (
       !historyLoadedRef.current ||
       messages.length === 0
@@ -447,14 +425,12 @@ function Home() {
       }
 
       const user = JSON.parse(savedUser);
-
       const userKey = getUserKey(user);
 
       if (!userKey) {
         return;
       }
 
-      // Buat ID lokal hanya kalau belum punya ID
       if (!activeHistoryIdRef.current) {
         activeHistoryIdRef.current =
           `local_${Date.now()}_${Math.random()
@@ -465,7 +441,6 @@ function Home() {
       const historyId =
         activeHistoryIdRef.current;
 
-      // Judul dari pesan user pertama
       const firstUserMessage =
         messages.find(
           (item) => item?.role === "user"
@@ -496,7 +471,6 @@ function Home() {
       setHistory((prev) => {
         const cleaned = cleanHistory(prev);
 
-        // Cari berdasarkan ID lokal
         const existingIndex =
           cleaned.findIndex(
             (chat) =>
@@ -512,7 +486,6 @@ function Home() {
           newHistory[existingIndex] =
             updatedChat;
         } else {
-          // Pastikan tidak ada chat backend yang sama
           const withoutDuplicate =
             cleaned.filter(
               (chat) =>
@@ -539,13 +512,11 @@ function Home() {
   // ==========================================
   // TERIMA CHAT DARI SIDEBAR
   // ==========================================
-
   useEffect(() => {
     const handleLoadChat = (event) => {
       const detail =
         event.detail || {};
 
-      // Pulihkan ID lokal history
       if (
         detail.historyId !== undefined &&
         detail.historyId !== null
@@ -554,7 +525,6 @@ function Home() {
           detail.historyId;
       }
 
-      // Pulihkan chat ID backend
       if (
         detail.chatId !== undefined &&
         detail.chatId !== null
@@ -583,7 +553,6 @@ function Home() {
   // ==========================================
   // ADMOB
   // ==========================================
-
   useEffect(() => {
     let banner = null;
 
@@ -594,6 +563,7 @@ function Home() {
         banner = new BannerAd({
           adUnitId:
             "ca-app-pub-5699049952148750/4400311367",
+
           position: "bottom",
         });
 
@@ -622,7 +592,6 @@ function Home() {
   // ==========================================
   // IMAGE
   // ==========================================
-
   const pilihGambar = (event) => {
     const file =
       event.target.files?.[0];
@@ -635,7 +604,6 @@ function Home() {
       );
 
       event.target.value = "";
-
       return;
     }
 
@@ -645,7 +613,6 @@ function Home() {
       );
 
       event.target.value = "";
-
       return;
     }
 
@@ -674,7 +641,6 @@ function Home() {
   // ==========================================
   // AUTO SCROLL
   // ==========================================
-
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -684,7 +650,6 @@ function Home() {
   // ==========================================
   // PAGE LOADING
   // ==========================================
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setPageLoading(false);
@@ -696,7 +661,6 @@ function Home() {
   // ==========================================
   // CLEAN IMAGE URL
   // ==========================================
-
   useEffect(() => {
     return () => {
       if (imagePreview) {
@@ -708,25 +672,16 @@ function Home() {
   // ==========================================
   // CHAT BARU
   // ==========================================
-
   const chatBaru = () => {
-    // Hanya reset chat aktif
-    // History tidak dihapus
-
     setMessages([]);
-
     setCurrentChatId(null);
-
-    // Percakapan berikutnya mendapat ID lokal baru
     activeHistoryIdRef.current = null;
-
     hapusGambar();
   };
 
   // ==========================================
   // FILE TO BASE64
   // ==========================================
-
   const fileToBase64 = (file) => {
     return new Promise(
       (resolve, reject) => {
@@ -752,7 +707,6 @@ function Home() {
   // ==========================================
   // KIRIM PESAN
   // ==========================================
-
   const kirimPesan = async () => {
     if (
       (!message.trim() && !selectedImage) ||
@@ -799,56 +753,110 @@ function Home() {
       return;
     }
 
+    // ======================================
+    // SIMPAN DATA PESAN SEBELUM STATE BERUBAH
+    // ======================================
+    const pesanText =
+      message.trim() ||
+      "Tolong analisis gambar ini.";
+
+    const imageFile =
+      selectedImage;
+
+    const previewAtSend =
+      imagePreview;
+
+    // ID unik untuk pesan user
+    const userMessageId =
+      `user_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
+    // ======================================
+    // BUAT HISTORY ID JIKA BELUM ADA
+    // ======================================
+    if (!activeHistoryIdRef.current) {
+      activeHistoryIdRef.current =
+        `local_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2, 8)}`;
+    }
+
     try {
       setLoading(true);
 
-      const pesanText =
-        message.trim() ||
-        "Tolong analisis gambar ini.";
-
-      let imageBase64 = null;
-
-      if (selectedImage) {
-        imageBase64 =
-          await fileToBase64(
-            selectedImage
-          );
-      }
-
       // ======================================
-      // PESAN USER
+      // GAMBAR USER LANGSUNG MASUK CHAT
       // ======================================
-
       const userMessage = {
+        id: userMessageId,
         role: "user",
         content: pesanText,
-        image: imagePreview || null,
-      };
 
-      // Pastikan ID history sudah dibuat
-      if (!activeHistoryIdRef.current) {
-        activeHistoryIdRef.current =
-          `local_${Date.now()}_${Math.random()
-            .toString(36)
-            .slice(2, 8)}`;
-      }
+        /*
+         * Untuk sementara gunakan preview.
+         * Setelah Base64 selesai, akan diganti
+         * dengan Base64 agar aman untuk history.
+         */
+        image: previewAtSend || null,
+      };
 
       setMessages((prev) => [
         ...prev,
         userMessage,
       ]);
 
+      // Kosongkan input teks SEKARANG
       setMessage("");
+
+      // ======================================
+      // SCROLL LANGSUNG KE PESAN USER
+      // ======================================
+      requestAnimationFrame(() => {
+        chatEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      });
+
+      // ======================================
+      // UBAH GAMBAR KE BASE64
+      // ======================================
+      let imageBase64 = null;
+
+      if (imageFile) {
+        imageBase64 =
+          await fileToBase64(imageFile);
+
+        // ====================================
+        // GANTI PREVIEW DENGAN BASE64
+        // ====================================
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.id === userMessageId
+              ? {
+                  ...item,
+                  image: imageBase64,
+                }
+              : item
+          )
+        );
+      }
+
+      // ======================================
+      // HAPUS PREVIEW INPUT
+      // ======================================
+      if (imageFile) {
+        hapusGambar();
+      }
 
       // ======================================
       // BACKEND
       // ======================================
-
       const res = await axios.post(
         "/chat",
         {
           message: pesanText,
-
           user_id: userId,
 
           chat_id:
@@ -863,7 +871,6 @@ function Home() {
       // ======================================
       // CHAT ID BACKEND
       // ======================================
-
       if (
         res.data?.chat_id !== undefined &&
         res.data?.chat_id !== null
@@ -876,7 +883,6 @@ function Home() {
       // ======================================
       // JAWABAN AI
       // ======================================
-
       const jawabanAI =
         bersihkanJawabanAI(
           res.data?.reply
@@ -885,14 +891,27 @@ function Home() {
       setMessages((prev) => [
         ...prev,
         {
+          id: `assistant_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`,
+
           role: "assistant",
+
           content:
             jawabanAI ||
             "AI tidak memberikan jawaban.",
         },
       ]);
 
-      hapusGambar();
+      // ======================================
+      // SCROLL KE JAWABAN AI
+      // ======================================
+      requestAnimationFrame(() => {
+        chatEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      });
     } catch (err) {
       console.error(
         "Kirim pesan error:",
@@ -920,7 +939,12 @@ function Home() {
       setMessages((prev) => [
         ...prev,
         {
+          id: `error_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`,
+
           role: "assistant",
+
           content: errorMessage,
         },
       ]);
@@ -932,7 +956,6 @@ function Home() {
   // ==========================================
   // LOADING
   // ==========================================
-
   if (pageLoading) {
     return <Loading />;
   }
@@ -940,7 +963,6 @@ function Home() {
   // ==========================================
   // RENDER
   // ==========================================
-
   return (
     <>
       <style>{`
@@ -1388,3 +1410,4 @@ function Home() {
 }
 
 export default Home;
+
