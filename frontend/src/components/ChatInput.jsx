@@ -46,32 +46,44 @@ function ChatInput({
     >
       {/*
         Animasi tombol + dan tombol kirim.
-        Ditaruh sebagai <style> lokal biar tidak perlu ubah file CSS terpisah.
+        PENTING: transform (scale/rotate) TIDAK dipasang di
+        label/button itu sendiri, karena elemen yang jadi target
+        tap tidak boleh berpindah posisi saat ditekan -- kalau
+        area tapnya bergeser dari bawah jari, touchscreen bisa
+        menganggap itu gesture batal, bukan tap, sehingga perlu
+        ditahan dulu baru terhitung klik. Makanya animasi dipasang
+        di elemen ikon DI DALAM label/button, bukan di label/button-nya.
       */}
       <style>{`
         .home-plus-button {
-          transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+          transition: background-color 0.15s ease, box-shadow 0.15s ease;
         }
         .home-plus-button:active {
-          transform: scale(0.88);
           background-color: #1c3550;
           box-shadow: 0 4px 12px rgba(0,0,0,.3);
         }
-        .home-plus-button svg {
-          transition: transform 0.2s ease;
+        .home-plus-icon {
+          transition: transform 0.15s ease;
+          display: flex;
+          pointer-events: none;
         }
-        .home-plus-button:active svg {
-          transform: rotate(90deg);
+        .home-plus-button:active .home-plus-icon {
+          transform: scale(0.82) rotate(90deg);
         }
         .home-plus-button.disabled {
           pointer-events: none;
         }
 
         .send-btn {
-          transition: transform 0.12s ease, background-color 0.15s ease;
+          transition: background-color 0.15s ease;
         }
-        .send-btn:active:not(:disabled) {
-          transform: scale(0.88);
+        .send-icon {
+          transition: transform 0.12s ease;
+          display: flex;
+          pointer-events: none;
+        }
+        .send-btn:active:not(:disabled) .send-icon {
+          transform: scale(0.82);
         }
       `}</style>
 
@@ -115,14 +127,10 @@ function ChatInput({
               margin: 0,
             }}
           >
-            {/* ICON */}
-            <FiPlus
-              size={23}
-              strokeWidth={2.5}
-              style={{
-                pointerEvents: "none",
-              }}
-            />
+            {/* ICON (yang dianimasikan, bukan label-nya) */}
+            <span className="home-plus-icon">
+              <FiPlus size={23} strokeWidth={2.5} />
+            </span>
 
             {/*
               Input file disembunyikan total (display: none).
@@ -219,7 +227,9 @@ function ChatInput({
                 WebkitTapHighlightColor: "transparent",
               }}
             >
-              <FaPaperPlane color="#081420" size={17} />
+              <span className="send-icon">
+                <FaPaperPlane color="#081420" size={17} />
+              </span>
             </Button>
           </div>
         </div>
