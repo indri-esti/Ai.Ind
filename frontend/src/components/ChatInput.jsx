@@ -23,17 +23,19 @@ function ChatInput({
     kirimPesan();
   };
 
-  const tekanPlus = () => {
+  const tekanPlus = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     if (loading) return;
 
-    // Efek tekan tombol
     setPlusPressed(true);
 
     setTimeout(() => {
       setPlusPressed(false);
     }, 180);
 
-    // Buka file picker secara langsung
+    // Klik input file secara langsung
     if (fileInputRef?.current) {
       fileInputRef.current.click();
     }
@@ -61,34 +63,51 @@ function ChatInput({
           box-sizing: border-box;
         }
 
+        /* ================================
+           PLUS WRAPPER
+           ================================ */
+
         .home-plus-wrapper {
           position: relative;
-          width: 46px;
+
+          width: 52px;
           height: 46px;
-          min-width: 46px;
+
+          min-width: 52px;
           min-height: 46px;
-          flex: 0 0 46px;
+
+          flex: 0 0 52px;
+
           z-index: 100000;
         }
 
-        .home-plus-button {
-          position: relative;
+        /* ================================
+           PLUS BUTTON
+           ================================ */
 
-          width: 46px !important;
+        .home-plus-button {
+          position: absolute;
+
+          top: 0;
+          left: 0;
+
+          width: 52px !important;
           height: 46px !important;
-          min-width: 46px !important;
+
+          min-width: 52px !important;
           min-height: 46px !important;
+
+          padding: 0 !important;
+          margin: 0 !important;
+
+          border-radius: 23px !important;
 
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
 
-          padding: 0 !important;
-          margin: 0 !important;
-
-          border-radius: 50% !important;
-
           background: #13283F !important;
+
           border: 1px solid rgba(255,255,255,.09) !important;
 
           color: #D7F6FF !important;
@@ -105,12 +124,14 @@ function ChatInput({
 
           outline: none !important;
 
+          z-index: 100001;
+
+          overflow: hidden;
+
           transition:
             transform 0.16s ease,
             background-color 0.16s ease,
             box-shadow 0.16s ease;
-
-          z-index: 100001;
         }
 
         .home-plus-button:hover:not(:disabled) {
@@ -120,12 +141,17 @@ function ChatInput({
         .home-plus-button:focus,
         .home-plus-button:focus-visible {
           outline: none !important;
-          box-shadow: 0 8px 24px rgba(0,0,0,.24) !important;
+
+          box-shadow:
+            0 8px 24px rgba(0,0,0,.24) !important;
         }
 
+        /* Efek ketika disentuh */
         .home-plus-button.pressed {
-          transform: scale(0.82) rotate(90deg);
+          transform: scale(0.90);
+
           background: #00C2FF !important;
+
           color: #081420 !important;
 
           box-shadow:
@@ -135,24 +161,30 @@ function ChatInput({
 
         .home-plus-button:disabled {
           opacity: 0.55;
+
           cursor: not-allowed;
         }
 
+        /* Icon tidak boleh mengambil event klik */
         .home-plus-icon {
           width: 100%;
           height: 100%;
 
           display: flex;
+
           align-items: center;
           justify-content: center;
 
           pointer-events: none;
+
+          user-select: none;
+          -webkit-user-select: none;
         }
 
-        /*
-          Input file benar-benar disembunyikan.
-          Tombol Plus sekarang TIDAK bergantung pada label/htmlFor.
-        */
+        /* ================================
+           FILE INPUT
+           ================================ */
+
         .home-plus-file {
           position: absolute !important;
 
@@ -167,21 +199,29 @@ function ChatInput({
 
           border: 0 !important;
           padding: 0 !important;
+
           margin: -1px !important;
         }
+
+        /* ================================
+           SEND BUTTON
+           ================================ */
 
         .send-btn {
           width: 46px !important;
           height: 46px !important;
+
           min-width: 46px !important;
           min-height: 46px !important;
 
           flex: 0 0 46px;
 
           border-radius: 50% !important;
+
           border: none !important;
 
           display: flex !important;
+
           align-items: center !important;
           justify-content: center !important;
 
@@ -189,6 +229,7 @@ function ChatInput({
           margin: 0 !important;
 
           touch-action: manipulation;
+
           -webkit-tap-highlight-color: transparent;
 
           outline: none !important;
@@ -201,11 +242,13 @@ function ChatInput({
         .send-btn:focus,
         .send-btn:focus-visible {
           outline: none !important;
+
           box-shadow: none !important;
         }
 
         .send-icon {
           display: flex;
+
           align-items: center;
           justify-content: center;
 
@@ -222,43 +265,65 @@ function ChatInput({
           transform: scale(0.82);
         }
 
+        /* ================================
+           CHAT INPUT
+           ================================ */
+
         .chat-input {
           -webkit-tap-highlight-color: transparent;
         }
 
         .chat-input:focus {
           outline: none !important;
+
           box-shadow: none !important;
         }
 
+        /* ================================
+           HP
+           ================================ */
+
         @media (max-width: 576px) {
+
           .home-plus-wrapper {
-            width: 46px;
+            width: 52px;
             height: 46px;
-            min-width: 46px;
-            flex-basis: 46px;
+
+            min-width: 52px;
+
+            flex: 0 0 52px;
           }
 
           .home-plus-button {
-            width: 46px !important;
+            width: 52px !important;
             height: 46px !important;
-            min-width: 46px !important;
+
+            min-width: 52px !important;
             min-height: 46px !important;
           }
 
           .send-btn {
             width: 46px !important;
             height: 46px !important;
+
             min-width: 46px !important;
             min-height: 46px !important;
           }
         }
 
+        /* ================================
+           DESKTOP
+           ================================ */
+
         @media (min-width: 577px) {
+
           .home-plus-wrapper {
-            width: 46px;
+            width: 52px;
             height: 46px;
-            min-width: 46px;
+
+            min-width: 52px;
+
+            flex: 0 0 52px;
           }
         }
       `}</style>
@@ -278,12 +343,13 @@ function ChatInput({
             boxSizing: "border-box",
           }}
         >
-          {/* =====================================================
-              PLUS BUTTON
-              ===================================================== */}
+
+          {/* ==========================================
+              PLUS
+              ========================================== */}
+
           <div className="home-plus-wrapper">
 
-            {/* INPUT FILE */}
             <input
               id="chat-image-input"
               ref={fileInputRef}
@@ -295,7 +361,6 @@ function ChatInput({
               className="home-plus-file"
             />
 
-            {/* TOMBOL PLUS */}
             <button
               type="button"
               className={`home-plus-button${
@@ -312,35 +377,52 @@ function ChatInput({
                 />
               </span>
             </button>
+
           </div>
 
-          {/* =====================================================
+          {/* ==========================================
               INPUT CHAT
-              ===================================================== */}
+              ========================================== */}
+
           <div
             style={{
               flex: 1,
               minWidth: 0,
+
               display: "flex",
               alignItems: "center",
+
               gap: 10,
+
               background: "#13283F",
+
               borderRadius: 28,
+
               padding: "7px 8px 7px 18px",
-              border: "1px solid rgba(255,255,255,.08)",
-              boxShadow: "0 8px 25px rgba(0,0,0,.25)",
+
+              border:
+                "1px solid rgba(255,255,255,.08)",
+
+              boxShadow:
+                "0 8px 25px rgba(0,0,0,.25)",
+
               boxSizing: "border-box",
             }}
           >
+
             <Form.Control
               as="textarea"
               rows={1}
+
               value={message}
+
               onChange={(e) => {
                 setMessage(e.target.value);
               }}
+
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
+
                   e.preventDefault();
 
                   if (
@@ -351,36 +433,56 @@ function ChatInput({
                   }
                 }
               }}
+
               placeholder="Ketik pertanyaan untuk AI.Ind..."
+
               className="chat-input"
+
               style={{
                 flex: 1,
+
                 resize: "none",
+
                 overflowY: "auto",
+
                 background: "transparent",
+
                 color: "#fff",
+
                 border: "none",
+
                 outline: "none",
+
                 boxShadow: "none",
+
                 fontSize: 15,
+
                 lineHeight: "22px",
+
                 minHeight: 40,
+
                 maxHeight: 110,
+
                 padding: "8px 0",
+
                 boxSizing: "border-box",
               }}
             />
 
-            {/* =================================================
+            {/* ==========================================
                 KIRIM
-                ================================================= */}
+                ========================================== */}
+
             <Button
               type="submit"
+
               className="send-btn"
+
               disabled={
                 loading ||
                 (!message.trim() && !imagePreview)
               }
+
               style={{
                 background:
                   loading ||
@@ -389,20 +491,27 @@ function ChatInput({
                     : "#00C2FF",
 
                 display: "flex",
+
                 justifyContent: "center",
                 alignItems: "center",
 
                 flexShrink: 0,
               }}
             >
+
               <span className="send-icon">
+
                 <FaPaperPlane
                   color="#081420"
                   size={17}
                 />
+
               </span>
+
             </Button>
+
           </div>
+
         </div>
       </Form>
     </div>
