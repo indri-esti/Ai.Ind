@@ -14,9 +14,36 @@ const root = ReactDOM.createRoot(
 );
 
 root.render(
-  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </GoogleOAuthProvider>
+  <React.StrictMode>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </GoogleOAuthProvider>
+  </React.StrictMode>
 );
+
+// ===============================
+// REGISTER SERVICE WORKER / PWA
+// ===============================
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("/sw.js");
+
+      console.log(
+        "AI.Ind Service Worker aktif:",
+        registration.scope
+      );
+
+      // Cek update Service Worker
+      registration.update();
+    } catch (error) {
+      console.error(
+        "AI.Ind Service Worker gagal:",
+        error
+      );
+    }
+  });
+}
