@@ -217,52 +217,10 @@ svg {
   min-width: 0;
 }
 
-.home-plus-button {
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  flex: 0 0 48px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border: 1px solid rgba(24, 216, 255, 0.3);
-  border-radius: 16px;
-
-  background: linear-gradient(
-    135deg,
-    rgba(24, 216, 255, 0.18),
-    rgba(0, 143, 232, 0.12)
-  );
-
-  color: #18d8ff;
-
-  cursor: pointer;
-
-  box-shadow: 0 8px 25px rgba(0, 194, 255, 0.1);
-
-  transition: all 0.2s ease;
-}
-
-.home-plus-button:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(24, 216, 255, 0.3),
-    rgba(0, 143, 232, 0.2)
-  );
-
-  transform: translateY(-2px);
-}
-
-.home-plus-button:active {
-  transform: scale(0.94);
-}
-
-.home-plus-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* NOTE: .home-plus-button (lama) sudah dihapus dari sini
+   karena bentrok dengan class dengan nama sama di dalam
+   ChatInput.jsx (style inline). Style tombol + sekarang
+   sepenuhnya dikontrol dari ChatInput.jsx. */
 
 /* ==========================================
    IMAGE PREVIEW
@@ -380,11 +338,6 @@ svg {
 ========================================== */
 
 @media (max-width: 768px) {
-  .home-plus-button {
-    width: 46px;
-    height: 46px;
-    min-width: 46px;
-    flex-basis: 46px;
-    border-radius: 15px;
-  }
+  /* NOTE: rule .home-plus-button lama untuk breakpoint ini
+     juga dihapus, alasan sama seperti di atas. */
 }
