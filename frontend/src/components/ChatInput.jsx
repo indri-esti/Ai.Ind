@@ -56,95 +56,79 @@ function ChatInput({
             width: "100%",
           }}
         >
-          {/* INPUT FILE */}
-          <input
-            ref={fileInputRef}
-            id="aiind-image-input"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={pilihGambar}
-            style={{
-              position: "absolute",
-              width: 1,
-              height: 1,
-              padding: 0,
-              margin: -1,
-              overflow: "hidden",
-              clip: "rect(0, 0, 0, 0)",
-              whiteSpace: "nowrap",
-              border: 0,
-              opacity: 0,
-              pointerEvents: "none",
-            }}
-          />
-
-          {/* PLUS */}
-          <label
-            htmlFor="aiind-image-input"
+          {/* PLUS BUTTON */}
+          <div
             className="home-plus-button"
-            aria-label="Tambah gambar"
-            title="Tambah gambar"
             style={{
+              position: "relative",
               width: 46,
               height: 46,
               minWidth: 46,
               borderRadius: "50%",
+              flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              flexShrink: 0,
-              cursor: loading ? "not-allowed" : "pointer",
-              userSelect: "none",
-              WebkitUserSelect: "none",
-              WebkitTapHighlightColor: "transparent",
-              touchAction: "manipulation",
-              background:
-                "rgba(19,40,63,.95)",
+              background: "#13283F",
               border:
                 "1px solid rgba(255,255,255,.09)",
               color: "#D7F6FF",
               boxShadow:
                 "0 8px 24px rgba(0,0,0,.24)",
-              transition:
-                "transform .15s ease, background .15s ease, border-color .15s ease",
+              overflow: "hidden",
               opacity: loading ? 0.5 : 1,
-              pointerEvents: loading
-                ? "none"
-                : "auto",
-            }}
-            onTouchStart={(e) => {
-              if (loading) {
-                e.preventDefault();
-                return;
-              }
-
-              e.currentTarget.style.transform =
-                "scale(.92)";
-            }}
-            onTouchEnd={(e) => {
-              e.currentTarget.style.transform =
-                "scale(1)";
-            }}
-            onMouseDown={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform =
-                  "scale(.92)";
-              }
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform =
-                "scale(1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform =
-                "scale(1)";
+              WebkitTapHighlightColor:
+                "transparent",
+              touchAction: "manipulation",
             }}
           >
+            {/* ICON */}
             <FiPlus
               size={23}
               strokeWidth={2.5}
+              style={{
+                pointerEvents: "none",
+                position: "relative",
+                zIndex: 1,
+              }}
             />
-          </label>
+
+            {/* 
+              INPUT FILE TRANSPARAN
+              
+              Input sengaja menutupi SELURUH tombol +.
+              Jadi tap pertama langsung diterima oleh
+              native file picker Android.
+            */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={pilihGambar}
+              disabled={loading}
+              aria-label="Tambah gambar"
+              title="Tambah gambar"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                margin: 0,
+                padding: 0,
+                opacity: 0,
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
+                zIndex: 10,
+                display: "block",
+                border: 0,
+                outline: 0,
+                touchAction: "manipulation",
+                WebkitTapHighlightColor:
+                  "transparent",
+              }}
+            />
+          </div>
 
           {/* INPUT CHAT */}
           <div
