@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
@@ -9,6 +9,7 @@ import {
   FiChevronUp,
   FiX,
   FiInfo,
+  FiCheck,
 } from "react-icons/fi";
 
 import {
@@ -37,96 +38,22 @@ function Sidebar({
     window.innerWidth >= 768
   );
 
-  const [settingOpen, setSettingOpen] =
-    useState(false);
+  const [settingOpen, setSettingOpen] = useState(false);
 
-  // ==========================================
-  // SWIPE
-  // ==========================================
+  // =====================================================
+  // REF
+  // =====================================================
 
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
-  // Mencegah satu chat terbuka dua kali
-  const lastOpenedChatRef = useRef(null);
+  const openingChatRef = useRef(false);
+  const lastOpenedKeyRef = useRef(null);
   const lastOpenedTimeRef = useRef(0);
 
-  const handleTouchStart = (e) => {
-    if (!mobile) return;
-
-    const touch = e.touches?.[0];
-
-    if (!touch) return;
-
-    touchStartX.current = touch.clientX;
-    touchStartY.current = touch.clientY;
-  };
-
-  const handleTouchMove = (e) => {
-    if (
-      !mobile ||
-      touchStartX.current === null ||
-      touchStartY.current === null
-    ) {
-      return;
-    }
-
-    const touch = e.touches?.[0];
-
-    if (!touch) return;
-
-    const diffX =
-      touch.clientX - touchStartX.current;
-
-    const diffY =
-      touch.clientY - touchStartY.current;
-
-    // Kalau gerakan vertikal, jangan dianggap swipe sidebar
-    if (
-      Math.abs(diffY) >
-      Math.abs(diffX)
-    ) {
-      return;
-    }
-
-    // ======================================
-    // KIRI -> KANAN = BUKA
-    // ======================================
-
-    if (
-      !open &&
-      touchStartX.current < 45 &&
-      diffX > 55
-    ) {
-      setOpen(true);
-
-      touchStartX.current = null;
-      touchStartY.current = null;
-    }
-
-    // ======================================
-    // KANAN -> KIRI = TUTUP
-    // ======================================
-
-    if (
-      open &&
-      diffX < -70
-    ) {
-      setOpen(false);
-
-      touchStartX.current = null;
-      touchStartY.current = null;
-    }
-  };
-
-  const handleTouchEnd = () => {
-    touchStartX.current = null;
-    touchStartY.current = null;
-  };
-
-  // ==========================================
+  // =====================================================
   // USER KEY
-  // ==========================================
+  // =====================================================
 
   const getUserKey = (currentUser) => {
     if (!currentUser) return null;
@@ -139,14 +66,158 @@ function Sidebar({
 
     if (!identifier) return null;
 
-    return `history_${String(
-      identifier
-    ).toLowerCase()}`;
+    return `history_${String(identifier)
+      .trim()
+      .toLowerCase()}`;
   };
 
-  // ==========================================
+  // =====================================================
+  // HISTORY UNIQUE KEY
+  // =====================================================
+
+  const getChatKey = (chat) => {
+    if (!chat) return null;
+
+    // ID backend
+    if (
+      chat.chatId !== undefined &&
+      chat.chatId !== null
+    ) {
+      return `backend_${String(chat.chatId)}`;
+    }
+
+    // ID lokal
+    if (
+      chat.id !== undefined &&
+      chat.id !== null
+    ) {
+      return `local_${String(chat.id)}`;
+    }
+
+    // Berdasarkan pesan pertama
+    if (
+      Array.isArray(chat.messages) &&
+      chat.messages.length > 0
+    ) {
+      const firstMessage = chat.messages[0];
+
+      const text =
+        firstMessage?.content ||
+        firstMessage?.text ||
+        firstMessage?.message ||
+        "";
+
+      if (text) {
+        return `content_${String(text)
+          .trim()
+          .toLowerCase()
+          .slice(0, 150)}`;
+      }
+    }
+
+    return `title_${String(
+      chat.title || "Percakapan baru"
+    )
+      .trim()
+      .toLowerCase()}`;
+  };
+
+  // =====================================================
+  // BERSIHKAN DUPLIKAT
+  // =====================================================
+
+  const cleanHistory = (list) => {
+    if (!Array.isArray(list)) {
+      return [];
+    }
+
+    const map = new Map();
+
+    list.forEach((chat, index) => {
+      if (!chat) return;
+
+      const key = getChatKey(chat);
+
+      if (!key) return;
+
+      const normalizedChat = {
+        ...chat,
+
+        id:
+          chat.id ??
+          chat.chatId ??
+          `local_${Date.now()}_${index}`,
+
+        chatId:
+          chat.chatId !== undefined &&
+          chat.chatId !== null
+            ? Number(chat.chatId)
+            : null,
+
+        messages: Array.isArray(chat.messages)
+          ? chat.messages
+          : [],
+
+        title:
+          chat.title ||
+          "Percakapan baru",
+
+        updatedAt:
+          chat.updatedAt ||
+          chat.createdAt ||
+          Date.now(),
+      };
+
+      const existing = map.get(key);
+
+      if (!existing) {
+        map.set(key, normalizedChat);
+        return;
+      }
+
+      const existingLength =
+        Array.isArray(existing.messages)
+          ? existing.messages.length
+          : 0;
+
+      const currentLength =
+        normalizedChat.messages.length;
+
+      const existingUpdated =
+        Number(existing.updatedAt || 0);
+
+      const currentUpdated =
+        Number(normalizedChat.updatedAt || 0);
+
+      /*
+       * Pilih data yang lebih lengkap / lebih baru.
+       */
+      if (
+        currentLength > existingLength ||
+        currentUpdated > existingUpdated
+      ) {
+        map.set(key, normalizedChat);
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        Number(b.updatedAt || 0) -
+        Number(a.updatedAt || 0)
+    );
+  };
+
+  // =====================================================
+  // HISTORY YANG SUDAH BERSIH
+  // =====================================================
+
+  const uniqueHistory = useMemo(() => {
+    return cleanHistory(history);
+  }, [history]);
+
+  // =====================================================
   // LOAD USER
-  // ==========================================
+  // =====================================================
 
   useEffect(() => {
     const loadUser = () => {
@@ -159,8 +230,7 @@ function Sidebar({
           return;
         }
 
-        const parsed =
-          JSON.parse(data);
+        const parsed = JSON.parse(data);
 
         if (
           parsed &&
@@ -187,69 +257,37 @@ function Sidebar({
       loadUser
     );
 
+    window.addEventListener(
+      "aiind-user-updated",
+      loadUser
+    );
+
     return () => {
       window.removeEventListener(
         "storage",
         loadUser
       );
+
+      window.removeEventListener(
+        "aiind-user-updated",
+        loadUser
+      );
     };
   }, []);
 
-  // ==========================================
-  // LOAD HISTORY SESUAI USER
-  // ==========================================
-
-  useEffect(() => {
-    const userKey =
-      getUserKey(user);
-
-    if (!userKey) {
-      setHistory([]);
-      return;
-    }
-
-    try {
-      const saved =
-        localStorage.getItem(userKey);
-
-      if (!saved) {
-        setHistory([]);
-        return;
-      }
-
-      const parsed =
-        JSON.parse(saved);
-
-      setHistory(
-        Array.isArray(parsed)
-          ? parsed
-          : []
-      );
-    } catch (error) {
-      console.log(
-        "History error:",
-        error
-      );
-
-      setHistory([]);
-    }
-  }, [user, setHistory]);
-
-  // ==========================================
+  // =====================================================
   // RESPONSIVE
-  // ==========================================
+  // =====================================================
 
   useEffect(() => {
     const handleResize = () => {
-      const isNowMobile =
+      const isMobile =
         window.innerWidth < 768;
 
-      setMobile(isNowMobile);
+      setMobile(isMobile);
 
-      if (!isNowMobile) {
+      if (!isMobile) {
         setOpen(true);
-      } else {
-        setOpen(false);
       }
     };
 
@@ -266,9 +304,87 @@ function Sidebar({
     };
   }, []);
 
-  // ==========================================
-  // TUTUP MOBILE
-  // ==========================================
+  // =====================================================
+  // SWIPE
+  // =====================================================
+
+  const handleTouchStart = (e) => {
+    if (!mobile) return;
+
+    const touch = e.touches?.[0];
+
+    if (!touch) return;
+
+    touchStartX.current =
+      touch.clientX;
+
+    touchStartY.current =
+      touch.clientY;
+  };
+
+  const handleTouchMove = (e) => {
+    if (
+      !mobile ||
+      touchStartX.current === null ||
+      touchStartY.current === null
+    ) {
+      return;
+    }
+
+    const touch = e.touches?.[0];
+
+    if (!touch) return;
+
+    const diffX =
+      touch.clientX -
+      touchStartX.current;
+
+    const diffY =
+      touch.clientY -
+      touchStartY.current;
+
+    // Jangan ganggu scroll vertikal
+    if (
+      Math.abs(diffY) >
+      Math.abs(diffX)
+    ) {
+      return;
+    }
+
+    // Buka dari kiri
+    if (
+      !open &&
+      touchStartX.current < 45 &&
+      diffX > 55
+    ) {
+      setOpen(true);
+
+      touchStartX.current = null;
+      touchStartY.current = null;
+
+      return;
+    }
+
+    // Tutup sidebar
+    if (
+      open &&
+      diffX < -70
+    ) {
+      setOpen(false);
+
+      touchStartX.current = null;
+      touchStartY.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // =====================================================
+  // CLOSE MOBILE
+  // =====================================================
 
   const closeMobileSidebar = () => {
     if (mobile) {
@@ -276,11 +392,24 @@ function Sidebar({
     }
   };
 
-  // ==========================================
+  // =====================================================
   // CHAT BARU
-  // ==========================================
+  // =====================================================
 
-  const handleChatBaru = () => {
+  const handleChatBaru = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    /*
+     * Jangan setHistory([]).
+     * Jangan hapus localStorage.
+     *
+     * Home yang mengosongkan chat aktif.
+     * History lama tetap tersimpan.
+     */
+
     if (typeof chatBaru === "function") {
       chatBaru();
     }
@@ -288,126 +417,151 @@ function Sidebar({
     closeMobileSidebar();
   };
 
-  // ==========================================
-  // LOAD CHAT
-  // ==========================================
+  // =====================================================
+  // OPEN CHAT
+  // =====================================================
 
-  const handleOpenChat = (chat) => {
+  const handleOpenChat = (chat, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if (!chat) return;
 
-    /*
-      Cegah satu history terbuka dua kali
-      akibat double click / event touch Android.
-    */
-
     const chatKey =
-      chat.id ||
-      chat.chatId ||
-      chat.title;
+      getChatKey(chat);
 
     const now = Date.now();
 
+    /*
+     * Anti double click / double event
+     */
+    if (openingChatRef.current) {
+      return;
+    }
+
     if (
-      lastOpenedChatRef.current === chatKey &&
-      now - lastOpenedTimeRef.current < 500
+      lastOpenedKeyRef.current ===
+        chatKey &&
+      now -
+        lastOpenedTimeRef.current <
+        700
     ) {
       return;
     }
 
-    lastOpenedChatRef.current =
+    openingChatRef.current = true;
+
+    lastOpenedKeyRef.current =
       chatKey;
 
     lastOpenedTimeRef.current =
       now;
 
-    // ======================================
-    // LOAD PESAN
-    // ======================================
-
     const chatMessages =
       Array.isArray(chat.messages)
-        ? chat.messages
+        ? [...chat.messages]
         : [];
 
+    /*
+     * Set messages hanya satu kali.
+     */
     setMessages(chatMessages);
 
-    // ======================================
-    // KIRIM CHAT ID BACKEND
-    // ======================================
+    /*
+     * Home akan:
+     * - mengambil historyId
+     * - mengambil chatId backend
+     * - mengunci percakapan aktif
+     */
+    window.dispatchEvent(
+      new CustomEvent(
+        "aiind-load-chat",
+        {
+          detail: {
+            chatId:
+              chat.chatId !== undefined &&
+              chat.chatId !== null
+                ? Number(chat.chatId)
+                : null,
 
-    if (chat.chatId) {
-      window.dispatchEvent(
-        new CustomEvent(
-          "aiind-load-chat",
-          {
-            detail: {
-              chatId:
-                Number(chat.chatId),
+            historyId:
+              chat.id ?? null,
 
-              // ID history lokal
-              historyId:
-                chat.id || null,
-            },
-          }
-        )
-      );
-    } else {
-      window.dispatchEvent(
-        new CustomEvent(
-          "aiind-load-chat",
-          {
-            detail: {
-              chatId: null,
-
-              historyId:
-                chat.id || null,
-            },
-          }
-        )
-      );
-    }
+            chatKey,
+          },
+        }
+      )
+    );
 
     closeMobileSidebar();
+
+    setTimeout(() => {
+      openingChatRef.current =
+        false;
+    }, 700);
   };
 
-  // ==========================================
+  // =====================================================
   // DELETE HISTORY
-  // ==========================================
+  // =====================================================
 
   const handleDeleteHistory = (
     e,
+    chatToDelete,
     index
   ) => {
-    e.stopPropagation();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (!chatToDelete) return;
+
+    const deletedKey =
+      getChatKey(chatToDelete);
 
     const newHistory =
-      [...history];
+      uniqueHistory.filter(
+        (chat, i) => {
+          if (i === index) {
+            return false;
+          }
 
-    newHistory.splice(index, 1);
+          return (
+            getChatKey(chat) !==
+            deletedKey
+          );
+        }
+      );
 
+    /*
+     * Hanya update state.
+     *
+     * Home adalah satu-satunya tempat
+     * yang menyimpan history ke localStorage.
+     */
     setHistory(newHistory);
 
-    const userKey =
-      getUserKey(user);
-
-    if (userKey) {
-      try {
-        localStorage.setItem(
-          userKey,
-          JSON.stringify(newHistory)
-        );
-      } catch (error) {
-        console.log(
-          "Gagal menghapus history:",
-          error
-        );
-      }
-    }
+    /*
+     * Beritahu Home bahwa history berubah.
+     */
+    window.dispatchEvent(
+      new CustomEvent(
+        "aiind-history-updated",
+        {
+          detail: {
+            history: newHistory,
+          },
+        }
+      )
+    );
   };
 
-  // ==========================================
+  // =====================================================
   // CHANGE ACCOUNT
-  // ==========================================
+  // =====================================================
 
   const handleChangeAccount = () => {
     if (!user) {
@@ -438,27 +592,32 @@ function Sidebar({
       cancelButtonColor:
         "#334155",
 
-      borderRadius: "18px",
+      reverseButtons: true,
     }).then((result) => {
       if (result.isConfirmed) {
         setMessages([]);
-        setHistory([]);
+        setSettingOpen(false);
 
         localStorage.removeItem(
           "user"
         );
 
         setUser(null);
-        setSettingOpen(false);
+
+        window.dispatchEvent(
+          new Event(
+            "aiind-user-updated"
+          )
+        );
 
         navigate("/login");
       }
     });
   };
 
-  // ==========================================
+  // =====================================================
   // LOGOUT
-  // ==========================================
+  // =====================================================
 
   const handleLogout = () => {
     Swal.fire({
@@ -484,27 +643,32 @@ function Sidebar({
       cancelButtonColor:
         "#334155",
 
-      borderRadius: "18px",
+      reverseButtons: true,
     }).then((result) => {
       if (result.isConfirmed) {
         setMessages([]);
-        setHistory([]);
+        setSettingOpen(false);
 
         localStorage.removeItem(
           "user"
         );
 
         setUser(null);
-        setSettingOpen(false);
+
+        window.dispatchEvent(
+          new Event(
+            "aiind-user-updated"
+          )
+        );
 
         navigate("/login");
       }
     });
   };
 
-  // ==========================================
+  // =====================================================
   // ABOUT
-  // ==========================================
+  // =====================================================
 
   const handleAbout = () => {
     Swal.fire({
@@ -515,7 +679,10 @@ function Sidebar({
           line-height:1.8;
           color:#A9C4D3;
         ">
-          <strong style="color:#00C2FF">
+          <strong style="
+            color:#00C2FF;
+            font-size:17px;
+          ">
             AI.Ind
           </strong>
 
@@ -525,7 +692,10 @@ function Sidebar({
 
           <br><br>
 
-          <span style="color:#71899A">
+          <span style="
+            color:#71899A;
+            font-size:13px;
+          ">
             Teman cerdas untuk membantu
             belajar, mencari ide,
             pemrograman, dan berbagai
@@ -534,7 +704,9 @@ function Sidebar({
 
           <br><br>
 
-          <small style="color:#536B7D">
+          <small style="
+            color:#536B7D;
+          ">
             Versi 1.0.0
           </small>
         </div>
@@ -548,956 +720,1068 @@ function Sidebar({
       confirmButtonColor:
         "#00C2FF",
 
-      borderRadius: "18px",
+      reverseButtons: true,
     });
   };
 
-  // ==========================================
+  // =====================================================
   // RENDER
-  // ==========================================
+  // =====================================================
 
   return (
     <>
-      <style>
-        {`
+      <style>{`
+        * {
+          box-sizing: border-box;
+        }
 
-          /* =====================================
-             SIDEBAR UTAMA
-          ===================================== */
+        /* ==========================================
+           SIDEBAR
+        ========================================== */
 
+        .ai-sidebar {
+          width: 274px;
+          height: 100dvh;
+          max-height: 100dvh;
+
+          flex-shrink: 0;
+
+          display: flex;
+          flex-direction: column;
+
+          position: relative;
+
+          background:
+            linear-gradient(
+              180deg,
+              #0A1B28 0%,
+              #07151F 100%
+            );
+
+          border-right:
+            1px solid
+            rgba(255,255,255,.07);
+
+          z-index: 1000;
+
+          overflow: hidden;
+        }
+
+        /* ==========================================
+           TOP
+        ========================================== */
+
+        .ai-sidebar-top {
+          flex-shrink: 0;
+
+          padding:
+            22px
+            18px
+            16px;
+        }
+
+        .ai-brand-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          gap: 10px;
+        }
+
+        .ai-brand {
+          display: flex;
+          align-items: center;
+
+          gap: 12px;
+
+          min-width: 0;
+        }
+
+        .ai-brand-logo {
+          width: 46px;
+          height: 46px;
+
+          min-width: 46px;
+
+          border-radius: 14px;
+
+          object-fit: cover;
+
+          box-shadow:
+            0 8px 28px
+            rgba(0,194,255,.14);
+        }
+
+        .ai-brand-name {
+          margin: 0;
+
+          color: #fff;
+
+          font-size: 20px;
+          font-weight: 800;
+
+          letter-spacing: -.5px;
+        }
+
+        .ai-brand-name span {
+          color: #00C2FF;
+        }
+
+        .ai-brand-sub {
+          margin-top: 3px;
+
+          color: #6F8798;
+
+          font-size: 11px;
+
+          white-space: nowrap;
+        }
+
+        /* ==========================================
+           NEW CHAT
+        ========================================== */
+
+        .ai-new-chat {
+          width: 100%;
+
+          margin-top: 22px;
+
+          padding:
+            12px
+            15px;
+
+          border:
+            1px solid
+            rgba(0,194,255,.18);
+
+          border-radius: 14px;
+
+          background:
+            linear-gradient(
+              135deg,
+              rgba(0,194,255,.16),
+              rgba(0,143,232,.08)
+            );
+
+          color: #DDF8FF;
+
+          display: flex;
+          align-items: center;
+
+          gap: 10px;
+
+          font-size: 13px;
+          font-weight: 700;
+
+          cursor: pointer;
+
+          transition:
+            background .2s ease,
+            border-color .2s ease,
+            transform .15s ease;
+
+          -webkit-tap-highlight-color:
+            transparent;
+        }
+
+        .ai-new-chat:hover {
+          background:
+            linear-gradient(
+              135deg,
+              rgba(0,194,255,.25),
+              rgba(0,143,232,.12)
+            );
+
+          border-color:
+            rgba(0,194,255,.35);
+
+          transform:
+            translateY(-1px);
+        }
+
+        .ai-new-chat:active {
+          transform:
+            scale(.98);
+        }
+
+        .ai-new-chat-icon {
+          width: 29px;
+          height: 29px;
+
+          min-width: 29px;
+
+          border-radius: 9px;
+
+          background:
+            #00C2FF;
+
+          color:
+            #06131C;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        /* ==========================================
+           HISTORY
+        ========================================== */
+
+        .ai-history {
+          flex:
+            1 1 0;
+
+          min-height: 0;
+
+          width: 100%;
+
+          overflow-y: auto;
+          overflow-x: hidden;
+
+          padding:
+            4px
+            10px
+            18px;
+
+          scrollbar-width: thin;
+
+          scrollbar-color:
+            #1C3849
+            transparent;
+
+          -webkit-overflow-scrolling:
+            touch;
+
+          overscroll-behavior:
+            contain;
+
+          touch-action:
+            pan-y;
+
+          position: relative;
+        }
+
+        .ai-history::-webkit-scrollbar {
+          width: 5px;
+        }
+
+        .ai-history::-webkit-scrollbar-track {
+          background:
+            transparent;
+        }
+
+        .ai-history::-webkit-scrollbar-thumb {
+          background:
+            #1C3849;
+
+          border-radius:
+            999px;
+        }
+
+        .ai-history::-webkit-scrollbar-thumb:hover {
+          background:
+            #2A5065;
+        }
+
+        /* ==========================================
+           HISTORY TITLE
+        ========================================== */
+
+        .ai-history-title {
+          display: flex;
+
+          align-items: center;
+
+          justify-content:
+            space-between;
+
+          padding:
+            10px
+            7px
+            9px;
+
+          color:
+            #60798B;
+
+          font-size:
+            10px;
+
+          font-weight:
+            800;
+
+          letter-spacing:
+            1.2px;
+
+          text-transform:
+            uppercase;
+
+          position:
+            sticky;
+
+          top: 0;
+
+          z-index: 5;
+
+          background:
+            linear-gradient(
+              180deg,
+              #091A27 80%,
+              rgba(9,26,39,0)
+            );
+        }
+
+        .ai-history-count {
+          min-width:
+            21px;
+
+          padding:
+            3px 6px;
+
+          border-radius:
+            20px;
+
+          background:
+            rgba(255,255,255,.05);
+
+          color:
+            #6C8799;
+
+          text-align:
+            center;
+
+          font-size:
+            10px;
+        }
+
+        /* ==========================================
+           EMPTY
+        ========================================== */
+
+        .ai-empty {
+          padding:
+            34px
+            15px;
+
+          text-align:
+            center;
+
+          color:
+            #4F697B;
+        }
+
+        .ai-empty-icon {
+          width:
+            46px;
+
+          height:
+            46px;
+
+          margin:
+            0 auto
+            11px;
+
+          border-radius:
+            14px;
+
+          background:
+            rgba(0,194,255,.06);
+
+          color:
+            #00C2FF;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+        }
+
+        .ai-empty p {
+          margin:
+            0;
+
+          color:
+            #6B8596;
+
+          font-size:
+            12px;
+        }
+
+        .ai-empty small {
+          display:
+            block;
+
+          margin-top:
+            5px;
+
+          color:
+            #3E5667;
+
+          font-size:
+            10px;
+
+          line-height:
+            1.5;
+        }
+
+        /* ==========================================
+           HISTORY ITEM
+        ========================================== */
+
+        .ai-history-item {
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          gap:
+            8px;
+
+          width:
+            100%;
+
+          padding:
+            8px;
+
+          margin-bottom:
+            4px;
+
+          border:
+            1px solid
+            transparent;
+
+          border-radius:
+            13px;
+
+          background:
+            transparent;
+
+          cursor:
+            pointer;
+
+          transition:
+            background .16s ease,
+            border-color .16s ease;
+
+          -webkit-tap-highlight-color:
+            transparent;
+
+          user-select:
+            none;
+
+          touch-action:
+            manipulation;
+        }
+
+        .ai-history-item:hover {
+          background:
+            rgba(255,255,255,.035);
+
+          border-color:
+            rgba(255,255,255,.045);
+        }
+
+        .ai-history-item:active {
+          background:
+            rgba(0,194,255,.07);
+        }
+
+        .ai-history-icon {
+          width:
+            35px;
+
+          height:
+            35px;
+
+          min-width:
+            35px;
+
+          border-radius:
+            10px;
+
+          background:
+            rgba(0,194,255,.07);
+
+          color:
+            #00C2FF;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+        }
+
+        .ai-history-text {
+          flex:
+            1;
+
+          min-width:
+            0;
+
+          overflow:
+            hidden;
+        }
+
+        .ai-history-name {
+          color:
+            #D8EAF2;
+
+          font-size:
+            12px;
+
+          line-height:
+            1.35;
+
+          white-space:
+            nowrap;
+
+          overflow:
+            hidden;
+
+          text-overflow:
+            ellipsis;
+        }
+
+        .ai-history-meta {
+          margin-top:
+            3px;
+
+          color:
+            #506A7B;
+
+          font-size:
+            9px;
+        }
+
+        /* ==========================================
+           DELETE
+        ========================================== */
+
+        .ai-delete {
+          width:
+            29px;
+
+          height:
+            29px;
+
+          min-width:
+            29px;
+
+          border:
+            0;
+
+          border-radius:
+            9px;
+
+          background:
+            transparent;
+
+          color:
+            #506979;
+
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          justify-content:
+            center;
+
+          cursor:
+            pointer;
+
+          opacity:
+            0;
+
+          transition:
+            background .16s ease,
+            color .16s ease,
+            opacity .16s ease;
+
+          -webkit-tap-highlight-color:
+            transparent;
+        }
+
+        .ai-history-item:hover
+        .ai-delete {
+          opacity:
+            1;
+        }
+
+        .ai-delete:hover {
+          background:
+            rgba(239,68,68,.1);
+
+          color:
+            #ff6b6b;
+        }
+
+        /* ==========================================
+           BOTTOM
+        ========================================== */
+
+        .ai-sidebar-bottom {
+          flex-shrink:
+            0;
+
+          padding:
+            12px;
+
+          border-top:
+            1px solid
+            rgba(255,255,255,.06);
+
+          background:
+            rgba(5,14,21,.5);
+        }
+
+        /* ==========================================
+           USER
+        ========================================== */
+
+        .ai-user-card {
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          gap:
+            10px;
+
+          padding:
+            10px;
+
+          border-radius:
+            13px;
+
+          background:
+            rgba(255,255,255,.025);
+
+          border:
+            1px solid
+            rgba(255,255,255,.045);
+        }
+
+        .ai-user-icon {
+          color:
+            #00C2FF;
+
+          flex-shrink:
+            0;
+        }
+
+        .ai-user-info {
+          min-width:
+            0;
+
+          flex:
+            1;
+        }
+
+        .ai-user-name {
+          color:
+            #EAF8FF;
+
+          font-size:
+            12px;
+
+          font-weight:
+            700;
+
+          white-space:
+            nowrap;
+
+          overflow:
+            hidden;
+
+          text-overflow:
+            ellipsis;
+        }
+
+        .ai-user-email {
+          margin-top:
+            2px;
+
+          color:
+            #60798B;
+
+          font-size:
+            9px;
+
+          white-space:
+            nowrap;
+
+          overflow:
+            hidden;
+
+          text-overflow:
+            ellipsis;
+        }
+
+        /* ==========================================
+           MENU
+        ========================================== */
+
+        .ai-menu {
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          gap:
+            10px;
+
+          padding:
+            9px 8px;
+
+          margin-top:
+            5px;
+
+          border-radius:
+            10px;
+
+          color:
+            #71899A;
+
+          font-size:
+            12px;
+
+          cursor:
+            pointer;
+
+          transition:
+            background .16s ease,
+            color .16s ease;
+
+          -webkit-tap-highlight-color:
+            transparent;
+        }
+
+        .ai-menu:hover {
+          background:
+            rgba(255,255,255,.035);
+
+          color:
+            #C9E5F0;
+        }
+
+        .ai-submenu {
+          margin-left:
+            24px;
+
+          margin-bottom:
+            3px;
+        }
+
+        .ai-submenu-item {
+          display:
+            flex;
+
+          align-items:
+            center;
+
+          gap:
+            9px;
+
+          padding:
+            8px;
+
+          border-radius:
+            9px;
+
+          color:
+            #8197A6;
+
+          font-size:
+            11px;
+
+          cursor:
+            pointer;
+
+          -webkit-tap-highlight-color:
+            transparent;
+        }
+
+        .ai-submenu-item:hover {
+          background:
+            rgba(255,255,255,.035);
+
+          color:
+            #fff;
+        }
+
+        .ai-about {
+          border-top:
+            1px solid
+            rgba(255,255,255,.05);
+
+          padding-top:
+            9px;
+
+          margin-top:
+            3px;
+        }
+
+        /* ==========================================
+           CLOSE
+        ========================================== */
+
+        .ai-mobile-close {
+          display:
+            none;
+        }
+
+        /* ==========================================
+           MOBILE
+        ========================================== */
+
+        @media (max-width: 767px) {
           .ai-sidebar {
-            width: 274px;
-            height: 100dvh;
-            max-height: 100dvh;
+            position:
+              fixed;
 
-            flex-shrink: 0;
+            top:
+              0;
 
-            background:
-              linear-gradient(
-                180deg,
-                #0A1B28 0%,
-                #07151F 100%
+            left:
+              0;
+
+            width:
+              min(292px, 84vw);
+
+            height:
+              100dvh;
+
+            max-height:
+              100dvh;
+
+            transform:
+              translateX(
+                ${open ? "0" : "-105%"}
               );
-
-            border-right:
-              1px solid rgba(255,255,255,.07);
-
-            display: flex;
-            flex-direction: column;
-
-            position: relative;
-
-            z-index: 1000;
-
-            overflow: hidden;
-
-            box-sizing: border-box;
-          }
-
-
-          /* =====================================
-             TOP
-          ===================================== */
-
-          .ai-sidebar-top {
-            flex-shrink: 0;
-            padding: 22px 18px 16px;
-          }
-
-
-          .ai-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-
-            min-width: 0;
-          }
-
-
-          .ai-brand-logo {
-            width: 46px;
-            height: 46px;
-
-            min-width: 46px;
-
-            border-radius: 14px;
-
-            object-fit: cover;
-
-            box-shadow:
-              0 8px 28px
-              rgba(0,194,255,.14);
-          }
-
-
-          .ai-brand-name {
-            margin: 0;
-
-            color: #fff;
-
-            font-size: 20px;
-            font-weight: 800;
-
-            letter-spacing: -.5px;
-          }
-
-
-          .ai-brand-name span {
-            color: #00C2FF;
-          }
-
-
-          .ai-brand-sub {
-            margin-top: 3px;
-
-            color: #6F8798;
-
-            font-size: 11px;
-
-            white-space: nowrap;
-          }
-
-
-          .ai-brand-row {
-            display: flex;
-            align-items: center;
-
-            justify-content: space-between;
-
-            gap: 10px;
-          }
-
-
-          /* =====================================
-             NEW CHAT
-          ===================================== */
-
-          .ai-new-chat {
-            width: 100%;
-
-            margin-top: 22px;
-
-            padding: 12px 15px;
-
-            border:
-              1px solid
-              rgba(0,194,255,.18);
-
-            border-radius: 14px;
-
-            background:
-              linear-gradient(
-                135deg,
-                rgba(0,194,255,.16),
-                rgba(0,143,232,.08)
-              );
-
-            color: #DDF8FF;
-
-            display: flex;
-            align-items: center;
-
-            gap: 10px;
-
-            font-size: 13px;
-            font-weight: 700;
-
-            cursor: pointer;
 
             transition:
-              background .2s ease,
-              border-color .2s ease,
-              transform .2s ease;
-
-            -webkit-tap-highlight-color:
-              transparent;
-          }
-
-
-          .ai-new-chat:hover {
-            background:
-              linear-gradient(
-                135deg,
-                rgba(0,194,255,.25),
-                rgba(0,143,232,.12)
+              transform
+              .28s
+              cubic-bezier(
+                .22,
+                .61,
+                .36,
+                1
               );
 
-            border-color:
-              rgba(0,194,255,.35);
+            box-shadow:
+              ${
+                open
+                  ? "12px 0 45px rgba(0,0,0,.38)"
+                  : "none"
+              };
 
-            transform:
-              translateY(-1px);
+            overscroll-behavior:
+              contain;
           }
 
-
-          .ai-new-chat:active {
-            transform:
-              scale(.98);
+          .ai-sidebar-top {
+            padding:
+              calc(
+                18px +
+                env(safe-area-inset-top)
+              )
+              16px
+              15px;
           }
-
-
-          .ai-new-chat-icon {
-            width: 28px;
-            height: 28px;
-
-            min-width: 28px;
-
-            border-radius: 9px;
-
-            background: #00C2FF;
-
-            color: #06131C;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-
-          /* =====================================
-             HISTORY
-          ===================================== */
 
           .ai-history {
-            flex: 1 1 auto;
-
-            min-height: 0;
-
-            width: 100%;
-
-            overflow-y: auto;
-            overflow-x: hidden;
-
             padding:
-              4px 12px
-              15px;
+              4px
+              10px
+              calc(
+                18px +
+                env(safe-area-inset-bottom)
+              );
 
-            box-sizing: border-box;
+            overflow-y:
+              scroll;
 
-            scrollbar-width: thin;
-
-            scrollbar-color:
-              #1C3849
-              transparent;
+            touch-action:
+              pan-y;
 
             -webkit-overflow-scrolling:
               touch;
 
             overscroll-behavior:
               contain;
-
-            touch-action:
-              pan-y;
           }
-
-
-          .ai-history::-webkit-scrollbar {
-            width: 5px;
-          }
-
-
-          .ai-history::-webkit-scrollbar-track {
-            background: transparent;
-          }
-
-
-          .ai-history::-webkit-scrollbar-thumb {
-            background:
-              #1C3849;
-
-            border-radius: 999px;
-          }
-
-
-          .ai-history-title {
-            display: flex;
-
-            justify-content:
-              space-between;
-
-            align-items: center;
-
-            padding:
-              10px 7px 9px;
-
-            color: #60798B;
-
-            font-size: 10px;
-
-            font-weight: 800;
-
-            letter-spacing: 1.2px;
-
-            text-transform:
-              uppercase;
-
-            position: sticky;
-
-            top: 0;
-
-            z-index: 2;
-
-            background:
-              linear-gradient(
-                180deg,
-                #091A27 80%,
-                rgba(9,26,39,0)
-              );
-          }
-
-
-          .ai-history-count {
-            min-width: 20px;
-
-            padding: 3px 6px;
-
-            border-radius: 20px;
-
-            background:
-              rgba(255,255,255,.04);
-
-            color: #587285;
-
-            text-align: center;
-
-            font-size: 10px;
-          }
-
-
-          /* =====================================
-             EMPTY
-          ===================================== */
-
-          .ai-empty {
-            padding:
-              32px 15px;
-
-            text-align: center;
-
-            color: #4F697B;
-          }
-
-
-          .ai-empty-icon {
-            width: 44px;
-            height: 44px;
-
-            margin:
-              0 auto 11px;
-
-            border-radius: 14px;
-
-            background:
-              rgba(0,194,255,.06);
-
-            color: #00C2FF;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-
-          .ai-empty p {
-            margin: 0;
-
-            font-size: 12px;
-          }
-
-
-          .ai-empty small {
-            display: block;
-
-            margin-top: 5px;
-
-            color: #3E5667;
-
-            font-size: 10px;
-
-            line-height: 1.5;
-          }
-
-
-          /* =====================================
-             HISTORY ITEM
-          ===================================== */
-
-          .ai-history-item {
-            display: flex;
-
-            align-items: center;
-
-            gap: 7px;
-
-            padding: 7px;
-
-            margin-bottom: 4px;
-
-            border:
-              1px solid transparent;
-
-            border-radius: 13px;
-
-            background:
-              transparent;
-
-            cursor: pointer;
-
-            transition:
-              background .18s ease,
-              border-color .18s ease;
-
-            -webkit-tap-highlight-color:
-              transparent;
-
-            user-select: none;
-
-            touch-action: manipulation;
-          }
-
-
-          .ai-history-item:hover {
-            background:
-              rgba(255,255,255,.035);
-
-            border-color:
-              rgba(255,255,255,.045);
-          }
-
-
-          .ai-history-item:active {
-            background:
-              rgba(0,194,255,.08);
-
-            transform:
-              scale(.995);
-          }
-
-
-          .ai-history-icon {
-            width: 34px;
-            height: 34px;
-
-            min-width: 34px;
-
-            border-radius: 10px;
-
-            background:
-              rgba(0,194,255,.07);
-
-            color: #00C2FF;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-
-          .ai-history-text {
-            flex: 1;
-
-            min-width: 0;
-          }
-
-
-          .ai-history-name {
-            color: #D8EAF2;
-
-            font-size: 12px;
-
-            line-height: 1.35;
-
-            white-space: nowrap;
-
-            overflow: hidden;
-
-            text-overflow: ellipsis;
-          }
-
-
-          .ai-history-meta {
-            margin-top: 3px;
-
-            color: #506A7B;
-
-            font-size: 9px;
-          }
-
-
-          /* =====================================
-             DELETE
-          ===================================== */
-
-          .ai-delete {
-            width: 28px;
-            height: 28px;
-
-            min-width: 28px;
-
-            border: 0;
-
-            border-radius: 9px;
-
-            background:
-              transparent;
-
-            color: #506979;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            cursor: pointer;
-
-            opacity: 0;
-
-            transition:
-              background .18s ease,
-              color .18s ease,
-              opacity .18s ease;
-
-            -webkit-tap-highlight-color:
-              transparent;
-          }
-
-
-          .ai-history-item:hover
-          .ai-delete {
-            opacity: 1;
-          }
-
-
-          .ai-delete:hover {
-            background:
-              rgba(239,68,68,.1);
-
-            color: #ff6b6b;
-          }
-
-
-          .ai-delete:active {
-            transform:
-              scale(.9);
-          }
-
-
-          /* =====================================
-             BOTTOM
-          ===================================== */
-
-          .ai-sidebar-bottom {
-            flex-shrink: 0;
-
-            padding:
-              12px;
-
-            border-top:
-              1px solid
-              rgba(255,255,255,.06);
-
-            background:
-              rgba(5,14,21,.35);
-
-            box-sizing: border-box;
-          }
-
-
-          .ai-user-card {
-            display: flex;
-
-            align-items: center;
-
-            gap: 10px;
-
-            padding: 10px;
-
-            border-radius: 13px;
-
-            background:
-              rgba(255,255,255,.025);
-
-            border:
-              1px solid
-              rgba(255,255,255,.045);
-          }
-
-
-          .ai-user-icon {
-            color: #00C2FF;
-
-            flex-shrink: 0;
-          }
-
-
-          .ai-user-info {
-            min-width: 0;
-
-            flex: 1;
-          }
-
-
-          .ai-user-name {
-            color: #EAF8FF;
-
-            font-size: 12px;
-
-            font-weight: 700;
-
-            white-space: nowrap;
-
-            overflow: hidden;
-
-            text-overflow: ellipsis;
-          }
-
-
-          .ai-user-email {
-            margin-top: 2px;
-
-            color: #60798B;
-
-            font-size: 9px;
-
-            white-space: nowrap;
-
-            overflow: hidden;
-
-            text-overflow: ellipsis;
-          }
-
-
-          /* =====================================
-             MENU
-          ===================================== */
-
-          .ai-menu {
-            display: flex;
-
-            align-items: center;
-
-            gap: 10px;
-
-            padding:
-              9px 8px;
-
-            margin-top: 5px;
-
-            border-radius: 10px;
-
-            color: #71899A;
-
-            font-size: 12px;
-
-            cursor: pointer;
-
-            transition:
-              background .18s ease,
-              color .18s ease;
-
-            -webkit-tap-highlight-color:
-              transparent;
-          }
-
-
-          .ai-menu:hover {
-            background:
-              rgba(255,255,255,.035);
-
-            color: #C9E5F0;
-          }
-
-
-          .ai-menu:active {
-            background:
-              rgba(0,194,255,.06);
-          }
-
-
-          .ai-submenu {
-            margin-left: 24px;
-
-            margin-bottom: 3px;
-          }
-
-
-          .ai-submenu-item {
-            display: flex;
-
-            align-items: center;
-
-            gap: 9px;
-
-            padding: 8px;
-
-            border-radius: 9px;
-
-            color: #8197A6;
-
-            font-size: 11px;
-
-            cursor: pointer;
-
-            -webkit-tap-highlight-color:
-              transparent;
-          }
-
-
-          .ai-submenu-item:hover {
-            background:
-              rgba(255,255,255,.035);
-
-            color: #fff;
-          }
-
-
-          .ai-about {
-            border-top:
-              1px solid
-              rgba(255,255,255,.05);
-
-            padding-top: 9px;
-
-            margin-top: 3px;
-          }
-
-
-          /* =====================================
-             MOBILE CLOSE
-          ===================================== */
 
           .ai-mobile-close {
-            display: none;
+            width:
+              31px;
+
+            height:
+              31px;
+
+            min-width:
+              31px;
+
+            border:
+              0;
+
+            border-radius:
+              9px;
+
+            background:
+              rgba(255,255,255,.05);
+
+            color:
+              #7690A1;
+
+            display:
+              flex;
+
+            align-items:
+              center;
+
+            justify-content:
+              center;
+
+            cursor:
+              pointer;
+
+            -webkit-tap-highlight-color:
+              transparent;
           }
 
-
-          /* =====================================
-             MOBILE
-          ===================================== */
-
-          @media (max-width: 767px) {
-
-            .ai-sidebar {
-              position: fixed;
-
-              top: 0;
-              left: 0;
-
-              width:
-                min(290px, 82vw);
-
-              height: 100dvh;
-
-              max-height: 100dvh;
-
-              transform:
-                translateX(
-                  ${open ? "0" : "-105%"}
-                );
-
-              transition:
-                transform
-                .28s
-                cubic-bezier(
-                  .22,
-                  .61,
-                  .36,
-                  1
-                );
-
-              box-shadow:
-                ${
-                  open
-                    ? "12px 0 45px rgba(0,0,0,.38)"
-                    : "none"
-                };
-
-              touch-action:
-                pan-y;
-
-              overscroll-behavior:
-                contain;
-            }
-
-
-            .ai-sidebar-top {
-              padding:
-                calc(
-                  18px +
-                  env(safe-area-inset-top)
-                )
-                16px
-                15px;
-            }
-
-
-            .ai-history {
-              padding:
-                4px 10px
-                calc(
-                  18px +
-                  env(safe-area-inset-bottom)
-                );
-
-              overflow-y: auto;
-
-              touch-action:
-                pan-y;
-
-              -webkit-overflow-scrolling:
-                touch;
-            }
-
-
-            .ai-mobile-close {
-              width: 30px;
-              height: 30px;
-
-              min-width: 30px;
-
-              border: 0;
-
-              border-radius: 9px;
-
-              background:
-                rgba(255,255,255,.04);
-
-              color: #7690A1;
-
-              display: flex;
-
-              align-items: center;
-              justify-content: center;
-
-              cursor: pointer;
-
-              -webkit-tap-highlight-color:
-                transparent;
-            }
-
-
-            .ai-delete {
-              opacity: 1;
-            }
-
-
-            .ai-history-item {
-              padding:
-                8px 7px;
-
-              margin-bottom: 5px;
-
-              min-height: 50px;
-            }
-
-
-            .ai-history-title {
-              padding:
-                10px 7px;
-            }
-
-
-            .ai-new-chat {
-              min-height: 48px;
-            }
+          .ai-delete {
+            opacity:
+              1;
           }
-        `}
-      </style>
 
-      {/* ========================================
+          .ai-history-item {
+            min-height:
+              51px;
+
+            padding:
+              8px
+              7px;
+
+            margin-bottom:
+              5px;
+          }
+
+          .ai-history-title {
+            padding:
+              10px
+              7px;
+          }
+
+          .ai-new-chat {
+            min-height:
+              48px;
+          }
+        }
+      `}</style>
+
+      {/* ==================================================
           AREA SWIPE
-      ======================================== */}
+      ================================================== */}
 
-      {mobile && (
+      {mobile && !open && (
         <div
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           style={{
             position: "fixed",
-
             top: 0,
             left: 0,
-
-            width:
-              open
-                ? "100%"
-                : "42px",
-
+            width: "45px",
             height: "100%",
-
             zIndex: 997,
-
-            pointerEvents:
-              open
-                ? "none"
-                : "auto",
-
-            touchAction:
-              "pan-y",
-
-            WebkitTapHighlightColor:
-              "transparent",
+            pointerEvents: "auto",
+            touchAction: "pan-y",
           }}
         />
       )}
 
-      {/* ========================================
+      {/* ==================================================
           OVERLAY
-      ======================================== */}
+      ================================================== */}
 
       {mobile && open && (
         <div
-          onClick={() =>
-            setOpen(false)
-          }
+          onClick={() => setOpen(false)}
           style={{
             position: "fixed",
-
             inset: 0,
-
             background:
               "rgba(0,0,0,.48)",
-
             backdropFilter:
               "blur(3px)",
-
             WebkitBackdropFilter:
               "blur(3px)",
-
             zIndex: 998,
           }}
         />
       )}
 
-      {/* ========================================
+      {/* ==================================================
           SIDEBAR
-      ======================================== */}
+      ================================================== */}
 
       <aside
         className="ai-sidebar"
+        onTouchStart={(e) => {
+          if (
+            e.target.closest(
+              ".ai-history"
+            )
+          ) {
+            return;
+          }
 
-        onTouchStart={
-          handleTouchStart
-        }
+          handleTouchStart(e);
+        }}
+        onTouchMove={(e) => {
+          if (
+            e.target.closest(
+              ".ai-history"
+            )
+          ) {
+            return;
+          }
 
-        onTouchMove={
-          handleTouchMove
-        }
+          handleTouchMove(e);
+        }}
+        onTouchEnd={(e) => {
+          if (
+            e.target.closest(
+              ".ai-history"
+            )
+          ) {
+            return;
+          }
 
-        onTouchEnd={
-          handleTouchEnd
-        }
+          handleTouchEnd(e);
+        }}
       >
-
-        {/* TOP */}
+        {/* ==================================================
+            TOP
+        ================================================== */}
 
         <div className="ai-sidebar-top">
-
           <div className="ai-brand-row">
-
             <div className="ai-brand">
-
               <img
                 src="/logo.svg"
                 alt="AI.Ind"
@@ -1507,16 +1791,13 @@ function Sidebar({
               <div>
                 <h2 className="ai-brand-name">
                   AI
-                  <span>
-                    .Ind
-                  </span>
+                  <span>.Ind</span>
                 </h2>
 
                 <div className="ai-brand-sub">
                   Asisten AI buatan Indonesia 🇮🇩
                 </div>
               </div>
-
             </div>
 
             {mobile && (
@@ -1531,16 +1812,12 @@ function Sidebar({
                 <FiX size={17} />
               </button>
             )}
-
           </div>
-
 
           <button
             type="button"
             className="ai-new-chat"
-            onClick={
-              handleChatBaru
-            }
+            onClick={handleChatBaru}
           >
             <span className="ai-new-chat-icon">
               <FiPlus size={17} />
@@ -1550,77 +1827,32 @@ function Sidebar({
               Percakapan baru
             </span>
           </button>
-
         </div>
 
-
-        {/* ======================================
+        {/* ==================================================
             HISTORY
-        ====================================== */}
+        ================================================== */}
 
         <div
           className="ai-history"
-          onTouchStart={(e) => {
-            /*
-              Biarkan scroll history bekerja.
-              Hanya mulai swipe sidebar jika
-              gesture dimulai dari area yang
-              bukan history.
-            */
-            if (
-              e.target.closest(
-                ".ai-history-item"
-              )
-            ) {
-              return;
-            }
-
-            handleTouchStart(e);
-          }}
-          onTouchMove={(e) => {
-            if (
-              e.target.closest(
-                ".ai-history-item"
-              )
-            ) {
-              return;
-            }
-
-            handleTouchMove(e);
-          }}
-          onTouchEnd={(e) => {
-            if (
-              e.target.closest(
-                ".ai-history-item"
-              )
-            ) {
-              return;
-            }
-
-            handleTouchEnd(e);
-          }}
+          onTouchStart={() => {}}
+          onTouchMove={() => {}}
+          onTouchEnd={() => {}}
         >
-
           <div className="ai-history-title">
-
             <span>
               Riwayat percakapan
             </span>
 
-            {history.length > 0 && (
+            {uniqueHistory.length > 0 && (
               <span className="ai-history-count">
-                {history.length}
+                {uniqueHistory.length}
               </span>
             )}
-
           </div>
 
-
-          {!history ||
-          history.length === 0 ? (
-
+          {uniqueHistory.length === 0 ? (
             <div className="ai-empty">
-
               <div className="ai-empty-icon">
                 <FiMessageSquare
                   size={20}
@@ -1635,98 +1867,80 @@ function Sidebar({
                 Pesan yang kamu kirim
                 akan otomatis tersimpan
               </small>
-
             </div>
-
           ) : (
+            uniqueHistory.map(
+              (chat, index) => {
+                const chatKey =
+                  getChatKey(chat);
 
-            history.map(
-              (chat, index) => (
-
-                <div
-                  key={
-                    chat.id ||
-                    chat.chatId ||
-                    `${chat.title}-${index}`
-                  }
-
-                  className="ai-history-item"
-
-                  onClick={() =>
-                    handleOpenChat(chat)
-                  }
-                >
-
-                  <div className="ai-history-icon">
-                    <FiMessageSquare
-                      size={15}
-                    />
-                  </div>
-
-
-                  <div className="ai-history-text">
-
-                    <div className="ai-history-name">
-                      {chat.title ||
-                        "Percakapan baru"}
-                    </div>
-
-                    <div className="ai-history-meta">
-                      {Array.isArray(
-                        chat.messages
-                      )
-                        ? `${chat.messages.length} pesan`
-                        : "Percakapan"}
-                    </div>
-
-                  </div>
-
-
-                  <button
-                    type="button"
-                    className="ai-delete"
-
+                return (
+                  <div
+                    key={chatKey}
+                    className="ai-history-item"
                     onClick={(e) =>
-                      handleDeleteHistory(
-                        e,
-                        index
+                      handleOpenChat(
+                        chat,
+                        e
                       )
-                    }
-
-                    aria-label={
-                      "Hapus percakapan"
                     }
                   >
-                    <FaTrash
-                      size={11}
-                    />
-                  </button>
+                    <div className="ai-history-icon">
+                      <FiMessageSquare
+                        size={15}
+                      />
+                    </div>
 
-                </div>
+                    <div className="ai-history-text">
+                      <div className="ai-history-name">
+                        {chat.title ||
+                          "Percakapan baru"}
+                      </div>
 
-              )
+                      <div className="ai-history-meta">
+                        {Array.isArray(
+                          chat.messages
+                        )
+                          ? `${chat.messages.length} pesan`
+                          : "Percakapan"}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="ai-delete"
+                      onClick={(e) =>
+                        handleDeleteHistory(
+                          e,
+                          chat,
+                          index
+                        )
+                      }
+                      aria-label="Hapus percakapan"
+                    >
+                      <FaTrash
+                        size={11}
+                      />
+                    </button>
+                  </div>
+                );
+              }
             )
-
           )}
-
         </div>
 
-
-        {/* ======================================
+        {/* ==================================================
             BOTTOM
-        ====================================== */}
+        ================================================== */}
 
         <div className="ai-sidebar-bottom">
-
           <div className="ai-user-card">
-
             <FaUserCircle
               size={32}
               className="ai-user-icon"
             />
 
             <div className="ai-user-info">
-
               <div className="ai-user-name">
                 {user?.nama ||
                   "Belum Login"}
@@ -1736,24 +1950,26 @@ function Sidebar({
                 {user?.email ||
                   "Masuk untuk menggunakan AI.Ind"}
               </div>
-
             </div>
 
+            {user && (
+              <FiCheck
+                size={14}
+                color="#00C2FF"
+              />
+            )}
           </div>
-
 
           {/* PENGATURAN */}
 
           <div
             className="ai-menu"
-
             onClick={() =>
               setSettingOpen(
-                !settingOpen
+                (prev) => !prev
               )
             }
           >
-
             <FaCog size={14} />
 
             <span
@@ -1773,73 +1989,51 @@ function Sidebar({
                 size={14}
               />
             )}
-
           </div>
 
-
           {settingOpen && (
-
             <div className="ai-submenu">
-
               <div
                 className="ai-submenu-item"
-
                 onClick={
                   handleChangeAccount
                 }
               >
-
                 <FaUserCircle
                   color="#00C2FF"
                 />
 
                 Ganti Akun
-
               </div>
-
 
               <div
                 className="ai-submenu-item"
-
                 style={{
                   color:
                     "#ff6b6b",
                 }}
-
                 onClick={
                   handleLogout
                 }
               >
-
                 <FaSignOutAlt />
 
                 Keluar
-
               </div>
-
             </div>
-
           )}
-
 
           {/* ABOUT */}
 
           <div
             className="ai-menu ai-about"
-
-            onClick={
-              handleAbout
-            }
+            onClick={handleAbout}
           >
-
             <FiInfo size={15} />
 
             Tentang AI.Ind
-
           </div>
-
         </div>
-
       </aside>
     </>
   );

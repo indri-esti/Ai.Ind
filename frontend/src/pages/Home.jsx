@@ -1,9 +1,8 @@
+
 import { Row, Col } from "react-bootstrap";
 import { FiX, FiImage } from "react-icons/fi";
 import { useState, useEffect, useRef } from "react";
-
 import { AdMob, BannerAd } from "@capgo/capacitor-admob";
-
 import axios from "../api";
 
 import Header from "../components/Header";
@@ -24,26 +23,31 @@ function Home() {
 
     let hasil = String(teks);
 
+    // <think> ... </think>
     hasil = hasil.replace(
       /<think>[\s\S]*?<\/think>/gi,
       ""
     );
 
+    // <think> yang belum ditutup
     hasil = hasil.replace(
       /<think>[\s\S]*$/gi,
       ""
     );
 
+    // Tag think sisa
     hasil = hasil.replace(
       /<\/?think>/gi,
       ""
     );
 
+    // Thinking process bahasa Inggris
     hasil = hasil.replace(
-      /^\s*(Here's|Heres|Here is)\s+a\s+thinking\s+process\s*:[\s\S]*$/i,
+      /^(Here's|Heres|Here is)\s+a\s+thinking\s+process\s*:[\s\S]*$/i,
       ""
     );
 
+    // Rapikan baris kosong
     hasil = hasil.replace(
       /\n{3,}/g,
       "\n\n"
@@ -56,48 +60,29 @@ function Home() {
   // STATE
   // ==========================================
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
 
-  const [messages, setMessages] =
-    useState([]);
+  const fileInputRef = useRef(null);
 
-  const [selectedImage, setSelectedImage] =
-    useState(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [currentChatId, setCurrentChatId] = useState(null);
 
-  const [imagePreview, setImagePreview] =
-    useState(null);
+  // ==========================================
+  // REF HISTORY
+  // ==========================================
 
-  const fileInputRef =
-    useRef(null);
+  const activeHistoryIdRef = useRef(null);
 
-  const [history, setHistory] =
-    useState([]);
+  const historyLoadedRef = useRef(false);
 
-  const [loading, setLoading] =
-    useState(false);
+  const historySaveTimeoutRef = useRef(null);
 
-  const [pageLoading, setPageLoading] =
-    useState(true);
-
-  const [currentChatId, setCurrentChatId] =
-    useState(null);
-
-  /*
-    ID lokal untuk history.
-
-    Ini berbeda dengan chat_id dari backend.
-    Gunanya supaya satu percakapan tidak
-    dibuat berkali-kali di localStorage.
-  */
-  const activeHistoryIdRef =
-    useRef(null);
-
-  const historyLoadedRef =
-    useRef(false);
-
-  const chatEndRef =
-    useRef(null);
+  const chatEndRef = useRef(null);
 
   // ==========================================
   // USER KEY
@@ -112,11 +97,150 @@ function Home() {
       user.googleId ||
       user.nama;
 
-    if (!identifier) return null;
+    if (!identifier) {
+      return null;
+    }
 
-    return `history_${String(
-      identifier
-    ).toLowerCase()}`;
+    return `history_${String(identifier)
+      .trim()
+      .toLowerCase()}`;
+  };
+
+  // ==========================================
+  // CHAT KEY
+  // ==========================================
+
+  const getChatKey = (chat) => {
+    if (!chat) return null;
+
+    // Prioritas pertama: ID backend
+    if (
+      chat.chatId !== undefined &&
+      chat.chatId !== null
+    ) {
+      return `backend_${String(chat.chatId)}`;
+    }
+
+    // ID lokal
+    if (
+      chat.id !== undefined &&
+      chat.id !== null
+    ) {
+      return `local_${String(chat.id)}`;
+    }
+
+    // Fallback berdasarkan pesan pertama
+    if (
+      Array.isArray(chat.messages) &&
+      chat.messages.length > 0
+    ) {
+      const first = chat.messages[0];
+
+      const text =
+        first?.content ||
+        first?.text ||
+        first?.message ||
+        "";
+
+      if (text) {
+        return `content_${String(text)
+          .trim()
+          .toLowerCase()
+          .slice(0, 150)}`;
+      }
+    }
+
+    return `title_${String(
+      chat.title || "Percakapan baru"
+    )
+      .trim()
+      .toLowerCase()}`;
+  };
+
+  // ==========================================
+  // CLEAN HISTORY
+  // ==========================================
+
+  const cleanHistory = (list) => {
+    if (!Array.isArray(list)) {
+      return [];
+    }
+
+    const map = new Map();
+
+    list.forEach((chat, index) => {
+      if (!chat) return;
+
+      const key = getChatKey(chat);
+
+      if (!key) return;
+
+      const normalized = {
+        ...chat,
+
+        id:
+          chat.id ??
+          chat.chatId ??
+          `local_${Date.now()}_${index}`,
+
+        chatId:
+          chat.chatId !== undefined &&
+          chat.chatId !== null
+            ? Number(chat.chatId)
+            : null,
+
+        title:
+          chat.title ||
+          "Percakapan baru",
+
+        messages:
+          Array.isArray(chat.messages)
+            ? chat.messages
+            : [],
+
+        updatedAt:
+          chat.updatedAt ||
+          chat.createdAt ||
+          Date.now(),
+      };
+
+      const existing = map.get(key);
+
+      if (!existing) {
+        map.set(key, normalized);
+        return;
+      }
+
+      const existingLength =
+        Array.isArray(existing.messages)
+          ? existing.messages.length
+          : 0;
+
+      const currentLength =
+        normalized.messages.length;
+
+      const existingTime = Number(
+        existing.updatedAt || 0
+      );
+
+      const currentTime = Number(
+        normalized.updatedAt || 0
+      );
+
+      // Pilih percakapan yang paling lengkap / terbaru
+      if (
+        currentLength > existingLength ||
+        currentTime > existingTime
+      ) {
+        map.set(key, normalized);
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        Number(b.updatedAt || 0) -
+        Number(a.updatedAt || 0)
+    );
   };
 
   // ==========================================
@@ -135,11 +259,9 @@ function Home() {
           return;
         }
 
-        const user =
-          JSON.parse(savedUser);
+        const user = JSON.parse(savedUser);
 
-        const userKey =
-          getUserKey(user);
+        const userKey = getUserKey(user);
 
         if (!userKey) {
           setHistory([]);
@@ -156,23 +278,27 @@ function Home() {
           return;
         }
 
-        const parsed =
-          JSON.parse(savedHistory);
+        const parsed = JSON.parse(savedHistory);
 
-        setHistory(
-          Array.isArray(parsed)
-            ? parsed
-            : []
+        const cleaned = cleanHistory(parsed);
+
+        setHistory(cleaned);
+
+        // Rapikan localStorage jika ada duplikat
+        localStorage.setItem(
+          userKey,
+          JSON.stringify(cleaned)
         );
 
         historyLoadedRef.current = true;
       } catch (error) {
-        console.log(
+        console.error(
           "History load error:",
           error
         );
 
         setHistory([]);
+
         historyLoadedRef.current = true;
       }
     };
@@ -184,10 +310,52 @@ function Home() {
       loadHistory
     );
 
+    window.addEventListener(
+      "aiind-user-updated",
+      loadHistory
+    );
+
     return () => {
       window.removeEventListener(
         "storage",
         loadHistory
+      );
+
+      window.removeEventListener(
+        "aiind-user-updated",
+        loadHistory
+      );
+    };
+  }, []);
+
+  // ==========================================
+  // HISTORY UPDATE DARI SIDEBAR
+  // ==========================================
+
+  useEffect(() => {
+    const handleHistoryUpdate = (event) => {
+      const incoming =
+        event.detail?.history;
+
+      if (!Array.isArray(incoming)) {
+        return;
+      }
+
+      const cleaned =
+        cleanHistory(incoming);
+
+      setHistory(cleaned);
+    };
+
+    window.addEventListener(
+      "aiind-history-updated",
+      handleHistoryUpdate
+    );
+
+    return () => {
+      window.removeEventListener(
+        "aiind-history-updated",
+        handleHistoryUpdate
       );
     };
   }, []);
@@ -195,18 +363,74 @@ function Home() {
   // ==========================================
   // AUTO SAVE HISTORY
   // ==========================================
-  /*
-    INI BAGIAN UTAMANYA.
-
-    Setiap messages berubah:
-    - pesan user masuk
-    - jawaban AI masuk
-    - error masuk
-
-    semuanya otomatis tersimpan.
-  */
 
   useEffect(() => {
+    // Jangan save sebelum load selesai
+    if (!historyLoadedRef.current) {
+      return;
+    }
+
+    const savedUser =
+      localStorage.getItem("user");
+
+    if (!savedUser) {
+      return;
+    }
+
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      return;
+    }
+
+    const userKey = getUserKey(user);
+
+    if (!userKey) {
+      return;
+    }
+
+    // Bersihkan duplikat sebelum save
+    const cleaned = cleanHistory(history);
+
+    // Jangan save terlalu sering
+    if (historySaveTimeoutRef.current) {
+      clearTimeout(
+        historySaveTimeoutRef.current
+      );
+    }
+
+    historySaveTimeoutRef.current =
+      setTimeout(() => {
+        try {
+          localStorage.setItem(
+            userKey,
+            JSON.stringify(cleaned)
+          );
+        } catch (error) {
+          console.error(
+            "Gagal menyimpan history:",
+            error
+          );
+        }
+      }, 200);
+
+    return () => {
+      if (historySaveTimeoutRef.current) {
+        clearTimeout(
+          historySaveTimeoutRef.current
+        );
+      }
+    };
+  }, [history]);
+
+  // ==========================================
+  // AUTO SAVE CHAT AKTIF
+  // ==========================================
+
+  useEffect(() => {
+    // Jangan membuat history kalau belum ada pesan
     if (
       !historyLoadedRef.current ||
       messages.length === 0
@@ -218,20 +442,20 @@ function Home() {
       const savedUser =
         localStorage.getItem("user");
 
-      if (!savedUser) return;
+      if (!savedUser) {
+        return;
+      }
 
-      const user =
-        JSON.parse(savedUser);
+      const user = JSON.parse(savedUser);
 
-      const userKey =
-        getUserKey(user);
+      const userKey = getUserKey(user);
 
-      if (!userKey) return;
+      if (!userKey) {
+        return;
+      }
 
-      // Buat ID history lokal hanya sekali
-      if (
-        !activeHistoryIdRef.current
-      ) {
+      // Buat ID lokal hanya kalau belum punya ID
+      if (!activeHistoryIdRef.current) {
         activeHistoryIdRef.current =
           `local_${Date.now()}_${Math.random()
             .toString(36)
@@ -241,10 +465,10 @@ function Home() {
       const historyId =
         activeHistoryIdRef.current;
 
+      // Judul dari pesan user pertama
       const firstUserMessage =
         messages.find(
-          (item) =>
-            item.role === "user"
+          (item) => item?.role === "user"
         );
 
       const title =
@@ -253,86 +477,93 @@ function Home() {
           ?.slice(0, 80) ||
         "Percakapan baru";
 
+      const updatedChat = {
+        id: historyId,
+
+        chatId:
+          currentChatId !== null &&
+          currentChatId !== undefined
+            ? Number(currentChatId)
+            : null,
+
+        title,
+
+        messages: [...messages],
+
+        updatedAt: Date.now(),
+      };
+
       setHistory((prev) => {
+        const cleaned = cleanHistory(prev);
+
+        // Cari berdasarkan ID lokal
         const existingIndex =
-          prev.findIndex(
+          cleaned.findIndex(
             (chat) =>
-              chat.id === historyId
+              String(chat.id) ===
+              String(historyId)
           );
-
-        const updatedChat = {
-          id: historyId,
-
-          // chat ID dari backend
-          chatId:
-            currentChatId
-              ? Number(
-                  currentChatId
-                )
-              : null,
-
-          title,
-
-          messages: [...messages],
-
-          updatedAt: Date.now(),
-        };
 
         let newHistory;
 
         if (existingIndex >= 0) {
-          newHistory = [...prev];
+          newHistory = [...cleaned];
 
-          newHistory[
-            existingIndex
-          ] = updatedChat;
+          newHistory[existingIndex] =
+            updatedChat;
         } else {
+          // Pastikan tidak ada chat backend yang sama
+          const withoutDuplicate =
+            cleaned.filter(
+              (chat) =>
+                getChatKey(chat) !==
+                getChatKey(updatedChat)
+            );
+
           newHistory = [
             updatedChat,
-            ...prev,
+            ...withoutDuplicate,
           ];
         }
 
-        try {
-          localStorage.setItem(
-            userKey,
-            JSON.stringify(
-              newHistory
-            )
-          );
-        } catch (error) {
-          console.log(
-            "Gagal menyimpan history:",
-            error
-          );
-        }
-
-        return newHistory;
+        return cleanHistory(newHistory);
       });
     } catch (error) {
-      console.log(
+      console.error(
         "Auto history error:",
         error
       );
     }
-  }, [
-    messages,
-    currentChatId,
-  ]);
+  }, [messages, currentChatId]);
 
   // ==========================================
-  // TERIMA CHAT YANG DIPILIH SIDEBAR
+  // TERIMA CHAT DARI SIDEBAR
   // ==========================================
 
   useEffect(() => {
     const handleLoadChat = (event) => {
-      const chatId =
-        event.detail?.chatId;
+      const detail =
+        event.detail || {};
 
-      if (chatId) {
+      // Pulihkan ID lokal history
+      if (
+        detail.historyId !== undefined &&
+        detail.historyId !== null
+      ) {
+        activeHistoryIdRef.current =
+          detail.historyId;
+      }
+
+      // Pulihkan chat ID backend
+      if (
+        detail.chatId !== undefined &&
+        detail.chatId !== null
+      ) {
         setCurrentChatId(
-          Number(chatId)
+          Number(detail.chatId)
         );
+      } else {
+        setCurrentChatId(null);
       }
     };
 
@@ -356,38 +587,34 @@ function Home() {
   useEffect(() => {
     let banner = null;
 
-    const tampilkanBanner =
-      async () => {
-        try {
-          await AdMob.start();
+    const tampilkanBanner = async () => {
+      try {
+        await AdMob.start();
 
-          banner =
-            new BannerAd({
-              adUnitId:
-                "ca-app-pub-5699049952148750/4400311367",
-              position: "bottom",
-            });
+        banner = new BannerAd({
+          adUnitId:
+            "ca-app-pub-5699049952148750/4400311367",
+          position: "bottom",
+        });
 
-          await banner.show();
+        await banner.show();
 
-          console.log(
-            "Banner AdMob berhasil ditampilkan"
-          );
-        } catch (error) {
-          console.error(
-            "AdMob error:",
-            error
-          );
-        }
-      };
+        console.log(
+          "Banner AdMob berhasil ditampilkan"
+        );
+      } catch (error) {
+        console.error(
+          "AdMob error:",
+          error
+        );
+      }
+    };
 
     tampilkanBanner();
 
     return () => {
       if (banner) {
-        banner.hide().catch(
-          () => {}
-        );
+        banner.hide().catch(() => {});
       }
     };
   }, []);
@@ -402,28 +629,23 @@ function Home() {
 
     if (!file) return;
 
-    if (
-      !file.type.startsWith(
-        "image/"
-      )
-    ) {
+    if (!file.type.startsWith("image/")) {
       alert(
         "Silakan pilih file gambar."
       );
 
       event.target.value = "";
+
       return;
     }
 
-    if (
-      file.size >
-      10 * 1024 * 1024
-    ) {
+    if (file.size > 10 * 1024 * 1024) {
       alert(
         "Ukuran gambar maksimal 10 MB."
       );
 
       event.target.value = "";
+
       return;
     }
 
@@ -432,25 +654,20 @@ function Home() {
     const previewUrl =
       URL.createObjectURL(file);
 
-    setImagePreview(
-      previewUrl
-    );
+    setImagePreview(previewUrl);
   };
 
   const hapusGambar = () => {
     setSelectedImage(null);
 
     if (imagePreview) {
-      URL.revokeObjectURL(
-        imagePreview
-      );
+      URL.revokeObjectURL(imagePreview);
     }
 
     setImagePreview(null);
 
     if (fileInputRef.current) {
-      fileInputRef.current.value =
-        "";
+      fileInputRef.current.value = "";
     }
   };
 
@@ -459,28 +676,21 @@ function Home() {
   // ==========================================
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView(
-      {
-        behavior: "smooth",
-      }
-    );
-  }, [
-    messages,
-    loading,
-  ]);
+    chatEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }, [messages, loading]);
 
   // ==========================================
   // PAGE LOADING
   // ==========================================
 
   useEffect(() => {
-    const timer =
-      setTimeout(() => {
-        setPageLoading(false);
-      }, 1800);
+    const timer = setTimeout(() => {
+      setPageLoading(false);
+    }, 1800);
 
-    return () =>
-      clearTimeout(timer);
+    return () => clearTimeout(timer);
   }, []);
 
   // ==========================================
@@ -490,9 +700,7 @@ function Home() {
   useEffect(() => {
     return () => {
       if (imagePreview) {
-        URL.revokeObjectURL(
-          imagePreview
-        );
+        URL.revokeObjectURL(imagePreview);
       }
     };
   }, [imagePreview]);
@@ -500,21 +708,17 @@ function Home() {
   // ==========================================
   // CHAT BARU
   // ==========================================
-  /*
-    SEKARANG fungsi ini TIDAK menyimpan
-    history lagi.
-
-    History sudah otomatis disimpan
-    oleh useEffect di atas.
-  */
 
   const chatBaru = () => {
+    // Hanya reset chat aktif
+    // History tidak dihapus
+
     setMessages([]);
 
     setCurrentChatId(null);
 
-    activeHistoryIdRef.current =
-      null;
+    // Percakapan berikutnya mendapat ID lokal baru
+    activeHistoryIdRef.current = null;
 
     hapusGambar();
   };
@@ -526,13 +730,10 @@ function Home() {
   const fileToBase64 = (file) => {
     return new Promise(
       (resolve, reject) => {
-        const reader =
-          new FileReader();
+        const reader = new FileReader();
 
         reader.onload = () => {
-          resolve(
-            reader.result
-          );
+          resolve(reader.result);
         };
 
         reader.onerror = () => {
@@ -552,205 +753,181 @@ function Home() {
   // KIRIM PESAN
   // ==========================================
 
-  const kirimPesan =
-    async () => {
+  const kirimPesan = async () => {
+    if (
+      (!message.trim() && !selectedImage) ||
+      loading
+    ) {
+      return;
+    }
+
+    const savedUser =
+      localStorage.getItem("user");
+
+    let currentUser = {};
+
+    try {
+      currentUser = savedUser
+        ? JSON.parse(savedUser)
+        : {};
+    } catch (error) {
+      console.error(
+        "Data user tidak valid:",
+        error
+      );
+
+      currentUser = {};
+    }
+
+    const userId = Number(
+      currentUser?.id
+    );
+
+    if (
+      !Number.isInteger(userId) ||
+      userId <= 0
+    ) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Sesi login kamu tidak valid. Silakan logout lalu login kembali.",
+        },
+      ]);
+
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const pesanText =
+        message.trim() ||
+        "Tolong analisis gambar ini.";
+
+      let imageBase64 = null;
+
+      if (selectedImage) {
+        imageBase64 =
+          await fileToBase64(
+            selectedImage
+          );
+      }
+
+      // ======================================
+      // PESAN USER
+      // ======================================
+
+      const userMessage = {
+        role: "user",
+        content: pesanText,
+        image: imagePreview || null,
+      };
+
+      // Pastikan ID history sudah dibuat
+      if (!activeHistoryIdRef.current) {
+        activeHistoryIdRef.current =
+          `local_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        userMessage,
+      ]);
+
+      setMessage("");
+
+      // ======================================
+      // BACKEND
+      // ======================================
+
+      const res = await axios.post(
+        "/chat",
+        {
+          message: pesanText,
+
+          user_id: userId,
+
+          chat_id:
+            currentChatId
+              ? Number(currentChatId)
+              : null,
+
+          image: imageBase64,
+        }
+      );
+
+      // ======================================
+      // CHAT ID BACKEND
+      // ======================================
+
       if (
-        (!message.trim() &&
-          !selectedImage) ||
-        loading
+        res.data?.chat_id !== undefined &&
+        res.data?.chat_id !== null
       ) {
-        return;
+        setCurrentChatId(
+          Number(res.data.chat_id)
+        );
       }
 
-      const savedUser =
-        localStorage.getItem(
-          "user"
+      // ======================================
+      // JAWABAN AI
+      // ======================================
+
+      const jawabanAI =
+        bersihkanJawabanAI(
+          res.data?.reply
         );
 
-      let currentUser = {};
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            jawabanAI ||
+            "AI tidak memberikan jawaban.",
+        },
+      ]);
 
-      try {
-        currentUser =
-          savedUser
-            ? JSON.parse(
-                savedUser
-              )
-            : {};
-      } catch (error) {
-        console.error(
-          "Data user tidak valid:",
-          error
-        );
+      hapusGambar();
+    } catch (err) {
+      console.error(
+        "Kirim pesan error:",
+        err
+      );
 
-        currentUser = {};
+      let errorMessage =
+        "Terjadi kesalahan saat menghubungi AI.";
+
+      if (err.response) {
+        const backendError =
+          err.response?.data?.error ||
+          err.response?.data?.message;
+
+        errorMessage =
+          backendError ||
+          `Backend mengembalikan error ${err.response.status}.`;
+      } else if (err.request) {
+        errorMessage =
+          "Backend tidak dapat dihubungi. Periksa koneksi internet atau status server.";
+      } else if (err.message) {
+        errorMessage = err.message;
       }
 
-      const userId =
-        Number(
-          currentUser?.id
-        );
-
-      if (
-        !Number.isInteger(
-          userId
-        ) ||
-        userId <= 0
-      ) {
-        setMessages(
-          (prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content:
-                "Sesi login kamu tidak valid. Silakan logout lalu login kembali.",
-            },
-          ]
-        );
-
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        const pesanText =
-          message.trim() ||
-          "Tolong analisis gambar ini.";
-
-        let imageBase64 = null;
-
-        if (selectedImage) {
-          imageBase64 =
-            await fileToBase64(
-              selectedImage
-            );
-        }
-
-        // ======================================
-        // PESAN USER
-        // ======================================
-
-        const userMessage = {
-          role: "user",
-          content: pesanText,
-          image:
-            imagePreview || null,
-        };
-
-        setMessages(
-          (prev) => [
-            ...prev,
-            userMessage,
-          ]
-        );
-
-        setMessage("");
-
-        // ======================================
-        // BACKEND
-        // ======================================
-
-        const res =
-          await axios.post(
-            "/chat",
-            {
-              message:
-                pesanText,
-
-              user_id:
-                userId,
-
-              chat_id:
-                currentChatId
-                  ? Number(
-                      currentChatId
-                    )
-                  : null,
-
-              image:
-                imageBase64,
-            }
-          );
-
-        // ======================================
-        // CHAT ID BACKEND
-        // ======================================
-
-        if (
-          res.data?.chat_id
-        ) {
-          setCurrentChatId(
-            res.data.chat_id
-          );
-        }
-
-        // ======================================
-        // JAWABAN AI
-        // ======================================
-
-        const jawabanAI =
-          bersihkanJawabanAI(
-            res.data?.reply
-          );
-
-        setMessages(
-          (prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content:
-                jawabanAI ||
-                "AI tidak memberikan jawaban.",
-            },
-          ]
-        );
-
-        hapusGambar();
-      } catch (err) {
-        console.error(
-          "Kirim pesan error:",
-          err
-        );
-
-        let errorMessage =
-          "Terjadi kesalahan saat menghubungi AI.";
-
-        if (err.response) {
-          const backendError =
-            err.response?.data
-              ?.error ||
-            err.response?.data
-              ?.message;
-
-          errorMessage =
-            backendError ||
-            `Backend mengembalikan error ${err.response.status}.`;
-        } else if (
-          err.request
-        ) {
-          errorMessage =
-            "Backend tidak dapat dihubungi. Periksa koneksi internet atau status server.";
-        } else if (
-          err.message
-        ) {
-          errorMessage =
-            err.message;
-        }
-
-        setMessages(
-          (prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content:
-                errorMessage,
-            },
-          ]
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: errorMessage,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ==========================================
   // LOADING
@@ -766,376 +943,341 @@ function Home() {
 
   return (
     <>
-      <style>
-        {`
-          .home-page {
-            min-height: 100dvh;
-            height: 100dvh;
-            display: flex;
-            overflow: hidden;
-            color: #fff;
+      <style>{`
+        .home-page {
+          min-height: 100dvh;
+          height: 100dvh;
+          display: flex;
+          overflow: hidden;
+          color: #fff;
+          background:
+            radial-gradient(
+              circle at 50% -20%,
+              rgba(0,194,255,.09),
+              transparent 35%
+            ),
+            #081420;
+        }
 
-            background:
-              radial-gradient(
-                circle at 50% -20%,
-                rgba(0,194,255,.09),
-                transparent 35%
-              ),
-              #081420;
-          }
+        .home-main {
+          flex: 1;
+          min-width: 0;
+          height: 100dvh;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+        }
 
-          .home-main {
-            flex: 1;
-            min-width: 0;
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-          }
+        .home-header {
+          flex-shrink: 0;
+          position: relative;
+          z-index: 10;
+        }
 
-          .home-header {
-            flex-shrink: 0;
-            position: relative;
-            z-index: 10;
-          }
+        .home-header-container {
+          width: 100%;
+          max-width: none;
+          margin: 0;
+          padding: 0;
+        }
 
+        .home-chat-area {
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        .home-chat-container {
+          width: 100%;
+          height: 100%;
+          max-width: 1100px;
+          margin: auto;
+          padding: 0 22px;
+        }
+
+        .home-chat-column {
+          height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .home-messages {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 12px 4px 165px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          scrollbar-width: thin;
+          scrollbar-color: #1B3445 transparent;
+        }
+
+        .home-welcome {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 25px 10px 40px;
+        }
+
+        .home-welcome-content {
+          width: 100%;
+          max-width: 720px;
+          text-align: center;
+        }
+
+        .home-logo-wrapper {
+          position: relative;
+          width: 96px;
+          height: 96px;
+          margin: 0 auto 24px;
+        }
+
+        .home-logo-glow {
+          position: absolute;
+          inset: -28px;
+          border-radius: 50%;
+          background: rgba(0,194,255,.08);
+          filter: blur(28px);
+        }
+
+        .home-logo-box {
+          position: relative;
+          width: 96px;
+          height: 96px;
+          border-radius: 27px;
+          overflow: hidden;
+          border: 1px solid rgba(24,216,255,.2);
+          box-shadow: 0 18px 55px rgba(0,194,255,.15);
+        }
+
+        .home-logo-box img {
+          width: 100%;
+          height: 100%;
+          display: block;
+          object-fit: cover;
+        }
+
+        .home-title {
+          margin: 0;
+          color: #fff;
+          font-size: clamp(28px, 5vw, 43px);
+          font-weight: 800;
+          letter-spacing: -1.5px;
+          line-height: 1.15;
+        }
+
+        .home-title span {
+          color: #00C2FF;
+        }
+
+        .home-subtitle {
+          margin: 12px 0 0;
+          color: #CDE4ED;
+          font-size: clamp(14px, 2vw, 18px);
+          font-weight: 600;
+        }
+
+        .home-description {
+          max-width: 570px;
+          margin: 10px auto 0;
+          color: #71899A;
+          font-size: 13px;
+          line-height: 1.7;
+        }
+
+        .home-suggestions {
+          margin-top: 22px;
+          display: flex;
+          justify-content: center;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .home-suggestion-button {
+          padding: 9px 14px;
+          border: 1px solid rgba(0,194,255,.13);
+          border-radius: 999px;
+          background: rgba(13,35,49,.72);
+          color: #8EACBC;
+          font-size: 11px;
+          cursor: pointer;
+          transition: .2s ease;
+        }
+
+        .home-suggestion-button:hover {
+          color: #DDF8FF;
+          border-color: rgba(0,194,255,.35);
+          background: rgba(0,194,255,.08);
+          transform: translateY(-1px);
+        }
+
+        .home-input-area {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 20;
+          padding: 40px 22px 18px;
+          background:
+            linear-gradient(
+              to top,
+              #081420 68%,
+              rgba(8,20,32,.92) 82%,
+              transparent
+            );
+        }
+
+        .home-input-container {
+          width: 100%;
+          max-width: 1100px;
+          margin: auto;
+        }
+
+        .home-input-row {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .home-input-row > * {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .home-disclaimer {
+          margin-top: 7px;
+          text-align: center;
+          color: #435C6D;
+          font-size: 9px;
+        }
+
+        .home-image-preview {
+          margin-bottom: 9px;
+        }
+
+        .home-image-preview-inner {
+          position: relative;
+          width: min(210px, 70vw);
+          max-height: 140px;
+          overflow: hidden;
+          border-radius: 15px;
+          border: 1px solid rgba(24,216,255,.18);
+          background: rgba(10,31,45,.95);
+        }
+
+        .home-image-preview-inner img {
+          display: block;
+          width: 100%;
+          max-height: 140px;
+          object-fit: cover;
+        }
+
+        .home-image-remove {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          width: 29px;
+          height: 29px;
+          border: 0;
+          border-radius: 50%;
+          background: rgba(5,15,24,.82);
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .home-image-label {
+          position: absolute;
+          left: 7px;
+          bottom: 7px;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 5px 8px;
+          border-radius: 999px;
+          background: rgba(5,15,24,.78);
+          color: #D8F6FF;
+          font-size: 9px;
+        }
+
+        @media (max-width: 767px) {
           .home-header-container {
-            width: 100%;
-            max-width: none;
-            margin: 0;
             padding: 0;
-          }
-
-          .home-chat-area {
-            flex: 1;
-            min-height: 0;
-            overflow: hidden;
+            margin: 0;
+            max-width: none;
           }
 
           .home-chat-container {
-            width: 100%;
-            height: 100%;
-            max-width: 1100px;
-            margin: auto;
-            padding: 0 22px;
-          }
-
-          .home-chat-column {
-            height: 100%;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
+            padding: 0 8px;
           }
 
           .home-messages {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding:
-              12px 4px 165px;
-
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-
-            scrollbar-width: thin;
-            scrollbar-color:
-              #1B3445 transparent;
+            padding: 6px 2px 145px;
+            gap: 10px;
           }
 
           .home-welcome {
-            flex: 1;
-            min-height: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding:
-              25px 10px 40px;
+            padding: 15px 8px 30px;
           }
 
-          .home-welcome-content {
-            width: 100%;
-            max-width: 720px;
-            text-align: center;
+          .home-logo-wrapper,
+          .home-logo-box {
+            width: 78px;
+            height: 78px;
           }
 
           .home-logo-wrapper {
-            position: relative;
-            width: 96px;
-            height: 96px;
-            margin: 0 auto 24px;
-          }
-
-          .home-logo-glow {
-            position: absolute;
-            inset: -28px;
-            border-radius: 50%;
-            background:
-              rgba(0,194,255,.08);
-            filter: blur(28px);
-          }
-
-          .home-logo-box {
-            position: relative;
-            width: 96px;
-            height: 96px;
-            border-radius: 27px;
-            overflow: hidden;
-            border:
-              1px solid rgba(24,216,255,.2);
-            box-shadow:
-              0 18px 55px
-              rgba(0,194,255,.15);
-          }
-
-          .home-logo-box img {
-            width: 100%;
-            height: 100%;
-            display: block;
-            object-fit: cover;
+            margin-bottom: 17px;
           }
 
           .home-title {
-            margin: 0;
-            color: #fff;
-            font-size:
-              clamp(28px, 5vw, 43px);
-            font-weight: 800;
-            letter-spacing: -1.5px;
-            line-height: 1.15;
-          }
-
-          .home-title span {
-            color: #00C2FF;
+            font-size: clamp(25px, 8vw, 34px);
+            letter-spacing: -.9px;
           }
 
           .home-subtitle {
-            margin:
-              12px 0 0;
-            color: #CDE4ED;
-            font-size:
-              clamp(14px, 2vw, 18px);
-            font-weight: 600;
+            font-size: 14px;
+            margin-top: 9px;
           }
 
           .home-description {
-            max-width: 570px;
-            margin:
-              10px auto 0;
-            color: #71899A;
-            font-size: 13px;
-            line-height: 1.7;
+            padding: 0 12px;
+            font-size: 11px;
+            line-height: 1.6;
           }
 
           .home-suggestions {
-            margin-top: 22px;
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 8px;
+            margin-top: 15px;
+            gap: 6px;
           }
 
           .home-suggestion-button {
-            padding: 9px 14px;
-            border:
-              1px solid
-              rgba(0,194,255,.13);
-            border-radius: 999px;
-            background:
-              rgba(13,35,49,.72);
-            color: #8EACBC;
-            font-size: 11px;
-            cursor: pointer;
-            transition: .2s ease;
-          }
-
-          .home-suggestion-button:hover {
-            color: #DDF8FF;
-            border-color:
-              rgba(0,194,255,.35);
-            background:
-              rgba(0,194,255,.08);
-            transform:
-              translateY(-1px);
+            padding: 8px 10px;
+            font-size: 10px;
           }
 
           .home-input-area {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 20;
-
             padding:
-              40px 22px 18px;
-
-            background:
-              linear-gradient(
-                to top,
-                #081420 68%,
-                rgba(8,20,32,.92) 82%,
-                transparent
+              28px 8px
+              calc(
+                9px +
+                env(safe-area-inset-bottom)
               );
           }
 
-          .home-input-container {
-            width: 100%;
-            max-width: 1100px;
-            margin: auto;
-          }
-
-          .home-input-row {
-            width: 100%;
-            min-width: 0;
-          }
-
-          .home-input-row > * {
-            width: 100%;
-            min-width: 0;
-          }
-
           .home-disclaimer {
-            margin-top: 7px;
-            text-align: center;
-            color: #435C6D;
-            font-size: 9px;
+            font-size: 8px;
           }
-
-          .home-image-preview {
-            margin-bottom: 9px;
-          }
-
-          .home-image-preview-inner {
-            position: relative;
-            width: min(210px, 70vw);
-            max-height: 140px;
-            overflow: hidden;
-            border-radius: 15px;
-            border:
-              1px solid rgba(24,216,255,.18);
-            background:
-              rgba(10,31,45,.95);
-          }
-
-          .home-image-preview-inner img {
-            display: block;
-            width: 100%;
-            max-height: 140px;
-            object-fit: cover;
-          }
-
-          .home-image-remove {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            width: 29px;
-            height: 29px;
-            border: 0;
-            border-radius: 50%;
-            background:
-              rgba(5,15,24,.82);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-          }
-
-          .home-image-label {
-            position: absolute;
-            left: 7px;
-            bottom: 7px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 5px 8px;
-            border-radius: 999px;
-            background:
-              rgba(5,15,24,.78);
-            color: #D8F6FF;
-            font-size: 9px;
-          }
-
-          @media (max-width: 767px) {
-            .home-header-container {
-              padding: 0;
-              margin: 0;
-              max-width: none;
-            }
-
-            .home-chat-container {
-              padding:
-                0 8px;
-            }
-
-            .home-messages {
-              padding:
-                6px 2px 145px;
-              gap: 10px;
-            }
-
-            .home-welcome {
-              padding:
-                15px 8px 30px;
-            }
-
-            .home-logo-wrapper,
-            .home-logo-box {
-              width: 78px;
-              height: 78px;
-            }
-
-            .home-logo-wrapper {
-              margin-bottom: 17px;
-            }
-
-            .home-title {
-              font-size:
-                clamp(25px, 8vw, 34px);
-              letter-spacing: -.9px;
-            }
-
-            .home-subtitle {
-              font-size: 14px;
-              margin-top: 9px;
-            }
-
-            .home-description {
-              padding: 0 12px;
-              font-size: 11px;
-              line-height: 1.6;
-            }
-
-            .home-suggestions {
-              margin-top: 15px;
-              gap: 6px;
-            }
-
-            .home-suggestion-button {
-              padding:
-                8px 10px;
-              font-size: 10px;
-            }
-
-            .home-input-area {
-              padding:
-                28px 8px
-                calc(
-                  9px +
-                  env(safe-area-inset-bottom)
-                );
-            }
-
-            .home-disclaimer {
-              font-size: 8px;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
 
       <div className="home-page">
-
         <Sidebar
           messages={messages}
           setMessages={setMessages}
@@ -1145,7 +1287,6 @@ function Home() {
         />
 
         <main className="home-main">
-
           <div className="home-header">
             <div className="home-header-container">
               <Header />
@@ -1154,7 +1295,6 @@ function Home() {
 
           <div className="home-chat-area">
             <div className="home-chat-container">
-
               <Row
                 style={{
                   height: "100%",
@@ -1168,9 +1308,7 @@ function Home() {
                     padding: 0,
                   }}
                 >
-
                   <div className="home-messages">
-
                     {messages.length === 0 &&
                       !loading && (
                         <Welcome
@@ -1187,30 +1325,20 @@ function Home() {
                       />
                     )}
 
-                    {loading && (
-                      <Typing />
-                    )}
+                    {loading && <Typing />}
 
-                    <div
-                      ref={chatEndRef}
-                    />
-
+                    <div ref={chatEndRef} />
                   </div>
-
                 </Col>
               </Row>
-
             </div>
           </div>
 
           <div className="home-input-area">
             <div className="home-input-container">
-
               {imagePreview && (
                 <div className="home-image-preview">
-
                   <div className="home-image-preview-inner">
-
                     <img
                       src={imagePreview}
                       alt="Preview gambar"
@@ -1229,14 +1357,11 @@ function Home() {
                       <FiImage size={13} />
                       Gambar siap dianalisis
                     </div>
-
                   </div>
-
                 </div>
               )}
 
               <div className="home-input-row">
-
                 <ChatInput
                   message={message}
                   setMessage={setMessage}
@@ -1247,17 +1372,15 @@ function Home() {
                   imagePreview={imagePreview}
                   hapusGambar={hapusGambar}
                 />
-
               </div>
 
               <div className="home-disclaimer">
-                AI.Ind dapat membuat kesalahan.
-                Periksa kembali informasi penting.
+                AI.Ind dapat membuat
+                kesalahan. Periksa kembali
+                informasi penting.
               </div>
-
             </div>
           </div>
-
         </main>
       </div>
     </>
@@ -1265,4 +1388,3 @@ function Home() {
 }
 
 export default Home;
-
