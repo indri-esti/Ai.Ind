@@ -551,10 +551,92 @@ function Home() {
   }, []);
 
   // ==========================================
+  // FIX VIEWPORT HEIGHT (100dvh sering "nyangkut"
+  // saat WebView native di-resize, misalnya oleh
+  // banner AdMob). Kita hitung ulang manual dan
+  // simpan sebagai CSS variable --app-height.
+  // ==========================================
+  useEffect(() => {
+    const setViewportHeight = () => {
+      document.documentElement.style.setProperty(
+        "--app-height",
+        `${window.innerHeight}px`
+      );
+    };
+
+    setViewportHeight();
+
+    window.addEventListener(
+      "resize",
+      setViewportHeight
+    );
+
+    window.addEventListener(
+      "orientationchange",
+      setViewportHeight
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        setViewportHeight
+      );
+
+      window.removeEventListener(
+        "orientationchange",
+        setViewportHeight
+      );
+    };
+  }, []);
+
+  // ==========================================
   // ADMOB
   // ==========================================
   useEffect(() => {
     let banner = null;
+
+    // Banner AdMob adalah native view yang duduk DI
+    // ATAS WebView (bukan elemen HTML), jadi bisa
+    // menutupi tombol + dan kirim secara fisik meski
+    // z-index CSS sudah benar. Untuk itu kita cadangkan
+    // ruang di bawah lewat CSS variable --admob-banner-height.
+
+    // 1) Fallback aman: begitu terdeteksi jalan di
+    //    Android/iOS native, langsung cadangkan ruang
+    //    seukuran banner standar (~60px) sebagai jaga-jaga.
+    const platform =
+      window.Capacitor?.getPlatform?.();
+
+    if (
+      platform === "android" ||
+      platform === "ios"
+    ) {
+      document.documentElement.style.setProperty(
+        "--admob-banner-height",
+        "60px"
+      );
+    }
+
+    // 2) Begitu ukuran banner ASLI diketahui dari plugin,
+    //    timpa nilai fallback di atas dengan nilai yang tepat.
+    const handleBannerSize = (event) => {
+      const height =
+        event?.detail?.size?.height ||
+        event?.detail?.height ||
+        0;
+
+      if (height > 0) {
+        document.documentElement.style.setProperty(
+          "--admob-banner-height",
+          `${height}px`
+        );
+      }
+    };
+
+    document.addEventListener(
+      "admob.banner.size",
+      handleBannerSize
+    );
 
     const tampilkanBanner = async () => {
       try {
@@ -577,12 +659,29 @@ function Home() {
           "AdMob error:",
           error
         );
+
+        // Gagal tampil (mis. testing di browser biasa) ->
+        // pastikan tidak ada ruang kosong yang dicadangkan.
+        document.documentElement.style.setProperty(
+          "--admob-banner-height",
+          "0px"
+        );
       }
     };
 
     tampilkanBanner();
 
     return () => {
+      document.removeEventListener(
+        "admob.banner.size",
+        handleBannerSize
+      );
+
+      document.documentElement.style.setProperty(
+        "--admob-banner-height",
+        "0px"
+      );
+
       if (banner) {
         banner.hide().catch(() => {});
       }
@@ -989,6 +1088,7 @@ function Home() {
           flex: 1;
           min-width: 0;
           height: 100dvh;
+          height: var(--app-height, 100dvh);
           display: flex;
           flex-direction: column;
           position: relative;
@@ -1149,7 +1249,10 @@ function Home() {
           bottom: 0;
           z-index: 100;
           pointer-events: auto;
-          padding: 40px 22px 18px;
+          padding-top: 40px;
+          padding-left: 22px;
+          padding-right: 22px;
+          padding-bottom: calc(18px + var(--admob-banner-height, 0px));
           background:
             linear-gradient(
               to top,
@@ -1304,12 +1407,14 @@ function Home() {
           }
 
           .home-input-area {
-            padding:
-              28px 8px
-              calc(
-                9px +
-                env(safe-area-inset-bottom)
-              );
+            padding-top: 28px;
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-bottom: calc(
+              9px +
+              env(safe-area-inset-bottom) +
+              var(--admob-banner-height, 0px)
+            );
           }
 
           .home-disclaimer {

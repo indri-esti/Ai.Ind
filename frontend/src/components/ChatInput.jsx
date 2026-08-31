@@ -40,6 +40,8 @@ function ChatInput({
         width: "100%",
         maxWidth: "900px",
         margin: "0 auto",
+        position: "relative",
+        zIndex: 20,
       }}
     >
       {/*
