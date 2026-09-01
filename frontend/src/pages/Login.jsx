@@ -56,15 +56,19 @@ function Login() {
 
       saveUserLogin(res.data.user);
 
-      Swal.fire({
-        icon: "success",
-        title: "Login Berhasil",
-        timer: 1200,
-        showConfirmButton: false,
-        ...alertStyle,
-      });
+// Login Berhasil
+Swal.fire({
+  icon: "success",
+  title: "Login Berhasil",
+  timer: 700,
+  showConfirmButton: false,
+  ...alertStyle,
+});
 
-      setTimeout(() => navigate("/"), 1200);
+setTimeout(() => navigate("/"), 700);
+
+
+
     } catch (err) {
       Swal.fire({
         icon: "error",
