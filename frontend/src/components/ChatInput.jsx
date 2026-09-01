@@ -13,18 +13,8 @@ function ChatInput({
 }) {
   const handleKirim = () => {
     if (loading) return;
-
     if (!message.trim() && !imagePreview) return;
-
     kirimPesan();
-  };
-
-  const handlePlusClick = () => {
-    if (loading) return;
-
-    if (fileInputRef?.current) {
-      fileInputRef.current.click();
-    }
   };
 
   return (
@@ -64,42 +54,53 @@ function ChatInput({
         ========================================== */
 
         .home-plus-wrapper {
-          position: relative;
-
-          width: 52px;
-          height: 46px;
-
-          min-width: 52px;
-          min-height: 46px;
-
-          max-width: 52px;
-          max-height: 46px;
-
-          flex: 0 0 52px;
-
-          margin: 0;
-          padding: 0;
-
-          display: block;
-
-          z-index: 1000000;
-
-          overflow: visible;
-
-          pointer-events: auto;
-
+          position: relative !important;
+          width: 52px !important;
+          height: 46px !important;
+          min-width: 52px !important;
+          min-height: 46px !important;
+          max-width: 52px !important;
+          max-height: 46px !important;
+          flex: 0 0 52px !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          display: block !important;
+          z-index: 1000000 !important;
+          overflow: visible !important;
+          pointer-events: auto !important;
           box-sizing: border-box;
-
-          touch-action: manipulation;
+          isolation: isolate;
+          touch-action: manipulation !important;
         }
 
         /* ==========================================
-           TOMBOL PLUS
+           FILE INPUT
+           Input tetap terhubung ke LABEL.
+           Tidak menjadi hitbox di atas tombol.
+        ========================================== */
+
+        .home-plus-file {
+          position: absolute !important;
+          width: 1px !important;
+          height: 1px !important;
+          padding: 0 !important;
+          margin: -1px !important;
+          overflow: hidden !important;
+          clip: rect(0, 0, 0, 0) !important;
+          clip-path: inset(50%) !important;
+          white-space: nowrap !important;
+          border: 0 !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+
+        /* ==========================================
+           PLUS BUTTON
+           LABEL = SELURUH HITBOX
         ========================================== */
 
         .home-plus-button {
           position: absolute !important;
-
           left: 0 !important;
           top: 0 !important;
 
@@ -122,7 +123,6 @@ function ChatInput({
           justify-content: center !important;
 
           background: #13283F !important;
-
           border: 1px solid rgba(255, 255, 255, 0.09) !important;
 
           color: #D7F6FF !important;
@@ -134,13 +134,12 @@ function ChatInput({
 
           user-select: none;
           -webkit-user-select: none;
-
           -webkit-touch-callout: none;
           -webkit-tap-highlight-color: transparent;
 
           outline: none !important;
 
-          z-index: 1000001;
+          z-index: 1000001 !important;
 
           overflow: hidden;
 
@@ -158,10 +157,32 @@ function ChatInput({
             box-shadow 0.12s ease;
         }
 
-        .home-plus-button:disabled {
+        /* Jangan biarkan style Bootstrap/global
+           mengubah label menjadi sesuatu yang lain */
+
+        .home-plus-button:hover {
+          background: #193652 !important;
+          color: #D7F6FF !important;
+        }
+
+        .home-plus-button:active {
+          background: #00C2FF !important;
+          color: #081420 !important;
+
+          box-shadow:
+            0 0 0 5px rgba(0, 194, 255, 0.15),
+            0 5px 16px rgba(0, 194, 255, 0.35);
+        }
+
+        .home-plus-button.is-disabled {
           opacity: 0.55;
           cursor: not-allowed;
+          pointer-events: none !important;
         }
+
+        /* ==========================================
+           ICON PLUS
+        ========================================== */
 
         .home-plus-icon {
           width: 100%;
@@ -180,52 +201,10 @@ function ChatInput({
           z-index: 1;
         }
 
-        /* ==========================================
-           FILE INPUT
-           
-           BUKAN HITBOX LAGI.
-           Tombol + yang membuka file picker.
-        ========================================== */
-
-        .home-plus-file {
-          position: absolute !important;
-
-          width: 1px !important;
-          height: 1px !important;
-
-          padding: 0 !important;
-          margin: -1px !important;
-
-          overflow: hidden !important;
-
-          clip: rect(0, 0, 0, 0) !important;
-          clip-path: inset(50%) !important;
-
-          white-space: nowrap !important;
-
-          border: 0 !important;
-
-          opacity: 0 !important;
-
+        .home-plus-icon svg {
           pointer-events: none !important;
-        }
-
-        /* ==========================================
-           EFEK VISUAL PLUS
-        ========================================== */
-
-        .home-plus-wrapper:hover .home-plus-button:not(:disabled) {
-          background: #193652 !important;
-        }
-
-        .home-plus-wrapper:active .home-plus-button:not(:disabled) {
-          background: #00C2FF !important;
-
-          color: #081420 !important;
-
-          box-shadow:
-            0 0 0 5px rgba(0, 194, 255, 0.15),
-            0 5px 16px rgba(0, 194, 255, 0.35);
+          user-select: none !important;
+          -webkit-user-select: none !important;
         }
 
         /* ==========================================
@@ -264,25 +243,19 @@ function ChatInput({
           min-width: 0;
 
           resize: none;
-
           overflow-y: auto;
 
           background: transparent !important;
-
           color: #fff !important;
 
           border: none !important;
-
           outline: none !important;
-
           box-shadow: none !important;
 
           font-size: 15px;
-
           line-height: 22px;
 
           min-height: 40px;
-
           max-height: 110px;
 
           padding: 8px 0;
@@ -317,7 +290,6 @@ function ChatInput({
           border: none !important;
 
           display: flex !important;
-
           align-items: center !important;
           justify-content: center !important;
 
@@ -331,7 +303,6 @@ function ChatInput({
           outline: none !important;
 
           position: relative;
-
           z-index: 2;
 
           transition:
@@ -373,16 +344,16 @@ function ChatInput({
           }
 
           .home-plus-wrapper {
-            width: 52px;
-            height: 46px;
+            width: 52px !important;
+            height: 46px !important;
 
-            min-width: 52px;
-            min-height: 46px;
+            min-width: 52px !important;
+            min-height: 46px !important;
 
-            max-width: 52px;
-            max-height: 46px;
+            max-width: 52px !important;
+            max-height: 46px !important;
 
-            flex: 0 0 52px;
+            flex: 0 0 52px !important;
           }
 
           .home-plus-button {
@@ -425,16 +396,16 @@ function ChatInput({
           }
 
           .home-plus-wrapper {
-            width: 50px;
-            height: 46px;
+            width: 50px !important;
+            height: 46px !important;
 
-            min-width: 50px;
-            min-height: 46px;
+            min-width: 50px !important;
+            min-height: 46px !important;
 
-            max-width: 50px;
-            max-height: 46px;
+            max-width: 50px !important;
+            max-height: 46px !important;
 
-            flex: 0 0 50px;
+            flex: 0 0 50px !important;
           }
 
           .home-plus-button {
@@ -460,16 +431,16 @@ function ChatInput({
 
         @media (min-width: 768px) {
           .home-plus-wrapper {
-            width: 52px;
-            height: 46px;
+            width: 52px !important;
+            height: 46px !important;
 
-            min-width: 52px;
-            min-height: 46px;
+            min-width: 52px !important;
+            min-height: 46px !important;
 
-            max-width: 52px;
-            max-height: 46px;
+            max-width: 52px !important;
+            max-height: 46px !important;
 
-            flex: 0 0 52px;
+            flex: 0 0 52px !important;
           }
 
           .home-plus-button {
@@ -499,7 +470,6 @@ function ChatInput({
 
           <div className="home-plus-wrapper">
 
-            {/* FILE INPUT ASLI */}
             <input
               id="chat-image-input"
               ref={fileInputRef}
@@ -507,17 +477,30 @@ function ChatInput({
               accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={pilihGambar}
               disabled={loading}
-              aria-label="Tambah gambar"
               className="home-plus-file"
             />
 
-            {/* TOMBOL PLUS ASLI */}
-            <button
-              type="button"
-              className="home-plus-button"
-              disabled={loading}
+            {/*
+              PENTING:
+              Tidak memakai button + .click() lagi.
+
+              Label langsung terhubung ke input file.
+              Jadi SELURUH area 52x46 adalah hitbox.
+            */}
+
+            <label
+              htmlFor="chat-image-input"
+              className={`home-plus-button ${
+                loading ? "is-disabled" : ""
+              }`}
               aria-label="Tambah gambar"
-              onClick={handlePlusClick}
+              title="Tambah gambar"
+              aria-disabled={loading}
+              onClick={(e) => {
+                if (loading) {
+                  e.preventDefault();
+                }
+              }}
             >
               <span className="home-plus-icon">
                 <FiPlus
@@ -525,7 +508,7 @@ function ChatInput({
                   strokeWidth={2.5}
                 />
               </span>
-            </button>
+            </label>
 
           </div>
 
@@ -598,7 +581,6 @@ function ChatInput({
             </Button>
 
           </div>
-
         </div>
       </Form>
     </div>

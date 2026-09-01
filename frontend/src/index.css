@@ -222,8 +222,15 @@ svg {
  * boleh menerima touch.
  */
 
-.home-input-container * {
-  pointer-events: auto;
+.home-input-container {
+  position: relative;
+  z-index: 999999 !important;
+  isolation: isolate;
+  pointer-events: auto !important;
+}
+
+.home-input-container svg {
+  pointer-events: none;
 }
 
 /*
