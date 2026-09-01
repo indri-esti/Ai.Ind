@@ -233,23 +233,16 @@ svg {
   pointer-events: none;
 }
 
-/*
- * Tetapi icon SVG tidak perlu menerima touch.
- * Touch diteruskan ke tombol +.
- */
-
-.home-input-container svg {
-  pointer-events: none;
-}
-
 /* =====================================================
    CHAT INPUT MODERN
 ===================================================== */
 
 .home-input-row {
   width: 100%;
+
   display: flex;
   align-items: center;
+
   gap: 8px;
 
   position: relative;
@@ -264,18 +257,247 @@ svg {
 }
 
 /* =====================================================
+   CHAT INPUT ROOT
+===================================================== */
+
+.chat-input-root {
+  width: 100%;
+
+  position: relative;
+
+  z-index: 999999 !important;
+
+  pointer-events: auto !important;
+}
+
+/* =====================================================
+   CHAT INPUT ROW
+===================================================== */
+
+.chat-input-row {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  position: relative;
+
+  z-index: 1000000 !important;
+
+  pointer-events: auto !important;
+}
+
+/* =====================================================
+   CHAT INPUT BOX
+===================================================== */
+
+.chat-input-box {
+  flex: 1 1 auto;
+
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  min-height: 46px;
+
+  padding: 4px 5px 4px 16px;
+
+  background: #13283f !important;
+
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+
+  border-radius: 24px;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.24);
+
+  position: relative;
+
+  z-index: 1000000 !important;
+
+  pointer-events: auto !important;
+}
+
+/* =====================================================
+   TEXTAREA
+===================================================== */
+
+.chat-input,
+.chat-input.form-control {
+  flex: 1 1 auto;
+
+  width: 100%;
+
+  min-width: 0;
+
+  min-height: 36px;
+  max-height: 110px;
+
+  resize: none;
+
+  padding: 7px 0 !important;
+  margin: 0 !important;
+
+  background: transparent !important;
+
+  color: #ffffff !important;
+
+  border: none !important;
+
+  outline: none !important;
+
+  box-shadow: none !important;
+
+  border-radius: 0 !important;
+
+  font-size: 14px;
+
+  line-height: 21px;
+
+  appearance: none !important;
+  -webkit-appearance: none !important;
+
+  pointer-events: auto !important;
+}
+
+.chat-input::placeholder {
+  color: #8a9bb5 !important;
+
+  opacity: 1 !important;
+}
+
+.chat-input:hover,
+.chat-input:active,
+.chat-input:focus {
+  background: transparent !important;
+
+  color: #ffffff !important;
+
+  border: none !important;
+
+  outline: none !important;
+
+  box-shadow: none !important;
+}
+
+/* =====================================================
+   SEND BUTTON
+===================================================== */
+
+.send-btn {
+  width: 38px !important;
+  height: 38px !important;
+
+  min-width: 38px !important;
+  min-height: 38px !important;
+
+  padding: 0 !important;
+
+  flex: 0 0 38px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border: none !important;
+
+  border-radius: 50% !important;
+
+  background: #00c2ff !important;
+
+  color: #081420 !important;
+
+  box-shadow: none !important;
+
+  outline: none !important;
+
+  appearance: none !important;
+  -webkit-appearance: none !important;
+
+  cursor: pointer;
+
+  pointer-events: auto !important;
+
+  touch-action: manipulation !important;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #18d0ff !important;
+
+  color: #081420 !important;
+}
+
+.send-btn:active:not(:disabled) {
+  background: #00a9df !important;
+
+  color: #081420 !important;
+}
+
+.send-btn:focus,
+.send-btn:focus-visible {
+  border: none !important;
+
+  outline: none !important;
+
+  box-shadow: none !important;
+}
+
+.send-btn:disabled {
+  background: #52606d !important;
+
+  color: #1e2a35 !important;
+
+  opacity: 0.75 !important;
+
+  cursor: not-allowed !important;
+}
+
+/* =====================================================
+   SEND ICON
+===================================================== */
+
+.send-icon {
+  width: 18px;
+  height: 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  pointer-events: none !important;
+}
+
+.send-icon svg {
+  pointer-events: none !important;
+}
+
+/* =====================================================
    PLUS BUTTON TOUCH FIX
 ===================================================== */
 
 /*
- * PENTING:
  * Jangan mengubah ukuran/posisi tombol.
- * Hanya pastikan seluruh button menjadi
- * touch target dan tidak mendapat border putih.
+ * Seluruh area tombol harus menjadi area touch.
  */
 
 .home-plus-wrapper {
   position: relative !important;
+
+  width: 52px;
+  height: 46px;
+
+  min-width: 52px;
+  min-height: 46px;
+
+  max-width: 52px;
+  max-height: 46px;
+
+  flex: 0 0 52px;
 
   z-index: 1000001 !important;
 
@@ -286,10 +508,83 @@ svg {
   isolation: isolate;
 }
 
+/* =====================================================
+   FILE INPUT
+===================================================== */
+
+.home-plus-file {
+  position: fixed !important;
+
+  width: 1px !important;
+  height: 1px !important;
+
+  margin: -1px !important;
+  padding: 0 !important;
+
+  opacity: 0 !important;
+
+  overflow: hidden !important;
+
+  clip: rect(0, 0, 0, 0) !important;
+
+  clip-path: inset(50%) !important;
+
+  border: 0 !important;
+
+  pointer-events: none !important;
+}
+
+/* =====================================================
+   PLUS BUTTON
+===================================================== */
+
 .home-plus-button {
+  width: 52px !important;
+  height: 46px !important;
+
+  min-width: 52px !important;
+  min-height: 46px !important;
+
+  max-width: 52px !important;
+  max-height: 46px !important;
+
+  flex: 0 0 52px !important;
+
   position: relative !important;
 
-  z-index: 1000002 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  /*
+   * WARNA TOMBOL ASLI
+   */
+  background: #13283f !important;
+
+  color: #d7f6ff !important;
+
+  /*
+   * HILANGKAN GARIS PUTIH
+   */
+  border: none !important;
+
+  outline: none !important;
+
+  border-radius: 23px !important;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.24) !important;
+
+  /*
+   * RESET DEFAULT BROWSER
+   */
+  appearance: none !important;
+  -webkit-appearance: none !important;
+
+  cursor: pointer;
 
   pointer-events: auto !important;
 
@@ -305,27 +600,88 @@ svg {
   transform: none !important;
   -webkit-transform: none !important;
 
-  /*
-   * FIX GARIS PUTIH
-   */
-  border: none !important;
-  outline: none !important;
-
-  /*
-   * Hilangkan tampilan default browser,
-   * tetapi TIDAK mengubah layout/ukuran.
-   */
-  appearance: none !important;
-  -webkit-appearance: none !important;
+  z-index: 1000002 !important;
 }
 
-/*
- * Icon hanya visual.
- * Seluruh touch masuk ke button.
- */
+/* =====================================================
+   PLUS ICON
+===================================================== */
 
-.home-plus-button svg,
-.home-plus-icon {
+.home-plus-button .home-plus-icon {
+  width: 23px;
+  height: 23px;
+
+  display: block;
+
+  flex: 0 0 auto;
+
+  color: inherit;
+
+  pointer-events: none !important;
+
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.home-plus-button svg {
+  pointer-events: none !important;
+}
+
+/* =====================================================
+   PLUS HOVER
+===================================================== */
+
+.home-plus-button:hover:not(:disabled) {
+  background: #193652 !important;
+
+  color: #d7f6ff !important;
+
+  border: none !important;
+}
+
+/* =====================================================
+   PLUS ACTIVE / TOUCH
+===================================================== */
+
+.home-plus-button:active:not(:disabled) {
+  background: #00c2ff !important;
+
+  color: #081420 !important;
+
+  border: none !important;
+
+  box-shadow:
+    0 0 0 5px rgba(0, 194, 255, 0.12),
+    0 5px 16px rgba(0, 194, 255, 0.30) !important;
+}
+
+/* =====================================================
+   PLUS FOCUS
+===================================================== */
+
+.home-plus-button:focus,
+.home-plus-button:focus-visible {
+  background: #13283f !important;
+
+  color: #d7f6ff !important;
+
+  border: none !important;
+
+  outline: none !important;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* =====================================================
+   PLUS DISABLED
+===================================================== */
+
+.home-plus-button:disabled {
+  opacity: 0.55 !important;
+
+  cursor: not-allowed !important;
+
   pointer-events: none !important;
 }
 
@@ -451,6 +807,30 @@ svg {
     pointer-events: auto !important;
   }
 
+  .chat-input-root {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .chat-input-row {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .chat-input-box {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
   .home-plus-wrapper {
     position: relative !important;
 
@@ -474,13 +854,12 @@ svg {
 
     -webkit-tap-highlight-color: transparent !important;
 
-    /*
-     * Tetap tanpa garis putih di HP
-     */
     border: none !important;
+
     outline: none !important;
 
     appearance: none !important;
+
     -webkit-appearance: none !important;
   }
 
@@ -525,6 +904,18 @@ svg {
     z-index: 1000000 !important;
   }
 
+  .chat-input-root {
+    position: relative;
+
+    z-index: 1000000 !important;
+  }
+
+  .chat-input-row {
+    position: relative;
+
+    z-index: 1000000 !important;
+  }
+
   .home-plus-wrapper {
     position: relative;
 
@@ -536,13 +927,12 @@ svg {
 
     z-index: 1000002 !important;
 
-    /*
-     * Tetap tanpa garis putih
-     */
     border: none !important;
+
     outline: none !important;
 
     appearance: none !important;
+
     -webkit-appearance: none !important;
   }
 }
@@ -604,6 +994,30 @@ svg {
     pointer-events: auto !important;
   }
 
+  .chat-input-root {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .chat-input-row {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .chat-input-box {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
   .home-plus-wrapper {
     position: relative !important;
 
@@ -621,13 +1035,12 @@ svg {
 
     touch-action: manipulation !important;
 
-    /*
-     * FIX PUTIH PADA HP
-     */
     border: none !important;
+
     outline: none !important;
 
     appearance: none !important;
+
     -webkit-appearance: none !important;
   }
 }
