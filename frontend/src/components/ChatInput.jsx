@@ -21,15 +21,21 @@ function ChatInput({
     kirimPesan();
   };
 
-  const handlePlusClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  // =========================================================
+  // TOMBOL PLUS
+  // Seluruh area button menjadi area touch.
+  // =========================================================
+  const handlePlusClick = () => {
     if (loading) return;
 
-    if (fileInputRef?.current) {
-      fileInputRef.current.click();
+    const input = fileInputRef?.current;
+
+    if (!input) {
+      console.error("fileInputRef belum terhubung");
+      return;
     }
+
+    input.click();
   };
 
   return (
@@ -49,31 +55,27 @@ function ChatInput({
           <div className="home-plus-wrapper">
             <input
               ref={fileInputRef}
+              id="home-image-input"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={pilihGambar}
               disabled={loading}
               className="home-plus-file"
-              tabIndex="-1"
-              aria-hidden="true"
             />
 
             <button
               type="button"
-              className={`home-plus-button ${
-                loading ? "is-disabled" : ""
-              }`}
+              className="home-plus-button"
               onClick={handlePlusClick}
               disabled={loading}
               aria-label="Tambah gambar"
               title="Tambah gambar"
             >
-              <span className="home-plus-icon">
-                <FiPlus
-                  size={23}
-                  strokeWidth={2.5}
-                />
-              </span>
+              <FiPlus
+                className="home-plus-icon"
+                size={23}
+                strokeWidth={2.5}
+              />
             </button>
           </div>
 
@@ -82,7 +84,6 @@ function ChatInput({
           ================================================== */}
 
           <div className="chat-input-box">
-
             <Form.Control
               as="textarea"
               rows={1}
@@ -91,18 +92,12 @@ function ChatInput({
                 setMessage(e.target.value);
               }}
               onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey
-                ) {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
 
                   if (
                     !loading &&
-                    (
-                      message.trim() ||
-                      imagePreview
-                    )
+                    (message.trim() || imagePreview)
                   ) {
                     handleKirim();
                   }
@@ -121,19 +116,13 @@ function ChatInput({
               className="send-btn"
               disabled={
                 loading ||
-                (
-                  !message.trim() &&
-                  !imagePreview
-                )
+                (!message.trim() && !imagePreview)
               }
             >
               <span className="send-icon">
-                <FaPaperPlane
-                  size={17}
-                />
+                <FaPaperPlane size={17} />
               </span>
             </Button>
-
           </div>
         </div>
       </Form>
@@ -142,3 +131,4 @@ function ChatInput({
 }
 
 export default ChatInput;
+
