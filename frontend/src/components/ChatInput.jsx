@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { Form, Button } from "react-bootstrap";
 import { FaPaperPlane } from "react-icons/fa";
 import { FiPlus } from "react-icons/fi";
@@ -12,74 +11,12 @@ function ChatInput({
   pilihGambar,
   imagePreview,
 }) {
-  // Mencegah event touch + click membuka file picker 2x
-  const touchHandledRef = useRef(false);
-
   const handleKirim = () => {
     if (loading) return;
 
     if (!message.trim() && !imagePreview) return;
 
     kirimPesan();
-  };
-
-  /* ==========================================
-     BUKA FILE INPUT
-     ========================================== */
-
-  const bukaFilePicker = () => {
-    if (loading) return;
-
-    if (!fileInputRef?.current) return;
-
-    fileInputRef.current.click();
-  };
-
-  /* ==========================================
-     TOUCH HP
-     ========================================== */
-
-  const handlePlusTouchStart = (e) => {
-    if (loading) return;
-
-    // Pastikan browser tidak melakukan gesture
-    e.stopPropagation();
-
-    touchHandledRef.current = true;
-  };
-
-  const handlePlusTouchEnd = (e) => {
-    if (loading) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    bukaFilePicker();
-
-    // Beri waktu supaya event click bawaan
-    // tidak menjalankan file picker kedua kali
-    setTimeout(() => {
-      touchHandledRef.current = false;
-    }, 500);
-  };
-
-  /* ==========================================
-     CLICK DESKTOP
-     ========================================== */
-
-  const handlePlusClick = (e) => {
-    if (loading) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Kalau sebelumnya sudah diproses oleh touch,
-    // jangan buka file picker lagi.
-    if (touchHandledRef.current) {
-      return;
-    }
-
-    bukaFilePicker();
   };
 
   return (
@@ -89,8 +26,9 @@ function ChatInput({
         maxWidth: "900px",
         margin: "0 auto",
         position: "relative",
-        zIndex: 99999,
+        zIndex: 999999,
         boxSizing: "border-box",
+        isolation: "isolate",
       }}
     >
       <style>{`
@@ -99,33 +37,23 @@ function ChatInput({
         }
 
         /* ==========================================
-           BARIS UTAMA
-           ========================================== */
+           BARIS CHAT
+        ========================================== */
 
         .chat-input-row {
           width: 100%;
-
           display: flex;
           align-items: center;
-
           gap: 8px;
-
           min-width: 0;
-
           position: relative;
-
+          z-index: 999999;
           box-sizing: border-box;
-
-          z-index: 100000;
         }
 
         /* ==========================================
            PLUS WRAPPER
-
-           Area wrapper dibuat PERSIS sama dengan
-           area tombol supaya koordinat touch HP
-           tidak bergeser.
-           ========================================== */
+        ========================================== */
 
         .home-plus-wrapper {
           position: relative;
@@ -141,65 +69,29 @@ function ChatInput({
 
           flex: 0 0 52px;
 
-          display: block;
-
           margin: 0;
           padding: 0;
 
-          box-sizing: border-box;
+          display: block;
 
-          z-index: 100001;
+          z-index: 1000000;
 
           overflow: visible;
 
           pointer-events: auto;
 
-          transform: translate3d(0, 0, 0);
-          -webkit-transform: translate3d(0, 0, 0);
+          box-sizing: border-box;
         }
 
         /* ==========================================
-           FILE INPUT
-
-           Tetap berada di DOM untuk ref,
-           tetapi tidak ikut menjadi area touch.
-           ========================================== */
-
-        .home-plus-file {
-          position: fixed !important;
-
-          width: 1px !important;
-          height: 1px !important;
-
-          opacity: 0 !important;
-
-          left: -9999px !important;
-          top: -9999px !important;
-
-          pointer-events: none !important;
-
-          border: 0 !important;
-          padding: 0 !important;
-          margin: 0 !important;
-        }
-
-        /* ==========================================
-           PLUS BUTTON
-
-           TOMBOL FISIK = AREA TOUCH.
-
-           Tidak absolute.
-           Tidak label.
-           Tidak ada transform permanen.
-           ========================================== */
+           TOMBOL PLUS
+        ========================================== */
 
         .home-plus-button {
-          position: relative;
+          position: absolute !important;
 
-          display: flex !important;
-
-          align-items: center !important;
-          justify-content: center !important;
+          left: 0 !important;
+          top: 0 !important;
 
           width: 52px !important;
           height: 46px !important;
@@ -210,12 +102,14 @@ function ChatInput({
           max-width: 52px !important;
           max-height: 46px !important;
 
-          flex: 0 0 52px !important;
-
           padding: 0 !important;
           margin: 0 !important;
 
           border-radius: 23px !important;
+
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
 
           background: #13283F !important;
 
@@ -231,78 +125,36 @@ function ChatInput({
           user-select: none;
           -webkit-user-select: none;
 
-          touch-action: manipulation;
           -webkit-touch-callout: none;
           -webkit-tap-highlight-color: transparent;
 
           outline: none !important;
 
-          position: relative;
-
-          z-index: 100002;
+          z-index: 1000001;
 
           overflow: hidden;
 
-          pointer-events: auto !important;
+          pointer-events: none !important;
 
-          /* Membantu Android WebView menentukan
-             hitbox berdasarkan posisi elemen aktual */
-          transform: translate3d(0, 0, 0);
-          -webkit-transform: translate3d(0, 0, 0);
+          box-sizing: border-box;
+
+          transform: none !important;
+          -webkit-transform: none !important;
 
           transition:
             background-color 0.12s ease,
             box-shadow 0.12s ease;
         }
 
-        .home-plus-button:hover:not(:disabled) {
-          background: #193652 !important;
-        }
-
-        .home-plus-button:active:not(:disabled) {
-          background: #00C2FF !important;
-
-          color: #081420 !important;
-
-          box-shadow:
-            0 0 0 5px rgba(0, 194, 255, 0.15),
-            0 5px 16px rgba(0, 194, 255, 0.35);
-
-          transform: scale(0.92);
-          -webkit-transform: scale(0.92);
-        }
-
-        .home-plus-button:focus,
-        .home-plus-button:focus-visible {
-          outline: none !important;
-
-          box-shadow:
-            0 8px 24px rgba(0, 0, 0, 0.24) !important;
-        }
-
         .home-plus-button:disabled {
           opacity: 0.55;
-
-          cursor: not-allowed;
-
-          pointer-events: none !important;
         }
 
-        /* ==========================================
-           ICON
-
-           Icon sama sekali tidak menerima touch.
-           Semua touch masuk ke BUTTON.
-           ========================================== */
-
         .home-plus-icon {
-          position: relative;
-
           width: 100%;
           height: 100%;
 
           display: flex;
-
           align-items: center;
           justify-content: center;
 
@@ -311,20 +163,92 @@ function ChatInput({
           user-select: none;
           -webkit-user-select: none;
 
+          position: relative;
           z-index: 1;
         }
 
         /* ==========================================
+           FILE INPUT
+
+           INI YANG MENJADI HITBOX ASLI DI HP.
+
+           Seluruh area tombol 52x46 menjadi
+           input file transparan.
+        ========================================== */
+
+        .home-plus-file {
+          position: absolute !important;
+
+          left: 0 !important;
+          top: 0 !important;
+
+          width: 52px !important;
+          height: 46px !important;
+
+          min-width: 52px !important;
+          min-height: 46px !important;
+
+          max-width: 52px !important;
+          max-height: 46px !important;
+
+          margin: 0 !important;
+          padding: 0 !important;
+
+          opacity: 0 !important;
+
+          border: 0 !important;
+
+          display: block !important;
+
+          cursor: pointer !important;
+
+          pointer-events: auto !important;
+
+          z-index: 1000002;
+
+          box-sizing: border-box;
+
+          touch-action: manipulation !important;
+
+          -webkit-tap-highlight-color: transparent;
+          -webkit-touch-callout: none;
+        }
+
+        .home-plus-wrapper:has(.home-plus-file:disabled) {
+          pointer-events: none;
+        }
+
+        /* ==========================================
+           EFEK VISUAL PLUS
+
+           Karena input transparan berada di atas,
+           tombol visual tetap menerima state
+           berdasarkan wrapper.
+        ========================================== */
+
+        .home-plus-wrapper:hover .home-plus-button:not(:disabled) {
+          background: #193652 !important;
+        }
+
+        .home-plus-wrapper:active .home-plus-button:not(:disabled) {
+          background: #00C2FF !important;
+
+          color: #081420 !important;
+
+          box-shadow:
+            0 0 0 5px rgba(0, 194, 255, 0.15),
+            0 5px 16px rgba(0, 194, 255, 0.35);
+        }
+
+        /* ==========================================
            INPUT CHAT
-           ========================================== */
+        ========================================== */
 
         .chat-input-box {
           flex: 1;
-
           min-width: 0;
 
           display: flex;
-
           align-items: center;
 
           gap: 10px;
@@ -350,7 +274,6 @@ function ChatInput({
 
         .chat-input {
           flex: 1;
-
           min-width: 0;
 
           resize: none;
@@ -388,7 +311,7 @@ function ChatInput({
 
         /* ==========================================
            SEND BUTTON
-           ========================================== */
+        ========================================== */
 
         .send-btn {
           width: 46px !important;
@@ -432,7 +355,6 @@ function ChatInput({
         .send-btn:focus,
         .send-btn:focus-visible {
           outline: none !important;
-
           box-shadow: none !important;
         }
 
@@ -442,7 +364,6 @@ function ChatInput({
 
         .send-icon {
           display: flex;
-
           align-items: center;
           justify-content: center;
 
@@ -451,20 +372,16 @@ function ChatInput({
           transition: transform 0.12s ease;
         }
 
-        .send-btn:active:not(:disabled)
-        .send-icon {
+        .send-btn:active:not(:disabled) .send-icon {
           transform: scale(0.82);
         }
 
         /* ==========================================
            MOBILE
-           ========================================== */
+        ========================================== */
 
         @media (max-width: 767px) {
-
           .chat-input-row {
-            width: 100%;
-
             gap: 7px;
           }
 
@@ -490,8 +407,17 @@ function ChatInput({
 
             max-width: 52px !important;
             max-height: 46px !important;
+          }
 
-            flex: 0 0 52px !important;
+          .home-plus-file {
+            width: 52px !important;
+            height: 46px !important;
+
+            min-width: 52px !important;
+            min-height: 46px !important;
+
+            max-width: 52px !important;
+            max-height: 46px !important;
           }
 
           .chat-input-box {
@@ -510,18 +436,14 @@ function ChatInput({
 
             min-width: 46px !important;
             min-height: 46px !important;
-
-            max-width: 46px !important;
-            max-height: 46px !important;
           }
         }
 
         /* ==========================================
            HP KECIL
-           ========================================== */
+        ========================================== */
 
         @media (max-width: 380px) {
-
           .chat-input-row {
             gap: 6px;
           }
@@ -548,8 +470,17 @@ function ChatInput({
 
             max-width: 50px !important;
             max-height: 46px !important;
+          }
 
-            flex: 0 0 50px !important;
+          .home-plus-file {
+            width: 50px !important;
+            height: 46px !important;
+
+            min-width: 50px !important;
+            min-height: 46px !important;
+
+            max-width: 50px !important;
+            max-height: 46px !important;
           }
 
           .chat-input-box {
@@ -560,10 +491,9 @@ function ChatInput({
 
         /* ==========================================
            DESKTOP
-           ========================================== */
+        ========================================== */
 
         @media (min-width: 768px) {
-
           .home-plus-wrapper {
             width: 52px;
             height: 46px;
@@ -586,8 +516,17 @@ function ChatInput({
 
             max-width: 52px !important;
             max-height: 46px !important;
+          }
 
-            flex: 0 0 52px !important;
+          .home-plus-file {
+            width: 52px !important;
+            height: 46px !important;
+
+            min-width: 52px !important;
+            min-height: 46px !important;
+
+            max-width: 52px !important;
+            max-height: 46px !important;
           }
         }
       `}</style>
@@ -595,18 +534,18 @@ function ChatInput({
       <Form
         onSubmit={(e) => {
           e.preventDefault();
-
           handleKirim();
         }}
       >
         <div className="chat-input-row">
 
           {/* ==========================================
-              PLUS
-              ========================================== */}
+              PLUS / UPLOAD
+          ========================================== */}
 
           <div className="home-plus-wrapper">
 
+            {/* HITBOX ASLI */}
             <input
               id="chat-image-input"
               ref={fileInputRef}
@@ -618,25 +557,13 @@ function ChatInput({
               className="home-plus-file"
             />
 
+            {/* TOMBOL VISUAL */}
             <button
               type="button"
               className="home-plus-button"
               disabled={loading}
-              aria-label="Tambah gambar"
-
-              /*
-               * EVENT TOUCH ANDROID
-               */
-
-              onTouchStart={handlePlusTouchStart}
-
-              onTouchEnd={handlePlusTouchEnd}
-
-              /*
-               * EVENT DESKTOP
-               */
-
-              onClick={handlePlusClick}
+              aria-hidden="true"
+              tabIndex={-1}
             >
               <span className="home-plus-icon">
                 <FiPlus
@@ -650,7 +577,7 @@ function ChatInput({
 
           {/* ==========================================
               INPUT CHAT
-              ========================================== */}
+          ========================================== */}
 
           <div className="chat-input-box">
 
@@ -685,7 +612,7 @@ function ChatInput({
 
             {/* ==========================================
                 KIRIM
-                ========================================== */}
+            ========================================== */}
 
             <Button
               type="submit"

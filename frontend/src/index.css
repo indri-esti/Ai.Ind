@@ -38,6 +38,7 @@ textarea {
 
 button {
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 img,
@@ -107,6 +108,31 @@ svg {
 .chat-container {
   min-width: 0;
   min-height: 0;
+
+  /*
+   * Jangan membuat layer ChatBox berada
+   * di atas area input.
+   */
+  position: relative;
+  z-index: 1;
+}
+
+/* =====================================================
+   CHAT MESSAGE AREA
+===================================================== */
+
+.home-messages {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * ChatBox tetap bisa discroll,
+ * tetapi tidak boleh menutupi area input.
+ */
+.home-messages,
+.home-chat-container {
+  min-width: 0;
 }
 
 /* =====================================================
@@ -171,45 +197,58 @@ svg {
 }
 
 /* =====================================================
-   MOBILE
+   INPUT CONTAINER
 ===================================================== */
 
-@media (max-width: 767px) {
-  html,
-  body,
-  #root {
-    min-height: 100%;
-  }
+/*
+ * PENTING:
+ *
+ * Input harus selalu berada di atas ChatBox.
+ * Ini yang membantu mengatasi tombol + yang
+ * hanya bisa disentuh di bagian pinggir pada HP.
+ */
 
-  body {
-    overflow-x: hidden;
-  }
+.home-input-container {
+  position: relative;
+  z-index: 999999 !important;
 
-  .logo {
-    width: 44px;
-    height: 44px;
-  }
+  isolation: isolate;
+
+  pointer-events: auto !important;
+}
+
+/*
+ * Semua elemen di dalam input container
+ * boleh menerima touch.
+ */
+
+.home-input-container * {
+  pointer-events: auto;
+}
+
+/*
+ * Tetapi icon SVG tidak perlu menerima touch.
+ * Touch diteruskan ke tombol +.
+ */
+
+.home-input-container svg {
+  pointer-events: none;
 }
 
 /* =====================================================
-   TABLET / DESKTOP
-===================================================== */
-
-@media (min-width: 768px) {
-  body {
-    overflow-x: hidden;
-  }
-}
-
-/* ==========================================
    CHAT INPUT MODERN
-========================================== */
+===================================================== */
 
 .home-input-row {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
+
+  position: relative;
+  z-index: 999999 !important;
+
+  pointer-events: auto !important;
 }
 
 .home-chat-input-wrapper {
@@ -217,14 +256,90 @@ svg {
   min-width: 0;
 }
 
-/* NOTE: .home-plus-button (lama) sudah dihapus dari sini
-   karena bentrok dengan class dengan nama sama di dalam
-   ChatInput.jsx (style inline). Style tombol + sekarang
-   sepenuhnya dikontrol dari ChatInput.jsx. */
+/* =====================================================
+   PLUS BUTTON TOUCH FIX
+===================================================== */
 
-/* ==========================================
+/*
+ * Jangan biarkan layer ChatBox mengambil
+ * koordinat touch tombol +.
+ */
+
+.home-plus-wrapper {
+  position: relative !important;
+
+  z-index: 1000000 !important;
+
+  pointer-events: auto !important;
+
+  touch-action: manipulation;
+
+  -webkit-user-select: none;
+  user-select: none;
+
+  -webkit-touch-callout: none;
+
+  isolation: isolate;
+}
+
+.home-plus-button {
+  position: relative !important;
+
+  z-index: 1000001 !important;
+
+  pointer-events: auto !important;
+
+  touch-action: manipulation !important;
+
+  -webkit-user-select: none !important;
+  user-select: none !important;
+
+  -webkit-touch-callout: none !important;
+
+  -webkit-tap-highlight-color: transparent !important;
+
+  /*
+   * Jangan menggunakan transform pada kondisi normal.
+   * Ini membuat hitbox Android lebih stabil.
+   */
+  transform: none;
+  -webkit-transform: none;
+}
+
+/*
+ * Icon tidak boleh mengambil alih hitbox tombol.
+ */
+
+.home-plus-button svg,
+.home-plus-icon {
+  pointer-events: none !important;
+}
+
+/*
+ * Saat ditekan, animasi tetap boleh berjalan.
+ */
+
+.home-plus-button:active {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* =====================================================
+   SEND BUTTON
+===================================================== */
+
+.send-btn {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.send-btn svg,
+.send-icon {
+  pointer-events: none !important;
+}
+
+/* =====================================================
    IMAGE PREVIEW
-========================================== */
+===================================================== */
 
 .home-image-preview {
   width: 100%;
@@ -285,6 +400,8 @@ svg {
   cursor: pointer;
 
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+
+  touch-action: manipulation;
 }
 
 .home-image-label {
@@ -297,6 +414,127 @@ svg {
   color: #8a9bb5;
 
   font-size: 10px;
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  /*
+   * MOBILE:
+   * Input wajib berada di atas ChatBox.
+   */
+
+  .home-input-container {
+    position: relative !important;
+
+    z-index: 999999 !important;
+
+    isolation: isolate;
+
+    pointer-events: auto !important;
+  }
+
+  .home-input-row {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .home-plus-wrapper {
+    position: relative !important;
+
+    z-index: 1000001 !important;
+
+    pointer-events: auto !important;
+
+    touch-action: manipulation !important;
+  }
+
+  .home-plus-button {
+    position: relative !important;
+
+    z-index: 1000002 !important;
+
+    pointer-events: auto !important;
+
+    touch-action: manipulation !important;
+
+    -webkit-touch-callout: none !important;
+
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  /*
+   * Chat area tetap bisa scroll,
+   * tetapi berada di bawah input.
+   */
+
+  .home-messages {
+    position: relative;
+    z-index: 1;
+  }
+
+  .home-chat-container {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+/* =====================================================
+   TABLET / DESKTOP
+===================================================== */
+
+@media (min-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .home-input-container {
+    position: relative;
+
+    z-index: 999999 !important;
+
+    isolation: isolate;
+
+    pointer-events: auto !important;
+  }
+
+  .home-input-row {
+    position: relative;
+
+    z-index: 1000000 !important;
+  }
+
+  .home-plus-wrapper {
+    position: relative;
+
+    z-index: 1000001 !important;
+  }
+
+  .home-plus-button {
+    position: relative;
+
+    z-index: 1000002 !important;
+  }
 }
 
 /* ==========================================
@@ -338,6 +576,39 @@ svg {
 ========================================== */
 
 @media (max-width: 768px) {
-  /* NOTE: rule .home-plus-button lama untuk breakpoint ini
-     juga dihapus, alasan sama seperti di atas. */
+  .home-input-container {
+    position: relative !important;
+
+    z-index: 999999 !important;
+
+    pointer-events: auto !important;
+
+    isolation: isolate;
+  }
+
+  .home-input-row {
+    position: relative !important;
+
+    z-index: 1000000 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .home-plus-wrapper {
+    position: relative !important;
+
+    z-index: 1000001 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .home-plus-button {
+    position: relative !important;
+
+    z-index: 1000002 !important;
+
+    pointer-events: auto !important;
+
+    touch-action: manipulation !important;
+  }
 }
