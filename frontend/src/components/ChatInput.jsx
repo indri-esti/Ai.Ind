@@ -19,6 +19,14 @@ function ChatInput({
     kirimPesan();
   };
 
+  const handlePlusClick = () => {
+    if (loading) return;
+
+    if (fileInputRef?.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   return (
     <div
       style={{
@@ -81,6 +89,8 @@ function ChatInput({
           pointer-events: auto;
 
           box-sizing: border-box;
+
+          touch-action: manipulation;
         }
 
         /* ==========================================
@@ -134,12 +144,14 @@ function ChatInput({
 
           overflow: hidden;
 
-          pointer-events: none !important;
+          pointer-events: auto !important;
 
           box-sizing: border-box;
 
           transform: none !important;
           -webkit-transform: none !important;
+
+          touch-action: manipulation !important;
 
           transition:
             background-color 0.12s ease,
@@ -148,6 +160,7 @@ function ChatInput({
 
         .home-plus-button:disabled {
           opacity: 0.55;
+          cursor: not-allowed;
         }
 
         .home-plus-icon {
@@ -169,61 +182,36 @@ function ChatInput({
 
         /* ==========================================
            FILE INPUT
-
-           INI YANG MENJADI HITBOX ASLI DI HP.
-
-           Seluruh area tombol 52x46 menjadi
-           input file transparan.
+           
+           BUKAN HITBOX LAGI.
+           Tombol + yang membuka file picker.
         ========================================== */
 
         .home-plus-file {
           position: absolute !important;
 
-          left: 0 !important;
-          top: 0 !important;
+          width: 1px !important;
+          height: 1px !important;
 
-          width: 52px !important;
-          height: 46px !important;
-
-          min-width: 52px !important;
-          min-height: 46px !important;
-
-          max-width: 52px !important;
-          max-height: 46px !important;
-
-          margin: 0 !important;
           padding: 0 !important;
+          margin: -1px !important;
 
-          opacity: 0 !important;
+          overflow: hidden !important;
+
+          clip: rect(0, 0, 0, 0) !important;
+          clip-path: inset(50%) !important;
+
+          white-space: nowrap !important;
 
           border: 0 !important;
 
-          display: block !important;
+          opacity: 0 !important;
 
-          cursor: pointer !important;
-
-          pointer-events: auto !important;
-
-          z-index: 1000002;
-
-          box-sizing: border-box;
-
-          touch-action: manipulation !important;
-
-          -webkit-tap-highlight-color: transparent;
-          -webkit-touch-callout: none;
-        }
-
-        .home-plus-wrapper:has(.home-plus-file:disabled) {
-          pointer-events: none;
+          pointer-events: none !important;
         }
 
         /* ==========================================
            EFEK VISUAL PLUS
-
-           Karena input transparan berada di atas,
-           tombol visual tetap menerima state
-           berdasarkan wrapper.
         ========================================== */
 
         .home-plus-wrapper:hover .home-plus-button:not(:disabled) {
@@ -268,7 +256,6 @@ function ChatInput({
           box-sizing: border-box;
 
           position: relative;
-
           z-index: 1;
         }
 
@@ -409,17 +396,6 @@ function ChatInput({
             max-height: 46px !important;
           }
 
-          .home-plus-file {
-            width: 52px !important;
-            height: 46px !important;
-
-            min-width: 52px !important;
-            min-height: 46px !important;
-
-            max-width: 52px !important;
-            max-height: 46px !important;
-          }
-
           .chat-input-box {
             padding:
               7px
@@ -472,17 +448,6 @@ function ChatInput({
             max-height: 46px !important;
           }
 
-          .home-plus-file {
-            width: 50px !important;
-            height: 46px !important;
-
-            min-width: 50px !important;
-            min-height: 46px !important;
-
-            max-width: 50px !important;
-            max-height: 46px !important;
-          }
-
           .chat-input-box {
             padding-left: 13px;
             padding-right: 6px;
@@ -517,17 +482,6 @@ function ChatInput({
             max-width: 52px !important;
             max-height: 46px !important;
           }
-
-          .home-plus-file {
-            width: 52px !important;
-            height: 46px !important;
-
-            min-width: 52px !important;
-            min-height: 46px !important;
-
-            max-width: 52px !important;
-            max-height: 46px !important;
-          }
         }
       `}</style>
 
@@ -545,7 +499,7 @@ function ChatInput({
 
           <div className="home-plus-wrapper">
 
-            {/* HITBOX ASLI */}
+            {/* FILE INPUT ASLI */}
             <input
               id="chat-image-input"
               ref={fileInputRef}
@@ -557,13 +511,13 @@ function ChatInput({
               className="home-plus-file"
             />
 
-            {/* TOMBOL VISUAL */}
+            {/* TOMBOL PLUS ASLI */}
             <button
               type="button"
               className="home-plus-button"
               disabled={loading}
-              aria-hidden="true"
-              tabIndex={-1}
+              aria-label="Tambah gambar"
+              onClick={handlePlusClick}
             >
               <span className="home-plus-icon">
                 <FiPlus

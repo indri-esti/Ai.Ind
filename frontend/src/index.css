@@ -260,80 +260,32 @@ svg {
    PLUS BUTTON TOUCH FIX
 ===================================================== */
 
-/*
- * Jangan biarkan layer ChatBox mengambil
- * koordinat touch tombol +.
- */
-
 .home-plus-wrapper {
   position: relative !important;
-
-  z-index: 1000000 !important;
-
+  z-index: 1000001 !important;
   pointer-events: auto !important;
-
-  touch-action: manipulation;
-
-  -webkit-user-select: none;
-  user-select: none;
-
-  -webkit-touch-callout: none;
-
+  touch-action: manipulation !important;
   isolation: isolate;
 }
 
 .home-plus-button {
   position: relative !important;
-
-  z-index: 1000001 !important;
-
+  z-index: 1000002 !important;
   pointer-events: auto !important;
-
   touch-action: manipulation !important;
 
   -webkit-user-select: none !important;
   user-select: none !important;
 
   -webkit-touch-callout: none !important;
-
   -webkit-tap-highlight-color: transparent !important;
 
-  /*
-   * Jangan menggunakan transform pada kondisi normal.
-   * Ini membuat hitbox Android lebih stabil.
-   */
-  transform: none;
-  -webkit-transform: none;
+  transform: none !important;
+  -webkit-transform: none !important;
 }
-
-/*
- * Icon tidak boleh mengambil alih hitbox tombol.
- */
 
 .home-plus-button svg,
 .home-plus-icon {
-  pointer-events: none !important;
-}
-
-/*
- * Saat ditekan, animasi tetap boleh berjalan.
- */
-
-.home-plus-button:active {
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* =====================================================
-   SEND BUTTON
-===================================================== */
-
-.send-btn {
-  touch-action: manipulation !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-.send-btn svg,
-.send-icon {
   pointer-events: none !important;
 }
 
