@@ -1,57 +1,59 @@
-import os
+import requests
 import re
+import time
+import base64
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.wsgi import WSGIMiddleware
-
-from ai import balas
-from auth import auth
-from database import init_db, get_connection
+from config import API_KEY, BASE_URL, MODEL
+from prompt import SYSTEM_PROMPT
 
 
 # ==================================================
-# FLASK APPLICATION
+# MODEL VISION
 # ==================================================
-
-flask_app = Flask(__name__)
-
-CORS(flask_app)
-
-# Batasi ukuran request.
-# Gambar dikirim sebagai Base64.
-flask_app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+VISION_MODEL = "qwen/qwen3.6-27b"
 
 
 # ==================================================
-# BERSIHKAN JAWABAN AI
+# PENGATURAN
 # ==================================================
+# History yang dikirim ke Groq.
+# Tidak menghapus history di frontend/database.
+MAX_HISTORY_CHARS = 12000
 
-def bersihkan_reply(teks):
+# Maksimal karakter satu pesan history.
+MAX_MESSAGE_CHARS = 4000
+
+# Maksimal token jawaban.
+MAX_OUTPUT_TOKENS = 1200
+
+# Maksimal percobaan request.
+MAX_RETRIES = 3
+
+# Jangan menunggu terlalu lama.
+MAX_RETRY_WAIT = 65
+
+# Maksimal ukuran data URL gambar.
+# Sedikit di bawah batas request main.py agar aman.
+MAX_IMAGE_CHARS = 5_500_000
+
+
+# ==================================================
+# BERSIHKAN JAWABAN
+# ==================================================
+def bersihkan_jawaban(teks):
 
     if not teks:
         return ""
 
     teks = str(teks)
 
-    # ==================================================
-    # HAPUS <think>...</think>
-    # ==================================================
-
+    # Hapus think/reasoning tags
     teks = re.sub(
         r"<think>.*?</think>",
         "",
         teks,
         flags=re.DOTALL | re.IGNORECASE
     )
-
-    # ==================================================
-    # JIKA <think> TIDAK PUNYA PENUTUP
-    # ==================================================
 
     teks = re.sub(
         r"<think>.*$",
@@ -60,32 +62,82 @@ def bersihkan_reply(teks):
         flags=re.DOTALL | re.IGNORECASE
     )
 
-    # ==================================================
-    # HAPUS TAG THINK YANG TERSISA
-    # ==================================================
-
     teks = re.sub(
-        r"</?think>",
+        r"</think>",
         "",
         teks,
         flags=re.IGNORECASE
     )
 
-    # ==================================================
-    # HAPUS "THINKING PROCESS"
-    # ==================================================
-
+    # Hapus heading markdown
     teks = re.sub(
-        r"^\s*(Here'?s a thinking process:|Here is a thinking process:).*$",
+        r"^\s*#{1,6}\s?",
+        "",
+        teks,
+        flags=re.MULTILINE
+    )
+
+    # Hapus blockquote
+    teks = re.sub(
+        r"^\s*>\s?",
+        "",
+        teks,
+        flags=re.MULTILINE
+    )
+
+    # Hapus bold
+    teks = teks.replace("**", "")
+
+    # Hapus italic markdown pada bullet
+    teks = re.sub(
+        r"^\s*\*\s+",
+        "",
+        teks,
+        flags=re.MULTILINE
+    )
+
+    # Hapus informasi safety
+    teks = teks.replace(
+        "User Safety: safe",
+        ""
+    )
+
+    teks = teks.replace(
+        "Response Safety: safe",
+        ""
+    )
+
+    # Hapus phrase thinking
+    teks = re.sub(
+        r"^\s*(Here's a thinking process:|Heres a thinking process:).*$",
         "",
         teks,
         flags=re.MULTILINE | re.IGNORECASE
     )
 
-    # ==================================================
-    # HAPUS BARIS KOSONG BERLEBIHAN
-    # ==================================================
+    teks = re.sub(
+        r"^\s*(Here is a thinking process:|Here is my thinking process:).*$",
+        "",
+        teks,
+        flags=re.MULTILINE | re.IGNORECASE
+    )
 
+    # Hapus reasoning tag
+    teks = re.sub(
+        r"<analysis>.*?</analysis>",
+        "",
+        teks,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    teks = re.sub(
+        r"<reasoning>.*?</reasoning>",
+        "",
+        teks,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # Rapikan baris kosong
     teks = re.sub(
         r"\n{3,}",
         "\n\n",
@@ -96,644 +148,957 @@ def bersihkan_reply(teks):
 
 
 # ==================================================
-# DATABASE
+# VALIDASI GAMBAR
 # ==================================================
+def validasi_gambar(image):
 
-try:
+    if not image:
+        return None
 
-    init_db()
-
-    print(
-        "Database berhasil diinisialisasi"
-    )
-
-except Exception as e:
-
-    print(
-        "Database error:",
-        repr(e)
-    )
-
-
-# ==================================================
-# REGISTER AUTH
-# ==================================================
-
-flask_app.register_blueprint(auth)
-
-
-# ==================================================
-# HOME
-# ==================================================
-
-@flask_app.route("/", methods=["GET"])
-def home():
-
-    return jsonify({
-
-        "status":
-            "AI.Ind Backend Running",
-
-        "message":
-            "Backend siap digunakan"
-
-    })
-
-
-# ==================================================
-# CHAT
-# ==================================================
-
-@flask_app.route("/chat", methods=["POST"])
-def chat():
-
-    conn = None
-
-    try:
-
-        data = request.get_json(
-            silent=True
+    if not isinstance(image, str):
+        raise ValueError(
+            "Format gambar tidak valid."
         )
 
-        # ==================================================
-        # CEK REQUEST
-        # ==================================================
+    image = image.strip()
 
-        if not data:
+    # Harus berupa Data URL gambar
+    if not image.lower().startswith("data:image/"):
+        raise ValueError(
+            "Format gambar tidak valid. "
+            "Gambar harus dikirim sebagai data URL."
+        )
 
-            return jsonify({
+    # Harus mempunyai base64
+    if ";base64," not in image.lower():
+        raise ValueError(
+            "Data gambar tidak menggunakan format Base64 yang valid."
+        )
 
-                "error":
-                    "Request body kosong"
+    # Pisahkan header dan data
+    try:
+        header, encoded = image.split(
+            ",",
+            1
+        )
+    except ValueError:
+        raise ValueError(
+            "Data gambar tidak valid."
+        )
 
-            }), 400
+    # Validasi MIME type
+    header_lower = header.lower()
 
-        # ==================================================
-        # DATA REQUEST
-        # ==================================================
+    tipe_yang_didukung = (
+        "data:image/jpeg;base64",
+        "data:image/jpg;base64",
+        "data:image/png;base64",
+        "data:image/webp;base64",
+        "data:image/gif;base64"
+    )
 
-        pesan = data.get("message")
+    if not header_lower.startswith(
+        tipe_yang_didukung
+    ):
+        raise ValueError(
+            "Format gambar tidak didukung. "
+            "Gunakan JPG, PNG, WEBP, atau GIF."
+        )
 
-        user_id = data.get("user_id")
+    # Data Base64 tidak boleh kosong
+    encoded = encoded.strip()
 
-        chat_id = data.get("chat_id")
+    if not encoded:
+        raise ValueError(
+            "Data gambar kosong."
+        )
 
-        # Gambar Base64 / data URL
-        image = data.get("image")
+    # Validasi Base64
+    try:
+        base64.b64decode(
+            encoded,
+            validate=True
+        )
+    except Exception:
+        raise ValueError(
+            "Data gambar Base64 tidak valid."
+        )
 
-        # ==================================================
-        # VALIDASI PESAN
-        # ==================================================
+    # Batasi ukuran data URL
+    if len(image) > MAX_IMAGE_CHARS:
+        raise ValueError(
+            "Ukuran gambar terlalu besar. "
+            "Gunakan gambar maksimal sekitar 4 MB."
+        )
 
-        # Pesan boleh kosong kalau ada gambar.
+    return image
+
+
+# ==================================================
+# SIAPKAN HISTORY
+# ==================================================
+def siapkan_history(history):
+
+    if not isinstance(history, list):
+        return []
+
+    hasil = []
+    total_chars = 0
+
+    for item in reversed(history):
+
+        if not isinstance(item, dict):
+            continue
+
+        role = item.get("role")
+        content = item.get("content")
+
+        if role not in [
+            "user",
+            "assistant"
+        ]:
+            continue
+
+        if not content:
+            continue
+
+        # History gambar tidak dikirim kembali sebagai gambar.
+        # Hanya ambil teksnya.
+        if isinstance(content, list):
+
+            teks_parts = []
+
+            for part in content:
+
+                if not isinstance(part, dict):
+                    continue
+
+                if part.get("type") == "text":
+
+                    text_part = part.get(
+                        "text",
+                        ""
+                    )
+
+                    if text_part:
+                        teks_parts.append(
+                            str(text_part)
+                        )
+
+            content = "\n".join(
+                teks_parts
+            )
+
+        content = str(
+            content
+        ).strip()
+
+        if not content:
+            continue
+
+        # Batasi panjang pesan.
+        if len(content) > MAX_MESSAGE_CHARS:
+
+            content = (
+                content[:MAX_MESSAGE_CHARS]
+                + "\n[Pesan dipersingkat untuk konteks AI]"
+            )
+
+        tambahan = len(content)
+
         if (
-            not pesan
-            or not str(pesan).strip()
+            total_chars + tambahan
+            > MAX_HISTORY_CHARS
         ):
 
-            if not image:
-
-                return jsonify({
-
-                    "error":
-                        "Pesan atau gambar harus diisi"
-
-                }), 400
-
-            pesan = (
-                "Tolong analisis gambar ini."
+            sisa = (
+                MAX_HISTORY_CHARS
+                - total_chars
             )
 
-        pesan = str(pesan).strip()
+            if sisa > 200:
 
-        # ==================================================
-        # VALIDASI LOGIN
-        # ==================================================
+                content = content[:sisa]
 
-        if not user_id:
+                hasil.append({
+                    "role": role,
+                    "content": content
+                })
 
-            return jsonify({
+            break
 
-                "error":
-                    "User belum login"
-
-            }), 401
-
-        try:
-
-            user_id = int(user_id)
-
-        except (ValueError, TypeError):
-
-            return jsonify({
-
-                "error":
-                    "User ID tidak valid"
-
-            }), 400
-
-        # ==================================================
-        # DATABASE
-        # ==================================================
-
-        conn = get_connection()
-
-        cursor = conn.cursor()
-
-        # ==================================================
-        # CEK USER
-        # ==================================================
-
-        cursor.execute(
-            """
-            SELECT id, nama, email, foto
-            FROM users
-            WHERE id=?
-            """,
-            (user_id,)
-        )
-
-        user = cursor.fetchone()
-
-        if not user:
-
-            conn.close()
-
-            return jsonify({
-
-                "error":
-                    "User tidak ditemukan"
-
-            }), 404
-
-        # ==================================================
-        # CHAT BARU
-        # ==================================================
-
-        if not chat_id:
-
-            if (
-                image
-                and pesan == "Tolong analisis gambar ini."
-            ):
-
-                title = "Analisis gambar"
-
-            else:
-
-                title = pesan[:40]
-
-            cursor.execute(
-                """
-                INSERT INTO chats
-                (user_id, title)
-                VALUES (?, ?)
-                """,
-                (
-                    user_id,
-                    title
-                )
-            )
-
-            chat_id = cursor.lastrowid
-
-            conn.commit()
-
-        # ==================================================
-        # VALIDASI CHAT ID
-        # ==================================================
-
-        try:
-
-            chat_id = int(chat_id)
-
-        except (ValueError, TypeError):
-
-            conn.close()
-
-            return jsonify({
-
-                "error":
-                    "Chat ID tidak valid"
-
-            }), 400
-
-        # ==================================================
-        # CEK CHAT MILIK USER
-        # ==================================================
-
-        cursor.execute(
-            """
-            SELECT id, user_id, title
-            FROM chats
-            WHERE id=? AND user_id=?
-            """,
-            (
-                chat_id,
-                user_id
-            )
-        )
-
-        chat = cursor.fetchone()
-
-        if not chat:
-
-            conn.close()
-
-            return jsonify({
-
-                "error":
-                    "Chat tidak ditemukan atau "
-                    "bukan milik akun ini"
-
-            }), 404
-
-        # ==================================================
-        # AMBIL HISTORY CHAT
-        # ==================================================
-
-        cursor.execute(
-            """
-            SELECT role, content
-            FROM messages
-            WHERE chat_id=?
-            ORDER BY id ASC
-            """,
-            (chat_id,)
-        )
-
-        history = cursor.fetchall()
-
-        conn.close()
-
-        conn = None
-
-        # ==================================================
-        # UBAH HISTORY KE DICT
-        # ==================================================
-
-        history_data = []
-
-        for item in history:
-
-            role = item["role"]
-
-            content = item["content"]
-
-            if role not in [
-                "user",
-                "assistant"
-            ]:
-
-                continue
-
-            if not content:
-
-                continue
-
-            history_data.append({
-
-                "role":
-                    role,
-
-                "content":
-                    str(content)
-
-            })
-
-        # ==================================================
-        # KIRIM KE AI
-        # ==================================================
-
-        jawaban = balas(
-
-            pesan,
-
-            history_data,
-
-            image
-
-        )
-
-        # ==================================================
-        # FILTER FINAL
-        # ==================================================
-
-        jawaban = bersihkan_reply(
-            jawaban
-        )
-
-        # ==================================================
-        # CEK JAWABAN
-        # ==================================================
-
-        if not jawaban:
-
-            jawaban = (
-                "Maaf, aku belum mendapatkan "
-                "jawaban. Coba kirim lagi ya."
-            )
-
-        # ==================================================
-        # SIMPAN PESAN
-        # ==================================================
-
-        conn = get_connection()
-
-        cursor = conn.cursor()
-
-        # ==================================================
-        # SIMPAN PESAN USER
-        # ==================================================
-
-        cursor.execute(
-            """
-            INSERT INTO messages
-            (chat_id, role, content)
-            VALUES (?, ?, ?)
-            """,
-            (
-                chat_id,
-                "user",
-                pesan
-            )
-        )
-
-        # ==================================================
-        # SIMPAN JAWABAN AI
-        # ==================================================
-
-        cursor.execute(
-            """
-            INSERT INTO messages
-            (chat_id, role, content)
-            VALUES (?, ?, ?)
-            """,
-            (
-                chat_id,
-                "assistant",
-                str(jawaban)
-            )
-        )
-
-        conn.commit()
-
-        conn.close()
-
-        conn = None
-
-        # ==================================================
-        # RESPONSE
-        # ==================================================
-
-        return jsonify({
-
-            "success":
-                True,
-
-            "reply":
-                jawaban,
-
-            "chat_id":
-                chat_id,
-
-            "has_image":
-                bool(image),
-
-            "user": {
-
-                "id":
-                    user["id"],
-
-                "nama":
-                    user["nama"],
-
-                "email":
-                    user["email"],
-
-                "foto":
-                    user["foto"]
-
-            }
-
+        hasil.append({
+            "role": role,
+            "content": content
         })
 
-    # ==================================================
-    # REQUEST TERLALU BESAR
-    # ==================================================
+        total_chars += tambahan
 
-    except Exception as e:
+    # Kembalikan ke urutan normal.
+    hasil.reverse()
 
-        if conn:
+    return hasil
+
+
+# ==================================================
+# AMBIL WAKTU RETRY
+# ==================================================
+def ambil_waktu_retry(response):
+
+    """
+    Mengambil waktu tunggu dari header Retry-After
+    atau pesan error Groq.
+    """
+
+    if response is None:
+        return 5
+
+    # --------------------------------------------------
+    # COBA HEADER Retry-After
+    # --------------------------------------------------
+    retry_after = response.headers.get(
+        "Retry-After"
+    )
+
+    if retry_after:
+
+        try:
+
+            waktu = float(
+                retry_after
+            )
+
+            return min(
+                max(waktu + 1, 2),
+                MAX_RETRY_WAIT
+            )
+
+        except (
+            ValueError,
+            TypeError
+        ):
+            pass
+
+    # --------------------------------------------------
+    # COBA RESPONSE TEXT
+    # --------------------------------------------------
+    teks = response.text or ""
+
+    pola = [
+        r"try again in\s+([\d.]+)s",
+        r"retry after\s+([\d.]+)s",
+        r"retry-after[:\s]+([\d.]+)"
+    ]
+
+    for pattern in pola:
+
+        match = re.search(
+            pattern,
+            teks,
+            flags=re.IGNORECASE
+        )
+
+        if match:
 
             try:
-                conn.close()
 
-            except Exception:
+                waktu = float(
+                    match.group(1)
+                )
+
+                return min(
+                    max(waktu + 1, 2),
+                    MAX_RETRY_WAIT
+                )
+
+            except (
+                ValueError,
+                TypeError
+            ):
                 pass
 
+    # Default
+    return 5
+
+
+# ==================================================
+# REQUEST KE GROQ
+# ==================================================
+def request_groq(headers, data):
+
+    for attempt in range(
+        MAX_RETRIES
+    ):
+
+        try:
+
+            response = requests.post(
+                BASE_URL,
+                headers=headers,
+                json=data,
+                timeout=90
+            )
+
+            # ==================================================
+            # BERHASIL
+            # ==================================================
+            if response.status_code == 200:
+                return response
+
+            # ==================================================
+            # RATE LIMIT 429
+            # ==================================================
+            if response.status_code == 429:
+
+                print(
+                    f"[Groq] Rate limit "
+                    f"percobaan {attempt + 1}/{MAX_RETRIES}"
+                )
+
+                print(
+                    "[Groq] Response:",
+                    response.text
+                )
+
+                if attempt < MAX_RETRIES - 1:
+
+                    retry_seconds = (
+                        ambil_waktu_retry(
+                            response
+                        )
+                    )
+
+                    print(
+                        f"[Groq] Menunggu "
+                        f"{retry_seconds:.1f} detik..."
+                    )
+
+                    time.sleep(
+                        retry_seconds
+                    )
+
+                    continue
+
+                return response
+
+            # ==================================================
+            # ERROR LAIN
+            # ==================================================
+            return response
+
+        except requests.exceptions.Timeout:
+
+            print(
+                "[Groq] Timeout"
+            )
+
+            if attempt < MAX_RETRIES - 1:
+
+                time.sleep(2)
+                continue
+
+            return None
+
+        except requests.exceptions.ConnectionError:
+
+            print(
+                "[Groq] Connection Error"
+            )
+
+            if attempt < MAX_RETRIES - 1:
+
+                time.sleep(2)
+                continue
+
+            return None
+
+        except requests.exceptions.RequestException as e:
+
+            print(
+                "[Groq] Request Error:",
+                repr(e)
+            )
+
+            return None
+
+    return None
+
+
+# ==================================================
+# BALAS AI
+# ==================================================
+def balas(
+    pesan,
+    history=None,
+    image=None
+):
+
+    # ==================================================
+    # API KEY
+    # ==================================================
+    if not API_KEY:
+
+        return (
+            "API Key Groq belum ditemukan. "
+            "Pastikan GROQ_API_KEY sudah tersedia "
+            "di Backend/.env."
+        )
+
+    # ==================================================
+    # HISTORY
+    # ==================================================
+    if not isinstance(
+        history,
+        list
+    ):
+
+        history = []
+
+    # ==================================================
+    # VALIDASI GAMBAR
+    # ==================================================
+    try:
+
+        image = validasi_gambar(
+            image
+        )
+
+    except ValueError as e:
+
         print(
-            "Chat Error:",
+            "[Gambar] Validasi gagal:",
+            str(e)
+        )
+
+        return str(e)
+
+    # ==================================================
+    # SYSTEM PROMPT
+    # ==================================================
+    system_prompt = str(
+        SYSTEM_PROMPT
+    ).strip()
+
+    messages = [
+        {
+            "role": "system",
+            "content": system_prompt
+        }
+    ]
+
+    # ==================================================
+    # HISTORY
+    # ==================================================
+    history_terbaru = (
+        siapkan_history(
+            history
+        )
+    )
+
+    messages.extend(
+        history_terbaru
+    )
+
+    # ==================================================
+    # PESAN
+    # ==================================================
+    pesan_text = ""
+
+    if pesan is not None:
+
+        pesan_text = str(
+            pesan
+        ).strip()
+
+    # Kalau hanya gambar.
+    if (
+        not pesan_text
+        and image
+    ):
+
+        pesan_text = (
+            "Analisis gambar ini dan jelaskan "
+            "apa yang terlihat dengan jelas."
+        )
+
+    # Kalau benar-benar kosong.
+    if (
+        not pesan_text
+        and not image
+    ):
+
+        return (
+            "Silakan tulis pertanyaan atau pesan "
+            "yang ingin kamu tanyakan."
+        )
+
+    # ==================================================
+    # KONTEN USER
+    # ==================================================
+    if image:
+
+        user_content = [
+            {
+                "type": "text",
+                "text": pesan_text
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image
+                }
+            }
+        ]
+
+    else:
+
+        user_content = pesan_text
+
+    messages.append(
+        {
+            "role": "user",
+            "content": user_content
+        }
+    )
+
+    # ==================================================
+    # MODEL
+    # ==================================================
+    if image:
+
+        request_model = VISION_MODEL
+
+    else:
+
+        request_model = MODEL
+
+    print(
+        "[Groq] Model:",
+        request_model
+    )
+
+    if image:
+
+        print(
+            "[Groq] Vision image: aktif"
+        )
+
+    # ==================================================
+    # HEADER
+    # ==================================================
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # ==================================================
+    # DATA REQUEST
+    # ==================================================
+    data = {
+        "model": request_model,
+        "messages": messages,
+        "max_completion_tokens":
+            MAX_OUTPUT_TOKENS,
+        "temperature": 0.4
+    }
+
+    # ==================================================
+    # REQUEST
+    # ==================================================
+    try:
+
+        response = request_groq(
+            headers,
+            data
+        )
+
+        # ==================================================
+        # TIDAK ADA RESPONSE
+        # ==================================================
+        if response is None:
+
+            return (
+                "AI sedang mengalami gangguan koneksi. "
+                "Silakan coba lagi."
+            )
+
+        # ==================================================
+        # RATE LIMIT
+        # ==================================================
+        if response.status_code == 429:
+
+            print(
+                "========== GROQ RATE LIMIT =========="
+            )
+
+            print(
+                response.text
+            )
+
+            print(
+                "====================================="
+            )
+
+            return (
+                "AI sedang sibuk karena terlalu banyak "
+                "permintaan. Tunggu sebentar lalu kirim "
+                "pesan lagi ya."
+            )
+
+        # ==================================================
+        # SERVER ERROR
+        # ==================================================
+        if response.status_code >= 500:
+
+            print(
+                "========== GROQ SERVER ERROR =========="
+            )
+
+            print(
+                "STATUS:",
+                response.status_code
+            )
+
+            print(
+                "RESPONSE:",
+                response.text
+            )
+
+            print(
+                "========================================"
+            )
+
+            return (
+                "Server AI sedang mengalami gangguan. "
+                "Silakan coba lagi sebentar."
+            )
+
+        # ==================================================
+        # ERROR CLIENT LAIN
+        # ==================================================
+        if response.status_code != 200:
+
+            print(
+                "========== GROQ ERROR =========="
+            )
+
+            print(
+                "STATUS:",
+                response.status_code
+            )
+
+            print(
+                "RESPONSE:",
+                response.text
+            )
+
+            print(
+                "================================"
+            )
+
+            # Berikan pesan khusus untuk error gambar
+            # supaya penyebab lebih mudah diketahui.
+            if image and response.status_code == 400:
+
+                return (
+                    "Gambar tidak dapat diproses oleh "
+                    "model AI. Pastikan gambar berupa "
+                    "JPG, PNG, WEBP, atau GIF lalu coba lagi."
+                )
+
+            return (
+                "AI tidak dapat memproses permintaan "
+                "saat ini. Silakan coba lagi."
+            )
+
+        # ==================================================
+        # PARSE JSON
+        # ==================================================
+        try:
+
+            hasil = response.json()
+
+        except ValueError:
+
+            print(
+                "Response Groq bukan JSON:",
+                response.text
+            )
+
+            return (
+                "Respons dari AI tidak valid. "
+                "Silakan coba lagi."
+            )
+
+        # ==================================================
+        # ERROR DARI API
+        # ==================================================
+        if isinstance(
+            hasil,
+            dict
+        ):
+
+            if hasil.get("error"):
+
+                print(
+                    "========== GROQ API ERROR =========="
+                )
+
+                print(
+                    hasil["error"]
+                )
+
+                print(
+                    "===================================="
+                )
+
+                error_data = hasil.get(
+                    "error"
+                )
+
+                if isinstance(
+                    error_data,
+                    dict
+                ):
+
+                    error_message = str(
+                        error_data.get(
+                            "message",
+                            ""
+                        )
+                    ).lower()
+
+                    # Error khusus model vision
+                    if image and (
+                        "image" in error_message
+                        or "vision" in error_message
+                        or "model" in error_message
+                    ):
+
+                        return (
+                            "Model AI tidak dapat memproses "
+                            "gambar tersebut. Coba gunakan "
+                            "gambar JPG atau PNG yang lebih kecil."
+                        )
+
+                return (
+                    "AI sedang mengalami kendala. "
+                    "Silakan coba lagi."
+                )
+
+        # ==================================================
+        # CHOICES
+        # ==================================================
+        choices = hasil.get(
+            "choices"
+        )
+
+        if not choices:
+
+            print(
+                "Response AI tidak memiliki choices:",
+                hasil
+            )
+
+            return (
+                "AI belum memberikan jawaban. "
+                "Silakan coba kirim pesan lagi."
+            )
+
+        # ==================================================
+        # MESSAGE
+        # ==================================================
+        message = choices[0].get(
+            "message",
+            {}
+        )
+
+        if not isinstance(
+            message,
+            dict
+        ):
+
+            print(
+                "Message AI tidak valid:",
+                message
+            )
+
+            return (
+                "AI belum memberikan jawaban yang valid."
+            )
+
+        # ==================================================
+        # CONTENT
+        # ==================================================
+        jawaban = message.get(
+            "content"
+        )
+
+        # ==================================================
+        # JIKA CONTENT KOSONG
+        # ==================================================
+        if not jawaban:
+
+            print(
+                "========== GROQ CONTENT KOSONG =========="
+            )
+
+            print(
+                "Message lengkap dari Groq:",
+                message
+            )
+
+            print(
+                "Full response:",
+                hasil
+            )
+
+            print(
+                "=========================================="
+            )
+
+            return (
+                "Maaf, AI belum mendapatkan jawaban. "
+                "Coba kirim lagi ya."
+            )
+
+        # ==================================================
+        # CONTENT BISA BERUPA LIST
+        # ==================================================
+        if isinstance(
+            jawaban,
+            list
+        ):
+
+            teks_parts = []
+
+            for part in jawaban:
+
+                if isinstance(
+                    part,
+                    dict
+                ):
+
+                    if part.get("type") == "text":
+
+                        text = part.get(
+                            "text",
+                            ""
+                        )
+
+                        if text:
+                            teks_parts.append(
+                                str(text)
+                            )
+
+                    elif part.get("text"):
+
+                        teks_parts.append(
+                            str(
+                                part.get(
+                                    "text"
+                                )
+                            )
+                        )
+
+                elif isinstance(
+                    part,
+                    str
+                ):
+
+                    teks_parts.append(
+                        part
+                    )
+
+            jawaban = "\n".join(
+                teks_parts
+            )
+
+        # Jangan menggunakan reasoning sebagai jawaban.
+        jawaban = str(
+            jawaban
+        ).strip()
+
+        # ==================================================
+        # BERSIHKAN
+        # ==================================================
+        jawaban = (
+            bersihkan_jawaban(
+                jawaban
+            )
+        )
+
+        # ==================================================
+        # CEK HASIL AKHIR
+        # ==================================================
+        if not jawaban:
+
+            print(
+                "Jawaban kosong setelah dibersihkan."
+            )
+
+            return (
+                "Maaf, AI belum mendapatkan jawaban. "
+                "Coba kirim lagi ya."
+            )
+
+        return jawaban
+
+    # ==================================================
+    # TIMEOUT
+    # ==================================================
+    except requests.exceptions.Timeout:
+
+        print(
+            "Groq request timeout"
+        )
+
+        return (
+            "Waktu respons AI terlalu lama. "
+            "Coba kirim pertanyaan lagi."
+        )
+
+    # ==================================================
+    # CONNECTION ERROR
+    # ==================================================
+    except requests.exceptions.ConnectionError:
+
+        print(
+            "Groq Connection Error"
+        )
+
+        return (
+            "Tidak dapat terhubung ke server AI. "
+            "Periksa koneksi internet atau backend."
+        )
+
+    # ==================================================
+    # REQUEST ERROR
+    # ==================================================
+    except requests.exceptions.RequestException as e:
+
+        print(
+            "Groq Request Exception:",
             repr(e)
         )
 
-        return jsonify({
-
-            "error":
-                "Terjadi kesalahan server"
-
-        }), 500
-
-
-# ==================================================
-# REQUEST TERLALU BESAR
-# ==================================================
-
-@flask_app.errorhandler(413)
-def request_too_large(error):
-
-    return jsonify({
-
-        "error":
-            "Ukuran gambar terlalu besar. "
-            "Gunakan gambar maksimal sekitar 4 MB."
-
-    }), 413
-
-
-# ==================================================
-# ERROR 404
-# ==================================================
-
-@flask_app.errorhandler(404)
-def not_found(error):
-
-    return jsonify({
-
-        "error":
-            "Endpoint tidak ditemukan"
-
-    }), 404
-
-
-# ==================================================
-# ERROR 500
-# ==================================================
-
-@flask_app.errorhandler(500)
-def server_error(error):
-
-    return jsonify({
-
-        "error":
-            "Terjadi kesalahan server"
-
-    }), 500
-
-
-# ==================================================
-# FASTAPI APPLICATION
-# ==================================================
-
-app = FastAPI(
-    title="AI.Ind Backend",
-    version="0.1.0",
-    description="Backend AI.Ind untuk chat AI, akun pengguna, history chat, dan analisis gambar."
-)
-
-
-# ==================================================
-# FASTAPI CORS
-# ==================================================
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# ==================================================
-# FASTAPI HOME
-# ==================================================
-
-@app.get(
-    "/",
-    tags=["System"],
-    summary="Cek status backend"
-)
-async def fastapi_home():
-
-    return {
-        "status": "AI.Ind Backend Running",
-        "message": "Backend siap digunakan"
-    }
-
-
-# ==================================================
-# FASTAPI CHAT
-# ==================================================
-
-@app.post(
-    "/chat",
-    tags=["AI"],
-    summary="Kirim pesan ke AI.Ind"
-)
-async def fastapi_chat(request: Request):
-
-    try:
-
-        data = await request.json()
-
-    except Exception:
-
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error":
-                    "Request body kosong atau JSON tidak valid"
-            }
+        return (
+            "Terjadi kesalahan saat menghubungi AI. "
+            "Silakan coba lagi."
         )
 
     # ==================================================
-    # TERUSKAN REQUEST KE FLASK
+    # ERROR UMUM
     # ==================================================
+    except Exception as e:
 
-    with flask_app.test_client() as client:
-
-        response = client.post(
-            "/chat",
-            json=data
+        print(
+            "Groq Unexpected Error:",
+            repr(e)
         )
 
-    # ==================================================
-    # AMBIL RESPONSE FLASK
-    # ==================================================
+        return (
+            "Terjadi kesalahan saat memproses "
+            "permintaan AI. Silakan coba lagi."
+        )
 
-    try:
-
-        response_data = response.get_json()
-
-    except Exception:
-
-        response_data = {
-            "error":
-                response.get_data(
-                    as_text=True
-                )
-        }
-
-    return JSONResponse(
-        status_code=response.status_code,
-        content=response_data
-    )
-
-
-# ==================================================
-# MOUNT FLASK KE FASTAPI
-# ==================================================
-
-# Flask tetap dipertahankan untuk route lama
-# dan endpoint auth.
-#
-# Endpoint FastAPI di atas (/ dan /chat)
-# akan diproses lebih dahulu oleh FastAPI.
-
-app.mount(
-    "/",
-    WSGIMiddleware(flask_app)
-)
-
-
-# ==================================================
-# PYTHONANYWHERE / WSGI
-# ==================================================
-
-application = flask_app
-
-
-# ==================================================
-# LOCAL
-# ==================================================
-
-if __name__ == "__main__":
-
-    print(
-        "🚀 AI.Ind Backend berjalan..."
-    )
-
-    flask_app.run(
-
-        host="0.0.0.0",
-
-        port=int(
-            os.environ.get(
-                "PORT",
-                5000
-            )
-        ),
-
-        debug=False
-    )
