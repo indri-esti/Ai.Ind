@@ -11,11 +11,11 @@
 html,
 body,
 #root {
-  margin: 0;
-  padding: 0;
   width: 100%;
   height: 100%;
   min-height: 100%;
+  margin: 0;
+  padding: 0;
   background: #081420;
 }
 
@@ -46,7 +46,10 @@ svg {
   max-width: 100%;
 }
 
-/* Hilangkan garis focus bawaan Bootstrap */
+svg {
+  display: block;
+}
+
 .form-control:focus {
   box-shadow: none !important;
   outline: none !important;
@@ -54,7 +57,7 @@ svg {
 
 .chat-input:focus {
   background: transparent !important;
-  color: white !important;
+  color: #fff !important;
   outline: none !important;
   box-shadow: none !important;
 }
@@ -71,11 +74,6 @@ svg {
   width: 48px;
   height: 48px;
   object-fit: contain;
-  display: block;
-}
-
-/* Logo SVG tidak terpotong */
-svg {
   display: block;
 }
 
@@ -108,35 +106,24 @@ svg {
 .chat-container {
   min-width: 0;
   min-height: 0;
-
-  /*
-   * Jangan membuat layer ChatBox berada
-   * di atas area input.
-   */
   position: relative;
   z-index: 1;
 }
-
-/* =====================================================
-   CHAT MESSAGE AREA
-===================================================== */
 
 .home-messages {
   position: relative;
   z-index: 1;
-}
-
-/*
- * ChatBox tetap bisa discroll,
- * tetapi tidak boleh menutupi area input.
- */
-.home-messages,
-.home-chat-container {
   min-width: 0;
 }
 
+.home-chat-container {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
 /* =====================================================
-   AI.IND TYPING
+   TYPING
 ===================================================== */
 
 .ai-dot {
@@ -187,7 +174,7 @@ svg {
 }
 
 /* =====================================================
-   SWEETALERT AI.IND
+   SWEETALERT
 ===================================================== */
 
 .aiind-swal-popup {
@@ -197,103 +184,399 @@ svg {
 }
 
 /* =====================================================
-   INPUT CONTAINER
+   CHAT INPUT CONTAINER
 ===================================================== */
 
-/*
- * PENTING:
- *
- * Input harus selalu berada di atas ChatBox.
- * Ini yang membantu mengatasi tombol + yang
- * hanya bisa disentuh di bagian pinggir pada HP.
- */
-
 .home-input-container {
   position: relative;
-  z-index: 999999 !important;
-
+  z-index: 20;
+  width: 100%;
   isolation: isolate;
-
-  pointer-events: auto !important;
-}
-
-/*
- * Semua elemen di dalam input container
- * boleh menerima touch.
- */
-
-.home-input-container {
-  position: relative;
-  z-index: 999999 !important;
-  isolation: isolate;
-  pointer-events: auto !important;
-}
-
-.home-input-container svg {
-  pointer-events: none;
-}
-
-/*
- * Tetapi icon SVG tidak perlu menerima touch.
- * Touch diteruskan ke tombol +.
- */
-
-.home-input-container svg {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 /* =====================================================
-   CHAT INPUT MODERN
+   CHAT INPUT ROOT
 ===================================================== */
 
-.home-input-row {
+.chat-input-root {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 20;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.chat-input-root,
+.chat-input-root * {
+  box-sizing: border-box;
+}
+
+/* =====================================================
+   CHAT INPUT ROW
+===================================================== */
+
+.chat-input-row {
   width: 100%;
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
-
-  position: relative;
-  z-index: 999999 !important;
-
-  pointer-events: auto !important;
-}
-
-.home-chat-input-wrapper {
-  flex: 1;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 21;
+  pointer-events: auto;
 }
 
 /* =====================================================
-   PLUS BUTTON TOUCH FIX
+   PLUS WRAPPER
 ===================================================== */
 
 .home-plus-wrapper {
-  position: relative !important;
-  z-index: 1000001 !important;
-  pointer-events: auto !important;
-  touch-action: manipulation !important;
+  position: relative;
+  flex: 0 0 52px;
+
+  width: 52px;
+  height: 46px;
+
+  min-width: 52px;
+  max-width: 52px;
+
+  min-height: 46px;
+  max-height: 46px;
+
+  margin: 0;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 30;
+
+  pointer-events: auto;
   isolation: isolate;
 }
 
+/* =====================================================
+   HIDDEN FILE INPUT
+
+   Tidak menjadi hitbox.
+===================================================== */
+
+.home-plus-file {
+  position: absolute !important;
+
+  width: 1px !important;
+  height: 1px !important;
+
+  padding: 0 !important;
+  margin: -1px !important;
+
+  overflow: hidden !important;
+
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+
+  white-space: nowrap !important;
+
+  border: 0 !important;
+
+  opacity: 0 !important;
+
+  pointer-events: none !important;
+}
+
+/* =====================================================
+   PLUS BUTTON
+
+   BUTTON ASLI.
+   SELURUH BADAN BUTTON = HITBOX.
+===================================================== */
+
 .home-plus-button {
   position: relative !important;
-  z-index: 1000002 !important;
-  pointer-events: auto !important;
+
+  width: 52px !important;
+  height: 46px !important;
+
+  min-width: 52px !important;
+  min-height: 46px !important;
+
+  max-width: 52px !important;
+  max-height: 46px !important;
+
+  flex: 0 0 52px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border-radius: 23px !important;
+
+  background: #13283f !important;
+
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+
+  color: #d7f6ff !important;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.24) !important;
+
+  cursor: pointer;
+
+  user-select: none;
+  -webkit-user-select: none;
+
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+
   touch-action: manipulation !important;
 
-  -webkit-user-select: none !important;
-  user-select: none !important;
+  outline: none !important;
 
-  -webkit-touch-callout: none !important;
-  -webkit-tap-highlight-color: transparent !important;
+  overflow: hidden;
+
+  pointer-events: auto !important;
+
+  z-index: 31;
 
   transform: none !important;
   -webkit-transform: none !important;
+
+  transition:
+    background-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
-.home-plus-button svg,
-.home-plus-icon {
+/* =====================================================
+   PLUS HOVER
+===================================================== */
+
+.home-plus-button:hover:not(:disabled) {
+  background: #193652 !important;
+  color: #d7f6ff !important;
+}
+
+/* =====================================================
+   PLUS ACTIVE
+===================================================== */
+
+.home-plus-button:active:not(:disabled) {
+  background: #00c2ff !important;
+  color: #081420 !important;
+
+  box-shadow:
+    0 0 0 5px rgba(0, 194, 255, 0.15),
+    0 5px 16px rgba(0, 194, 255, 0.35) !important;
+}
+
+/* =====================================================
+   PLUS DISABLED
+===================================================== */
+
+.home-plus-button:disabled,
+.home-plus-button.is-disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
   pointer-events: none !important;
+}
+
+/* =====================================================
+   PLUS ICON
+
+   Icon TIDAK boleh menangkap touch.
+   BUTTON yang menerima touch.
+===================================================== */
+
+.home-plus-icon {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  pointer-events: none !important;
+
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.home-plus-icon svg {
+  width: 23px;
+  height: 23px;
+
+  display: block;
+
+  pointer-events: none !important;
+
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* =====================================================
+   CHAT INPUT BOX
+===================================================== */
+
+.chat-input-box {
+  flex: 1 1 auto;
+
+  width: auto;
+  min-width: 0;
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 10px;
+
+  background: #13283f;
+
+  border-radius: 28px;
+
+  padding: 7px 8px 7px 18px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  box-shadow:
+    0 8px 25px rgba(0, 0, 0, 0.25);
+
+  position: relative;
+
+  z-index: 22;
+
+  pointer-events: auto;
+}
+
+/* =====================================================
+   TEXTAREA
+===================================================== */
+
+.chat-input {
+  flex: 1 1 auto;
+
+  width: auto;
+  min-width: 0;
+
+  resize: none;
+
+  overflow-y: auto;
+
+  background: transparent !important;
+  color: #fff !important;
+
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+
+  font-size: 15px;
+  line-height: 22px;
+
+  min-height: 40px;
+  max-height: 110px;
+
+  padding: 8px 0;
+  margin: 0;
+
+  box-sizing: border-box;
+
+  -webkit-tap-highlight-color: transparent;
+
+  touch-action: manipulation;
+}
+
+/* =====================================================
+   SEND BUTTON
+===================================================== */
+
+.send-btn {
+  width: 46px !important;
+  height: 46px !important;
+
+  min-width: 46px !important;
+  min-height: 46px !important;
+
+  max-width: 46px !important;
+  max-height: 46px !important;
+
+  flex: 0 0 46px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  border-radius: 50% !important;
+
+  border: none !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  position: relative;
+
+  background: #00c2ff !important;
+  color: #081420 !important;
+
+  touch-action: manipulation;
+
+  -webkit-tap-highlight-color: transparent;
+
+  outline: none !important;
+
+  box-shadow: none !important;
+
+  transition:
+    background-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.send-btn:disabled {
+  background: #4b647a !important;
+  opacity: 1 !important;
+}
+
+.send-btn:focus,
+.send-btn:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.send-btn:active:not(:disabled) {
+  transform: scale(0.90);
+}
+
+/* =====================================================
+   SEND ICON
+===================================================== */
+
+.send-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  pointer-events: none;
+
+  color: #081420;
+
+  transition:
+    transform 0.12s ease;
+}
+
+.send-icon svg {
+  pointer-events: none !important;
+}
+
+.send-btn:active:not(:disabled) .send-icon {
+  transform: scale(0.82);
 }
 
 /* =====================================================
@@ -319,7 +602,8 @@ svg {
 
   border: 1px solid rgba(24, 216, 255, 0.18);
 
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.25);
 }
 
 .home-image-preview img {
@@ -358,7 +642,8 @@ svg {
 
   cursor: pointer;
 
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 5px 15px rgba(0, 0, 0, 0.3);
 
   touch-action: manipulation;
 }
@@ -383,6 +668,7 @@ svg {
   html,
   body,
   #root {
+    width: 100%;
     min-height: 100%;
   }
 
@@ -395,63 +681,87 @@ svg {
     height: 44px;
   }
 
-  /*
-   * MOBILE:
-   * Input wajib berada di atas ChatBox.
-   */
-
   .home-input-container {
     position: relative !important;
-
-    z-index: 999999 !important;
-
+    z-index: 20 !important;
     isolation: isolate;
-
     pointer-events: auto !important;
   }
 
-  .home-input-row {
-    position: relative !important;
+  .chat-input-root {
+    width: 100%;
+    max-width: 100%;
+  }
 
-    z-index: 1000000 !important;
+  .chat-input-row {
+    width: 100%;
+    gap: 7px;
 
-    pointer-events: auto !important;
+    position: relative;
+    z-index: 21;
   }
 
   .home-plus-wrapper {
-    position: relative !important;
+    flex: 0 0 52px;
 
-    z-index: 1000001 !important;
+    width: 52px;
+    height: 46px;
 
-    pointer-events: auto !important;
+    min-width: 52px;
+    max-width: 52px;
 
-    touch-action: manipulation !important;
+    min-height: 46px;
+    max-height: 46px;
+
+    z-index: 30;
   }
 
   .home-plus-button {
-    position: relative !important;
+    width: 52px !important;
+    height: 46px !important;
 
-    z-index: 1000002 !important;
+    min-width: 52px !important;
+    min-height: 46px !important;
+
+    max-width: 52px !important;
+    max-height: 46px !important;
+
+    flex: 0 0 52px !important;
+
+    z-index: 31 !important;
 
     pointer-events: auto !important;
 
     touch-action: manipulation !important;
-
-    -webkit-touch-callout: none !important;
-
-    -webkit-tap-highlight-color: transparent !important;
   }
 
-  /*
-   * Chat area tetap bisa scroll,
-   * tetapi berada di bawah input.
-   */
+  .chat-input-box {
+    flex: 1 1 auto;
+    min-width: 0;
 
-  .home-messages {
-    position: relative;
-    z-index: 1;
+    padding:
+      7px
+      7px
+      7px
+      15px;
+
+    gap: 7px;
   }
 
+  .chat-input {
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .send-btn {
+    width: 46px !important;
+    height: 46px !important;
+
+    min-width: 46px !important;
+    min-height: 46px !important;
+  }
+
+  .home-messages,
   .home-chat-container {
     position: relative;
     z-index: 1;
@@ -459,7 +769,46 @@ svg {
 }
 
 /* =====================================================
-   TABLET / DESKTOP
+   HP KECIL
+===================================================== */
+
+@media (max-width: 380px) {
+  .chat-input-row {
+    gap: 6px;
+  }
+
+  .home-plus-wrapper {
+    flex: 0 0 50px;
+
+    width: 50px;
+    height: 46px;
+
+    min-width: 50px;
+    max-width: 50px;
+  }
+
+  .home-plus-button {
+    width: 50px !important;
+    height: 46px !important;
+
+    min-width: 50px !important;
+    max-width: 50px !important;
+
+    flex: 0 0 50px !important;
+  }
+
+  .chat-input-box {
+    padding-left: 13px;
+    padding-right: 6px;
+  }
+
+  .chat-input {
+    font-size: 13px;
+  }
+}
+
+/* =====================================================
+   DESKTOP
 ===================================================== */
 
 @media (min-width: 768px) {
@@ -467,38 +816,34 @@ svg {
     overflow-x: hidden;
   }
 
-  .home-input-container {
-    position: relative;
-
-    z-index: 999999 !important;
-
-    isolation: isolate;
-
-    pointer-events: auto !important;
-  }
-
-  .home-input-row {
-    position: relative;
-
-    z-index: 1000000 !important;
+  .chat-input-root {
+    max-width: 900px;
   }
 
   .home-plus-wrapper {
-    position: relative;
+    flex: 0 0 52px;
 
-    z-index: 1000001 !important;
+    width: 52px;
+    height: 46px;
+
+    min-width: 52px;
+    max-width: 52px;
   }
 
   .home-plus-button {
-    position: relative;
+    width: 52px !important;
+    height: 46px !important;
 
-    z-index: 1000002 !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+
+    flex: 0 0 52px !important;
   }
 }
 
-/* ==========================================
-   DESKTOP RESPONSIVE
-========================================== */
+/* =====================================================
+   DESKTOP BESAR
+===================================================== */
 
 @media (min-width: 1200px) {
   .home-chat-container,
@@ -511,6 +856,10 @@ svg {
     max-width: 760px;
   }
 }
+
+/* =====================================================
+   TABLET
+===================================================== */
 
 @media (min-width: 769px) and (max-width: 1100px) {
   .home-chat-container,
@@ -527,47 +876,5 @@ svg {
 
   .home-title {
     font-size: 34px;
-  }
-}
-
-/* ==========================================
-   MOBILE CHAT INPUT
-========================================== */
-
-@media (max-width: 768px) {
-  .home-input-container {
-    position: relative !important;
-
-    z-index: 999999 !important;
-
-    pointer-events: auto !important;
-
-    isolation: isolate;
-  }
-
-  .home-input-row {
-    position: relative !important;
-
-    z-index: 1000000 !important;
-
-    pointer-events: auto !important;
-  }
-
-  .home-plus-wrapper {
-    position: relative !important;
-
-    z-index: 1000001 !important;
-
-    pointer-events: auto !important;
-  }
-
-  .home-plus-button {
-    position: relative !important;
-
-    z-index: 1000002 !important;
-
-    pointer-events: auto !important;
-
-    touch-action: manipulation !important;
   }
 }
