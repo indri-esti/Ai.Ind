@@ -2,6 +2,10 @@ import json
 import os
 
 
+# ==================================================
+# BASE DIRECTORY
+# ==================================================
+
 BASE_DIR = os.path.dirname(
     os.path.abspath(__file__)
 )
@@ -13,6 +17,10 @@ DATA_DIR = os.path.join(
 
 MAX_HISTORY = 20
 
+
+# ==================================================
+# MEMORY FILE
+# ==================================================
 
 def get_memory_file(user_id=None):
 
@@ -40,6 +48,10 @@ def get_memory_file(user_id=None):
     )
 
 
+# ==================================================
+# LOAD MEMORY
+# ==================================================
+
 def load_memory(user_id=None):
 
     file = get_memory_file(
@@ -55,7 +67,6 @@ def load_memory(user_id=None):
 
         return []
 
-
     try:
 
         with open(
@@ -66,7 +77,7 @@ def load_memory(user_id=None):
 
             memory = json.load(f)
 
-
+        # Memory harus berupa list
         if not isinstance(
             memory,
             list
@@ -74,43 +85,51 @@ def load_memory(user_id=None):
 
             return []
 
-
         valid_memory = []
-
 
         for item in memory:
 
-            if (
-                isinstance(item, dict)
-                and item.get("role")
-                in [
-                    "user",
-                    "assistant"
-                ]
-                and isinstance(
-                    item.get("content"),
-                    str
-                )
-                and item.get(
-                    "content"
-                ).strip()
+            if not isinstance(
+                item,
+                dict
             ):
+                continue
 
-                valid_memory.append({
+            role = item.get(
+                "role"
+            )
 
-                    "role":
-                        item["role"],
+            content = item.get(
+                "content"
+            )
 
-                    "content":
-                        item["content"].strip()
+            if role not in [
+                "user",
+                "assistant"
+            ]:
+                continue
 
-                })
+            # Memory lama hanya mendukung string.
+            # Tetap pertahankan kompatibilitas.
+            if not isinstance(
+                content,
+                str
+            ):
+                continue
 
+            content = content.strip()
+
+            if not content:
+                continue
+
+            valid_memory.append({
+                "role": role,
+                "content": content
+            })
 
         return valid_memory[
             -MAX_HISTORY:
         ]
-
 
     except (
         json.JSONDecodeError,
@@ -124,6 +143,10 @@ def load_memory(user_id=None):
 
         return []
 
+
+# ==================================================
+# SAVE MEMORY
+# ==================================================
 
 def save_memory(
     memory,
@@ -139,7 +162,6 @@ def save_memory(
         exist_ok=True
     )
 
-
     if not isinstance(
         memory,
         list
@@ -147,11 +169,9 @@ def save_memory(
 
         memory = []
 
-
     memory = memory[
         -MAX_HISTORY:
     ]
-
 
     try:
 
@@ -168,7 +188,6 @@ def save_memory(
                 indent=2
             )
 
-
     except OSError as e:
 
         print(
@@ -176,6 +195,10 @@ def save_memory(
             e
         )
 
+
+# ==================================================
+# ADD MESSAGE
+# ==================================================
 
 def add_message(
     role,
@@ -190,36 +213,35 @@ def add_message(
 
         return
 
-
     if (
-        not content
+        content is None
         or not str(content).strip()
     ):
 
         return
 
-
     memory = load_memory(
         user_id
     )
 
-
     memory.append({
 
-        "role":
-            role,
+        "role": role,
 
         "content":
             str(content).strip()
 
     })
 
-
     save_memory(
         memory,
         user_id
     )
 
+
+# ==================================================
+# CLEAR MEMORY
+# ==================================================
 
 def clear_memory(
     user_id=None
@@ -231,6 +253,10 @@ def clear_memory(
     )
 
 
+# ==================================================
+# DELETE USER MEMORY
+# ==================================================
+
 def delete_user_memory(
     user_id
 ):
@@ -238,7 +264,6 @@ def delete_user_memory(
     file = get_memory_file(
         user_id
     )
-
 
     try:
 
@@ -249,7 +274,6 @@ def delete_user_memory(
             print(
                 f"Memory user {user_id} berhasil dihapus."
             )
-
 
     except OSError as e:
 
