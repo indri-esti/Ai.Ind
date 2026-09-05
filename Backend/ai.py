@@ -4,6 +4,7 @@ import time
 
 from config import API_KEY, BASE_URL, MODEL
 from prompt import SYSTEM_PROMPT
+from memory import get_memory_context
 
 
 # ==================================================
@@ -35,6 +36,10 @@ MAX_RETRY_WAIT = 65
 
 # Maksimal ukuran gambar.
 MAX_IMAGE_CHARS = 5_500_000
+
+# Maksimal karakter memory jangka panjang
+# yang dimasukkan ke context AI.
+MAX_MEMORY_CONTEXT_CHARS = 6000
 
 
 # ==================================================
@@ -458,6 +463,58 @@ def siapkan_history(history):
 
 
 # ==================================================
+# SIAPKAN MEMORY JANGKA PANJANG
+# ==================================================
+
+def siapkan_memory_context(
+    user_id=None
+):
+
+    if user_id is None:
+        return ""
+
+    try:
+
+        memory_context = (
+            get_memory_context(
+                user_id
+            )
+        )
+
+    except Exception as e:
+
+        print(
+            "Long term memory context error:",
+            repr(e)
+        )
+
+        return ""
+
+    if not memory_context:
+        return ""
+
+    memory_context = str(
+        memory_context
+    ).strip()
+
+    if not memory_context:
+        return ""
+
+    # Batas tambahan untuk berjaga-jaga
+    # agar memory tidak terlalu besar.
+    if len(memory_context) > MAX_MEMORY_CONTEXT_CHARS:
+
+        memory_context = (
+            memory_context[
+                :MAX_MEMORY_CONTEXT_CHARS
+            ]
+            + "\n[Memory dipersingkat]"
+        )
+
+    return memory_context
+
+
+# ==================================================
 # AMBIL WAKTU RETRY
 # ==================================================
 
@@ -682,7 +739,8 @@ def request_groq(
 def balas(
     pesan,
     history=None,
-    image=None
+    image=None,
+    user_id=None
 ):
 
     # ==================================================
@@ -729,6 +787,36 @@ def balas(
     system_prompt = str(
         SYSTEM_PROMPT
     ).strip()
+
+    # ==================================================
+    # MEMORY JANGKA PANJANG
+    # ==================================================
+
+    memory_context = (
+        siapkan_memory_context(
+            user_id
+        )
+    )
+
+    # Memory ditempatkan setelah system prompt
+    # agar AI mengetahui konteks penting pengguna.
+    if memory_context:
+
+        system_prompt = (
+            system_prompt
+            + "\n\n"
+            + "==================================================\n"
+            + "MEMORY JANGKA PANJANG PENGGUNA\n"
+            + "==================================================\n"
+            + "\n"
+            + memory_context
+            + "\n\n"
+            + "Gunakan memory ini hanya jika relevan "
+              "dengan percakapan saat ini. "
+              "Jangan menyebutkan bahwa memory internal "
+              "sedang digunakan kecuali pengguna memang "
+              "menanyakannya."
+        )
 
     messages = [
         {
