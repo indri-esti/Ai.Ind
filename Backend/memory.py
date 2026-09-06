@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ==================================================
@@ -17,81 +17,434 @@ DATA_DIR = os.path.join(
     "data"
 )
 
-MAX_HISTORY = 20
 
-# Maksimal memory jangka panjang.
+# ==================================================
+# LIMIT
+# ==================================================
+
+MAX_HISTORY = 30
+
 MAX_LONG_TERM_MEMORY = 100
 
-# Maksimal karakter satu memory.
 MAX_MEMORY_CHARS = 1000
 
-# Maksimal karakter context memory
-# yang nantinya diberikan ke AI.
-MAX_MEMORY_CONTEXT_CHARS = 6000
+MAX_MEMORY_CONTEXT_CHARS = 8000
+
+
+# ==================================================
+# ENSURE DATA DIRECTORY
+# ==================================================
+
+def ensure_data_dir():
+
+    os.makedirs(
+        DATA_DIR,
+        exist_ok=True
+    )
+
+
+# ==================================================
+# SAFE USER ID
+# ==================================================
+
+def safe_user_id(
+    user_id
+):
+
+    if user_id is None:
+        return "default"
+
+    value = str(
+        user_id
+    ).strip()
+
+    if not value:
+        return "default"
+
+    value = re.sub(
+        r"[^a-zA-Z0-9_.-]",
+        "_",
+        value
+    )
+
+    return value[:100]
 
 
 # ==================================================
 # MEMORY FILE
 # ==================================================
 
-def get_memory_file(user_id=None):
+def get_memory_file(
+    user_id=None
+):
 
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True
-    )
-
-    if user_id is not None:
-
-        safe_user_id = (
-            str(user_id)
-            .replace("/", "_")
-            .replace("\\", "_")
-        )
-
-        return os.path.join(
-            DATA_DIR,
-            f"memory_{safe_user_id}.json"
-        )
+    ensure_data_dir()
 
     return os.path.join(
         DATA_DIR,
-        "memory.json"
+        f"memory_{safe_user_id(user_id)}.json"
     )
 
 
 # ==================================================
-# LONG TERM MEMORY FILE
+# LONG MEMORY FILE
 # ==================================================
 
-def get_long_term_memory_file(user_id=None):
+def get_long_term_memory_file(
+    user_id=None
+):
 
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True
-    )
-
-    if user_id is not None:
-
-        safe_user_id = (
-            str(user_id)
-            .replace("/", "_")
-            .replace("\\", "_")
-        )
-
-        return os.path.join(
-            DATA_DIR,
-            f"long_memory_{safe_user_id}.json"
-        )
+    ensure_data_dir()
 
     return os.path.join(
         DATA_DIR,
-        "long_memory.json"
+        f"long_memory_{safe_user_id(user_id)}.json"
     )
 
 
 # ==================================================
-# GET MEMORY DATA
+# READ JSON
+# ==================================================
+
+def read_json(
+    file,
+    default
+):
+
+    if not os.path.exists(
+        file
+    ):
+
+        return default
+
+    try:
+
+        with open(
+            file,
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return json.load(f)
+
+    except (
+        json.JSONDecodeError,
+        OSError
+    ) as e:
+
+        print(
+            "[Memory] JSON read error:",
+            repr(e)
+        )
+
+        return default
+
+
+# ==================================================
+# WRITE JSON
+# ==================================================
+
+def write_json(
+    file,
+    data
+):
+
+    ensure_data_dir()
+
+    temporary_file = (
+        file + ".tmp"
+    )
+
+    try:
+
+        with open(
+            temporary_file,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                data,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+        os.replace(
+            temporary_file,
+            file
+        )
+
+        return True
+
+    except OSError as e:
+
+        print(
+            "[Memory] JSON write error:",
+            repr(e)
+        )
+
+        try:
+
+            if os.path.exists(
+                temporary_file
+            ):
+
+                os.remove(
+                    temporary_file
+                )
+
+        except OSError:
+            pass
+
+        return False
+
+
+# ==================================================
+# LOAD CHAT MEMORY
+# ==================================================
+
+def load_memory(
+    user_id=None
+):
+
+    file = get_memory_file(
+        user_id
+    )
+
+    data = read_json(
+        file,
+        []
+    )
+
+    # --------------------------------------------------
+    # FORMAT LAMA
+    # --------------------------------------------------
+
+    if isinstance(
+        data,
+        list
+    ):
+
+        history = data
+
+    # --------------------------------------------------
+    # FORMAT BARU
+    # --------------------------------------------------
+
+    elif isinstance(
+        data,
+        dict
+    ):
+
+        history = data.get(
+            "history",
+            []
+        )
+
+    else:
+
+        return []
+
+    if not isinstance(
+        history,
+        list
+    ):
+
+        return []
+
+    result = []
+
+    for item in history:
+
+        if not isinstance(
+            item,
+            dict
+        ):
+
+            continue
+
+        role = item.get(
+            "role"
+        )
+
+        content = item.get(
+            "content"
+        )
+
+        if role not in (
+            "user",
+            "assistant"
+        ):
+
+            continue
+
+        if content is None:
+            continue
+
+        content = str(
+            content
+        ).strip()
+
+        if not content:
+            continue
+
+        result.append({
+
+            "role":
+                role,
+
+            "content":
+                content
+
+        })
+
+    return result[
+        -MAX_HISTORY:
+    ]
+
+
+# ==================================================
+# SAVE CHAT MEMORY
+# ==================================================
+
+def save_memory(
+    memory,
+    user_id=None
+):
+
+    if not isinstance(
+        memory,
+        list
+    ):
+
+        memory = []
+
+    result = []
+
+    for item in memory:
+
+        if not isinstance(
+            item,
+            dict
+        ):
+
+            continue
+
+        role = item.get(
+            "role"
+        )
+
+        content = item.get(
+            "content"
+        )
+
+        if role not in (
+            "user",
+            "assistant"
+        ):
+
+            continue
+
+        if content is None:
+            continue
+
+        content = str(
+            content
+        ).strip()
+
+        if not content:
+            continue
+
+        result.append({
+
+            "role":
+                role,
+
+            "content":
+                content
+
+        })
+
+    result = result[
+        -MAX_HISTORY:
+    ]
+
+    return write_json(
+        get_memory_file(
+            user_id
+        ),
+        result
+    )
+
+
+# ==================================================
+# ADD MESSAGE
+# ==================================================
+
+def add_message(
+    role,
+    content,
+    user_id=None
+):
+
+    if role not in (
+        "user",
+        "assistant"
+    ):
+
+        return
+
+    if content is None:
+        return
+
+    content = str(
+        content
+    ).strip()
+
+    if not content:
+        return
+
+    memory = load_memory(
+        user_id
+    )
+
+    memory.append({
+
+        "role":
+            role,
+
+        "content":
+            content
+
+    })
+
+    save_memory(
+        memory,
+        user_id
+    )
+
+    # Hanya user message yang
+    # dipertimbangkan untuk long-term memory.
+    if role == "user":
+
+        try:
+
+            deteksi_memory_penting(
+                content,
+                user_id
+            )
+
+        except Exception as e:
+
+            print(
+                "[Memory] Detection error:",
+                repr(e)
+            )
+
+
+# ==================================================
+# LONG MEMORY DATA
 # ==================================================
 
 def get_memory_data(
@@ -102,81 +455,52 @@ def get_memory_data(
         user_id
     )
 
-    if not os.path.exists(file):
+    data = read_json(
+        file,
+        {
+            "memories": []
+        }
+    )
+
+    if not isinstance(
+        data,
+        dict
+    ):
 
         return {
             "memories": []
         }
 
-    try:
+    memories = data.get(
+        "memories",
+        []
+    )
 
-        with open(
-            file,
-            "r",
-            encoding="utf-8"
-        ) as f:
+    if not isinstance(
+        memories,
+        list
+    ):
 
-            data = json.load(f)
+        memories = []
 
-        if not isinstance(
-            data,
-            dict
-        ):
+    return {
 
-            return {
-                "memories": []
-            }
-
-        memories = data.get(
-            "memories",
-            []
-        )
-
-        if not isinstance(
-            memories,
-            list
-        ):
-
-            memories = []
-
-        return {
-            "memories": memories[
+        "memories":
+            memories[
                 -MAX_LONG_TERM_MEMORY:
             ]
-        }
 
-    except (
-        json.JSONDecodeError,
-        OSError
-    ) as e:
-
-        print(
-            "Long term memory load error:",
-            e
-        )
-
-        return {
-            "memories": []
-        }
+    }
 
 
 # ==================================================
-# SAVE MEMORY DATA
+# SAVE LONG MEMORY
 # ==================================================
 
 def save_memory_data(
     data,
     user_id=None
 ):
-
-    file = get_long_term_memory_file(
-        user_id
-    )
-
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True
-    )
 
     if not isinstance(
         data,
@@ -203,368 +527,22 @@ def save_memory_data(
         -MAX_LONG_TERM_MEMORY:
     ]
 
-    data = {
-        "memories": memories
-    }
+    return write_json(
 
-    try:
-
-        with open(
-            file,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                data,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
-    except OSError as e:
-
-        print(
-            "Long term memory save error:",
-            e
-        )
-
-
-# ==================================================
-# LOAD MEMORY
-# ==================================================
-
-def load_memory(
-    user_id=None
-):
-
-    file = get_memory_file(
-        user_id
-    )
-
-    if not os.path.exists(file):
-
-        save_memory(
-            [],
+        get_long_term_memory_file(
             user_id
-        )
+        ),
 
-        return []
+        {
+            "memories":
+                memories
+        }
 
-    try:
-
-        with open(
-            file,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            memory = json.load(f)
-
-        # --------------------------------------------------
-        # FORMAT MEMORY LAMA
-        # --------------------------------------------------
-
-        if isinstance(
-            memory,
-            list
-        ):
-
-            valid_memory = []
-
-            for item in memory:
-
-                if not isinstance(
-                    item,
-                    dict
-                ):
-
-                    continue
-
-                role = item.get(
-                    "role"
-                )
-
-                content = item.get(
-                    "content"
-                )
-
-                if role not in [
-                    "user",
-                    "assistant"
-                ]:
-
-                    continue
-
-                if not isinstance(
-                    content,
-                    str
-                ):
-
-                    continue
-
-                content = content.strip()
-
-                if not content:
-                    continue
-
-                valid_memory.append({
-                    "role": role,
-                    "content": content
-                })
-
-            return valid_memory[
-                -MAX_HISTORY:
-            ]
-
-        # --------------------------------------------------
-        # FORMAT BARU
-        # --------------------------------------------------
-
-        if isinstance(
-            memory,
-            dict
-        ):
-
-            history = memory.get(
-                "history",
-                []
-            )
-
-            if not isinstance(
-                history,
-                list
-            ):
-
-                return []
-
-            valid_memory = []
-
-            for item in history:
-
-                if not isinstance(
-                    item,
-                    dict
-                ):
-
-                    continue
-
-                role = item.get(
-                    "role"
-                )
-
-                content = item.get(
-                    "content"
-                )
-
-                if role not in [
-                    "user",
-                    "assistant"
-                ]:
-
-                    continue
-
-                if not isinstance(
-                    content,
-                    str
-                ):
-
-                    continue
-
-                content = content.strip()
-
-                if not content:
-                    continue
-
-                valid_memory.append({
-                    "role": role,
-                    "content": content
-                })
-
-            return valid_memory[
-                -MAX_HISTORY:
-            ]
-
-        return []
-
-    except (
-        json.JSONDecodeError,
-        OSError
-    ) as e:
-
-        print(
-            "Memory load error:",
-            e
-        )
-
-        return []
-
-
-# ==================================================
-# SAVE MEMORY
-# ==================================================
-
-def save_memory(
-    memory,
-    user_id=None
-):
-
-    file = get_memory_file(
-        user_id
     )
 
-    os.makedirs(
-        DATA_DIR,
-        exist_ok=True
-    )
-
-    if not isinstance(
-        memory,
-        list
-    ):
-
-        memory = []
-
-    valid_memory = []
-
-    for item in memory:
-
-        if not isinstance(
-            item,
-            dict
-        ):
-
-            continue
-
-        role = item.get(
-            "role"
-        )
-
-        content = item.get(
-            "content"
-        )
-
-        if role not in [
-            "user",
-            "assistant"
-        ]:
-
-            continue
-
-        if not isinstance(
-            content,
-            str
-        ):
-
-            continue
-
-        content = content.strip()
-
-        if not content:
-            continue
-
-        valid_memory.append({
-            "role": role,
-            "content": content
-        })
-
-    valid_memory = valid_memory[
-        -MAX_HISTORY:
-    ]
-
-    try:
-
-        with open(
-            file,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                valid_memory,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
-    except OSError as e:
-
-        print(
-            "Memory save error:",
-            e
-        )
-
 
 # ==================================================
-# ADD MESSAGE
-# ==================================================
-
-def add_message(
-    role,
-    content,
-    user_id=None
-):
-
-    if role not in [
-        "user",
-        "assistant"
-    ]:
-
-        return
-
-    if (
-        content is None
-        or not str(content).strip()
-    ):
-
-        return
-
-    content = str(
-        content
-    ).strip()
-
-    memory = load_memory(
-        user_id
-    )
-
-    memory.append({
-
-        "role":
-            role,
-
-        "content":
-            content
-
-    })
-
-    save_memory(
-        memory,
-        user_id
-    )
-
-    # --------------------------------------------------
-    # Coba deteksi informasi penting secara otomatis.
-    # --------------------------------------------------
-
-    if role == "user":
-
-        try:
-
-            deteksi_memory_penting(
-                content,
-                user_id
-            )
-
-        except Exception as e:
-
-            print(
-                "Memory detection error:",
-                e
-            )
-
-
-# ==================================================
-# DETEKSI MEMORY PENTING
+# DETEKSI MEMORY
 # ==================================================
 
 def deteksi_memory_penting(
@@ -579,42 +557,49 @@ def deteksi_memory_penting(
         content
     ).strip()
 
-    if not text:
-        return
-
-    # Jangan menyimpan pesan yang terlalu pendek.
     if len(text) < 8:
         return
 
-    text_lower = text.lower()
+    lower = text.lower()
 
-    kategori = None
+    category = None
 
     # ==================================================
-    # PREFERENSI
+    # PREFERENCE
     # ==================================================
 
     preference_patterns = [
-        r"\bakulah\b",
+
         r"\baku suka\b",
+
         r"\baku tidak suka\b",
-        r"\baku nggak suka\b",
+
         r"\baku gak suka\b",
-        r"\bjangan panggil aku\b",
-        r"\bpanggil aku\b",
+
+        r"\baku nggak suka\b",
+
         r"\baku lebih suka\b",
+
+        r"\bjangan panggil aku\b",
+
+        r"\bpanggil aku\b",
+
         r"\baku ingin\b",
-        r"\bakumau\b"
+
+        r"\baku mau\b",
+
     ]
 
     for pattern in preference_patterns:
 
         if re.search(
             pattern,
-            text_lower
+            lower
         ):
 
-            kategori = "preference"
+            category = (
+                "preference"
+            )
 
             break
 
@@ -622,98 +607,129 @@ def deteksi_memory_penting(
     # PROJECT
     # ==================================================
 
-    project_patterns = [
-        r"\bproject\b",
-        r"\bprojek\b",
-        r"\baplikasi\b",
-        r"\bwebsite\b",
-        r"\bweb\b",
-        r"\bapp\b",
-        r"\bgithub\b",
-        r"\breact\b",
-        r"\bvite\b",
-        r"\bpython\b",
-        r"\bflask\b",
-        r"\bfastapi\b",
-        r"\bjava\b",
-        r"\bspring boot\b",
-        r"\bsql\b"
-    ]
+    if category is None:
 
-    if kategori is None:
+        project_patterns = [
+
+            r"\bproject\b",
+
+            r"\bprojek\b",
+
+            r"\baplikasi\b",
+
+            r"\bwebsite\b",
+
+            r"\bgithub\b",
+
+            r"\bgitlab\b",
+
+            r"\breact\b",
+
+            r"\bvite\b",
+
+            r"\bpython\b",
+
+            r"\bflask\b",
+
+            r"\bfastapi\b",
+
+            r"\bjava\b",
+
+            r"\bspring boot\b",
+
+            r"\bsql\b",
+
+            r"\bandroid\b",
+
+        ]
 
         for pattern in project_patterns:
 
             if re.search(
                 pattern,
-                text_lower
+                lower
             ):
 
-                kategori = "project"
+                category = (
+                    "project"
+                )
 
                 break
 
     # ==================================================
-    # INFORMASI PRIBADI YANG TIDAK SENSITIF
+    # CONTEXT
     # ==================================================
 
-    personal_patterns = [
-        r"\baku sedang belajar\b",
-        r"\baku belajar\b",
-        r"\baku kelas\b",
-        r"\baku sekolah\b",
-        r"\baku kerja\b",
-        r"\baku kuliah\b",
-        r"\baku tinggal\b"
-    ]
+    if category is None:
 
-    if kategori is None:
+        context_patterns = [
 
-        for pattern in personal_patterns:
+            r"\baku sedang belajar\b",
+
+            r"\baku belajar\b",
+
+            r"\baku kelas\b",
+
+            r"\baku sekolah\b",
+
+            r"\baku kerja\b",
+
+            r"\baku kuliah\b",
+
+        ]
+
+        for pattern in context_patterns:
 
             if re.search(
                 pattern,
-                text_lower
+                lower
             ):
 
-                kategori = "context"
+                category = (
+                    "context"
+                )
 
                 break
 
     # ==================================================
-    # TUJUAN
+    # GOAL
     # ==================================================
 
-    goal_patterns = [
-        r"\baku ingin membuat\b",
-        r"\baku mau membuat\b",
-        r"\baku ingin belajar\b",
-        r"\baku mau belajar\b",
-        r"\btujuanku\b",
-        r"\btargetku\b",
-        r"\btarget saya\b",
-        r"\brencanaku\b"
-    ]
+    if category is None:
 
-    if kategori is None:
+        goal_patterns = [
+
+            r"\baku ingin membuat\b",
+
+            r"\baku mau membuat\b",
+
+            r"\baku ingin belajar\b",
+
+            r"\baku mau belajar\b",
+
+            r"\btujuanku\b",
+
+            r"\btargetku\b",
+
+            r"\brencanaku\b",
+
+        ]
 
         for pattern in goal_patterns:
 
             if re.search(
                 pattern,
-                text_lower
+                lower
             ):
 
-                kategori = "goal"
+                category = (
+                    "goal"
+                )
 
                 break
 
-    if kategori is None:
+    if category is None:
         return
-
-    # ==================================================
-    # BATAS PANJANG
-    # ==================================================
 
     if len(text) > MAX_MEMORY_CHARS:
 
@@ -724,24 +740,20 @@ def deteksi_memory_penting(
             + "..."
         )
 
-    # ==================================================
-    # SIMPAN
-    # ==================================================
-
     tambah_memory_penting(
         text,
-        kategori,
+        category,
         user_id
     )
 
 
 # ==================================================
-# TAMBAH MEMORY PENTING
+# ADD LONG MEMORY
 # ==================================================
 
 def tambah_memory_penting(
     content,
-    category="context",
+    category="general",
     user_id=None
 ):
 
@@ -764,13 +776,15 @@ def tambah_memory_penting(
             + "..."
         )
 
-    if category not in [
+    allowed = (
         "preference",
         "project",
         "context",
         "goal",
         "general"
-    ]:
+    )
+
+    if category not in allowed:
 
         category = "general"
 
@@ -783,13 +797,19 @@ def tambah_memory_penting(
         []
     )
 
-    # ==================================================
-    # CEK DUPLIKAT
-    # ==================================================
-
-    content_normalized = (
-        content.lower().strip()
+    normalized = (
+        re.sub(
+            r"\s+",
+            " ",
+            content
+        )
+        .lower()
+        .strip()
     )
+
+    # --------------------------------------------------
+    # DUPLICATE
+    # --------------------------------------------------
 
     for item in memories:
 
@@ -800,20 +820,33 @@ def tambah_memory_penting(
 
             continue
 
-        old_content = str(
+        old = str(
             item.get(
                 "content",
                 ""
             )
-        ).lower().strip()
+        )
 
-        if old_content == content_normalized:
+        old_normalized = (
+            re.sub(
+                r"\s+",
+                " ",
+                old
+            )
+            .lower()
+            .strip()
+        )
+
+        if (
+            old_normalized
+            == normalized
+        ):
 
             return
 
-    # ==================================================
-    # MEMORY BARU
-    # ==================================================
+    # --------------------------------------------------
+    # ADD
+    # --------------------------------------------------
 
     memories.append({
 
@@ -824,13 +857,11 @@ def tambah_memory_penting(
             category,
 
         "created_at":
-            datetime.utcnow().isoformat()
+            datetime.now(
+                timezone.utc
+            ).isoformat()
 
     })
-
-    # ==================================================
-    # BATASI JUMLAH
-    # ==================================================
 
     memories = memories[
         -MAX_LONG_TERM_MEMORY:
@@ -846,7 +877,7 @@ def tambah_memory_penting(
 
 
 # ==================================================
-# GET LONG TERM MEMORY
+# LOAD LONG MEMORY
 # ==================================================
 
 def load_long_term_memory(
@@ -862,14 +893,7 @@ def load_long_term_memory(
         []
     )
 
-    if not isinstance(
-        memories,
-        list
-    ):
-
-        return []
-
-    hasil = []
+    result = []
 
     for item in memories:
 
@@ -887,10 +911,12 @@ def load_long_term_memory(
         if not content:
             continue
 
-        hasil.append({
+        result.append({
 
             "content":
-                str(content).strip(),
+                str(
+                    content
+                ).strip(),
 
             "category":
                 item.get(
@@ -906,13 +932,13 @@ def load_long_term_memory(
 
         })
 
-    return hasil[
+    return result[
         -MAX_LONG_TERM_MEMORY:
     ]
 
 
 # ==================================================
-# GET MEMORY CONTEXT
+# MEMORY CONTEXT
 # ==================================================
 
 def get_memory_context(
@@ -930,9 +956,9 @@ def get_memory_context(
 
     bagian = []
 
-    total_chars = 0
+    total = 0
 
-    # Memory terbaru lebih diprioritaskan.
+    # Terbaru lebih diprioritaskan.
     for item in reversed(
         memories
     ):
@@ -950,24 +976,24 @@ def get_memory_context(
         if not content:
             continue
 
-        baris = (
+        line = (
             f"- [{category}] {content}"
         )
 
         if (
-            total_chars
-            + len(baris)
+            total
+            + len(line)
             > MAX_MEMORY_CONTEXT_CHARS
         ):
 
             break
 
         bagian.append(
-            baris
+            line
         )
 
-        total_chars += len(
-            baris
+        total += len(
+            line
         )
 
     bagian.reverse()
@@ -977,12 +1003,14 @@ def get_memory_context(
 
     return (
         "MEMORY PENTING PENGGUNA:\n"
-        + "\n".join(bagian)
+        + "\n".join(
+            bagian
+        )
     )
 
 
 # ==================================================
-# CLEAR MEMORY
+# CLEAR CHAT MEMORY
 # ==================================================
 
 def clear_memory(
@@ -996,37 +1024,39 @@ def clear_memory(
 
 
 # ==================================================
-# CLEAR LONG TERM MEMORY
+# CLEAR LONG MEMORY
 # ==================================================
 
 def clear_long_term_memory(
     user_id=None
 ):
 
-    file = get_long_term_memory_file(
-        user_id
+    file = (
+        get_long_term_memory_file(
+            user_id
+        )
     )
 
     try:
 
-        if os.path.exists(file):
+        if os.path.exists(
+            file
+        ):
 
-            os.remove(file)
-
-            print(
-                "Long term memory berhasil dihapus."
+            os.remove(
+                file
             )
 
     except OSError as e:
 
         print(
-            "Long term memory delete error:",
-            e
+            "[Memory] Delete error:",
+            repr(e)
         )
 
 
 # ==================================================
-# CLEAR ALL MEMORY
+# CLEAR ALL
 # ==================================================
 
 def clear_all_memory(
@@ -1043,66 +1073,40 @@ def clear_all_memory(
 
 
 # ==================================================
-# DELETE USER MEMORY
+# DELETE USER
 # ==================================================
 
 def delete_user_memory(
     user_id
 ):
 
-    # --------------------------------------------------
-    # Hapus history
-    # --------------------------------------------------
+    files = [
 
-    file = get_memory_file(
-        user_id
-    )
+        get_memory_file(
+            user_id
+        ),
 
-    try:
-
-        if os.path.exists(file):
-
-            os.remove(file)
-
-            print(
-                f"Memory user {user_id} berhasil dihapus."
-            )
-
-    except OSError as e:
-
-        print(
-            "Memory delete error:",
-            e
-        )
-
-    # --------------------------------------------------
-    # Hapus long-term memory
-    # --------------------------------------------------
-
-    long_file = (
         get_long_term_memory_file(
             user_id
         )
-    )
 
-    try:
+    ]
 
-        if os.path.exists(
-            long_file
-        ):
+    for file in files:
 
-            os.remove(
-                long_file
-            )
+        try:
+
+            if os.path.exists(
+                file
+            ):
+
+                os.remove(
+                    file
+                )
+
+        except OSError as e:
 
             print(
-                f"Long term memory user {user_id} "
-                "berhasil dihapus."
+                "[Memory] Delete error:",
+                repr(e)
             )
-
-    except OSError as e:
-
-        print(
-            "Long term memory delete error:",
-            e
-        )

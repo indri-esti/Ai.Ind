@@ -1,45 +1,50 @@
-import requests
+import base64
+import json
 import re
 import time
+from typing import Any
 
-from config import API_KEY, BASE_URL, MODEL
+import requests
+
+from config import (
+    API_KEY,
+    BASE_URL,
+    MODEL,
+    VISION_MODEL,
+)
+
 from prompt import SYSTEM_PROMPT
 from memory import get_memory_context
 
 
 # ==================================================
-# MODEL VISION
+# KONFIGURASI
 # ==================================================
 
-VISION_MODEL = "qwen/qwen3.6-27b"
+MAX_HISTORY_CHARS = 20000
 
+MAX_MESSAGE_CHARS = 6000
 
-# ==================================================
-# PENGATURAN
-# ==================================================
+MAX_OUTPUT_TOKENS = 4096
 
-# History yang dikirim ke Groq.
-# Tidak menghapus history di frontend/database.
-MAX_HISTORY_CHARS = 12000
-
-# Maksimal karakter satu pesan history.
-MAX_MESSAGE_CHARS = 4000
-
-# Maksimal token jawaban.
-MAX_OUTPUT_TOKENS = 1200
-
-# Maksimal percobaan request.
 MAX_RETRIES = 3
 
-# Maksimal waktu tunggu retry.
 MAX_RETRY_WAIT = 65
 
-# Maksimal ukuran gambar.
-MAX_IMAGE_CHARS = 5_500_000
+REQUEST_TIMEOUT = 120
 
-# Maksimal karakter memory jangka panjang
-# yang dimasukkan ke context AI.
-MAX_MEMORY_CONTEXT_CHARS = 6000
+MAX_IMAGE_CHARS = 20_000_000
+
+MAX_MEMORY_CONTEXT_CHARS = 8000
+
+
+# ==================================================
+# MODEL
+# ==================================================
+
+TEXT_MODEL = MODEL
+
+IMAGE_MODEL = VISION_MODEL
 
 
 # ==================================================
@@ -48,13 +53,14 @@ MAX_MEMORY_CONTEXT_CHARS = 6000
 
 def bersihkan_jawaban(teks):
 
-    if not teks:
+    if teks is None:
         return ""
 
-    teks = str(teks)
+    if not isinstance(teks, str):
+        teks = str(teks)
 
     # --------------------------------------------------
-    # HAPUS THINK TAG
+    # THINK TAG
     # --------------------------------------------------
 
     teks = re.sub(
@@ -79,7 +85,7 @@ def bersihkan_jawaban(teks):
     )
 
     # --------------------------------------------------
-    # HAPUS ANALYSIS TAG
+    # ANALYSIS / REASONING TAG
     # --------------------------------------------------
 
     teks = re.sub(
@@ -97,92 +103,30 @@ def bersihkan_jawaban(teks):
     )
 
     # --------------------------------------------------
-    # HAPUS HEADING MARKDOWN
+    # HAPUS INTERNAL PROCESS
     # --------------------------------------------------
 
     teks = re.sub(
-        r"^\s*#{1,6}\s?",
-        "",
-        teks,
-        flags=re.MULTILINE
-    )
-
-    # --------------------------------------------------
-    # HAPUS BLOCKQUOTE
-    # --------------------------------------------------
-
-    teks = re.sub(
-        r"^\s*>\s?",
-        "",
-        teks,
-        flags=re.MULTILINE
-    )
-
-    # --------------------------------------------------
-    # HAPUS BOLD
-    # --------------------------------------------------
-
-    teks = teks.replace(
-        "**",
-        ""
-    )
-
-    # --------------------------------------------------
-    # HAPUS ITALIC BULLET YANG SALAH
-    # --------------------------------------------------
-
-    teks = re.sub(
-        r"^\s*\*\s+",
-        "",
-        teks,
-        flags=re.MULTILINE
-    )
-
-    # --------------------------------------------------
-    # HAPUS INFORMASI SAFETY
-    # --------------------------------------------------
-
-    teks = teks.replace(
-        "User Safety: safe",
-        ""
-    )
-
-    teks = teks.replace(
-        "Response Safety: safe",
-        ""
-    )
-
-    # --------------------------------------------------
-    # HAPUS PHRASE THINKING
-    # --------------------------------------------------
-
-    teks = re.sub(
-        r"^\s*(Here's a thinking process:|Heres a thinking process:).*$",
-        "",
-        teks,
-        flags=re.MULTILINE | re.IGNORECASE
-    )
-
-    teks = re.sub(
-        r"^\s*(Here is a thinking process:|Here is my thinking process:).*$",
+        r"^\s*(thinking process|chain of thought|"
+        r"internal reasoning|internal analysis)\s*:?.*$",
         "",
         teks,
         flags=re.MULTILINE | re.IGNORECASE
     )
 
     # --------------------------------------------------
-    # HAPUS PHRASE REASONING
+    # SAFETY STATUS
     # --------------------------------------------------
 
     teks = re.sub(
-        r"^\s*(Reasoning:|Analysis:|Thinking:).*$",
+        r"^\s*(User Safety|Response Safety)\s*:\s*safe\s*$",
         "",
         teks,
         flags=re.MULTILINE | re.IGNORECASE
     )
 
     # --------------------------------------------------
-    # RAPAKAN BARIS
+    # RAPATKAN BARIS
     # --------------------------------------------------
 
     teks = re.sub(
@@ -195,74 +139,7 @@ def bersihkan_jawaban(teks):
 
 
 # ==================================================
-# VALIDASI GAMBAR
-# ==================================================
-
-def validasi_gambar(image):
-
-    if not image:
-        return None
-
-    if not isinstance(
-        image,
-        str
-    ):
-        return None
-
-    image = image.strip()
-
-    if not image.startswith(
-        "data:image/"
-    ):
-
-        return None
-
-    if ";base64," not in image:
-
-        return None
-
-    # Pastikan format gambar valid.
-    mime_match = re.match(
-        r"^data:image/([a-zA-Z0-9.+-]+);base64,",
-        image
-    )
-
-    if not mime_match:
-
-        return None
-
-    mime_type = (
-        mime_match.group(1)
-        .lower()
-    )
-
-    allowed_types = {
-        "jpeg",
-        "jpg",
-        "png",
-        "webp",
-        "gif"
-    }
-
-    if mime_type not in allowed_types:
-
-        raise ValueError(
-            "Format gambar tidak didukung. "
-            "Gunakan JPG, JPEG, PNG, WEBP, atau GIF."
-        )
-
-    if len(image) > MAX_IMAGE_CHARS:
-
-        raise ValueError(
-            "Ukuran gambar terlalu besar. "
-            "Kompres gambar terlebih dahulu."
-        )
-
-    return image
-
-
-# ==================================================
-# EKSTRAK TEKS CONTENT
+# EKSTRAK CONTENT
 # ==================================================
 
 def ekstrak_teks_content(content):
@@ -270,7 +147,6 @@ def ekstrak_teks_content(content):
     if content is None:
         return ""
 
-    # Content biasa berupa string.
     if isinstance(
         content,
         str
@@ -278,14 +154,12 @@ def ekstrak_teks_content(content):
 
         return content.strip()
 
-    # Beberapa response API dapat mengembalikan
-    # content dalam bentuk list.
     if isinstance(
         content,
         list
     ):
 
-        teks_parts = []
+        bagian = []
 
         for part in content:
 
@@ -294,7 +168,7 @@ def ekstrak_teks_content(content):
                 str
             ):
 
-                teks_parts.append(
+                bagian.append(
                     part
                 )
 
@@ -307,35 +181,154 @@ def ekstrak_teks_content(content):
 
                 continue
 
-            part_type = part.get(
-                "type"
+            part_type = (
+                part.get("type")
+                or ""
             )
 
-            if part_type in [
+            if part_type in (
                 "text",
                 "output_text"
-            ]:
+            ):
 
-                text_part = part.get(
-                    "text",
-                    ""
+                value = (
+                    part.get("text")
+                    or ""
                 )
 
-                if text_part:
-
-                    teks_parts.append(
-                        str(text_part)
+                if value:
+                    bagian.append(
+                        str(value)
                     )
 
         return "\n".join(
-            teks_parts
+            bagian
         ).strip()
 
     return ""
 
 
 # ==================================================
-# SIAPKAN HISTORY
+# VALIDASI GAMBAR
+# ==================================================
+
+def validasi_gambar(image):
+
+    if image is None:
+        return None
+
+    if not isinstance(
+        image,
+        str
+    ):
+
+        raise ValueError(
+            "Format gambar tidak valid."
+        )
+
+    image = image.strip()
+
+    if not image:
+        return None
+
+    # --------------------------------------------------
+    # DATA URL
+    # --------------------------------------------------
+
+    if not image.lower().startswith(
+        "data:image/"
+    ):
+
+        raise ValueError(
+            "Gambar harus dikirim dalam format "
+            "data:image/...;base64,..."
+        )
+
+    if ";base64," not in image.lower():
+
+        raise ValueError(
+            "Data gambar bukan Base64 yang valid."
+        )
+
+    # --------------------------------------------------
+    # HEADER
+    # --------------------------------------------------
+
+    try:
+
+        header, encoded = image.split(
+            ",",
+            1
+        )
+
+    except ValueError:
+
+        raise ValueError(
+            "Data gambar tidak valid."
+        )
+
+    header_lower = (
+        header.lower()
+    )
+
+    allowed_types = (
+        "data:image/jpeg;base64",
+        "data:image/jpg;base64",
+        "data:image/png;base64",
+        "data:image/webp;base64",
+        "data:image/gif;base64",
+    )
+
+    if not header_lower.startswith(
+        allowed_types
+    ):
+
+        raise ValueError(
+            "Format gambar tidak didukung. "
+            "Gunakan JPG, PNG, WEBP, atau GIF."
+        )
+
+    # --------------------------------------------------
+    # UKURAN
+    # --------------------------------------------------
+
+    if len(image) > MAX_IMAGE_CHARS:
+
+        raise ValueError(
+            "Ukuran gambar terlalu besar. "
+            "Kompres gambar terlebih dahulu."
+        )
+
+    # --------------------------------------------------
+    # BASE64
+    # --------------------------------------------------
+
+    encoded = encoded.strip()
+
+    if not encoded:
+
+        raise ValueError(
+            "Data gambar kosong."
+        )
+
+    try:
+
+        base64.b64decode(
+            encoded,
+            validate=True
+        )
+
+    except Exception:
+
+        raise ValueError(
+            "Data Base64 gambar tidak valid."
+        )
+
+    return image
+
+
+# ==================================================
+# HISTORY
 # ==================================================
 
 def siapkan_history(history):
@@ -351,7 +344,7 @@ def siapkan_history(history):
 
     total_chars = 0
 
-    # Mulai dari pesan terbaru.
+    # Pesan terbaru diprioritaskan.
     for item in reversed(history):
 
         if not isinstance(
@@ -369,14 +362,14 @@ def siapkan_history(history):
             "content"
         )
 
-        if role not in [
+        if role not in (
             "user",
             "assistant"
-        ]:
+        ):
 
             continue
 
-        if not content:
+        if content is None:
             continue
 
         # --------------------------------------------------
@@ -398,22 +391,22 @@ def siapkan_history(history):
 
             content = str(
                 content
-            ).strip()
+            )
+
+        content = content.strip()
 
         if not content:
             continue
 
         # --------------------------------------------------
-        # BATAS SATU PESAN
+        # BATAS PER PESAN
         # --------------------------------------------------
 
         if len(content) > MAX_MESSAGE_CHARS:
 
             content = (
-                content[
-                    :MAX_MESSAGE_CHARS
-                ]
-                + "\n[Pesan dipersingkat untuk konteks AI]"
+                content[:MAX_MESSAGE_CHARS]
+                + "\n[Pesan dipersingkat]"
             )
 
         tambahan = len(
@@ -421,11 +414,12 @@ def siapkan_history(history):
         )
 
         # --------------------------------------------------
-        # BATAS TOTAL HISTORY
+        # BATAS TOTAL
         # --------------------------------------------------
 
         if (
-            total_chars + tambahan
+            total_chars
+            + tambahan
             > MAX_HISTORY_CHARS
         ):
 
@@ -453,17 +447,17 @@ def siapkan_history(history):
             "content": content
         })
 
-        total_chars += tambahan
+        total_chars += len(
+            content
+        )
 
-    # Kembalikan urutan menjadi
-    # pesan lama -> pesan baru.
     hasil.reverse()
 
     return hasil
 
 
 # ==================================================
-# SIAPKAN MEMORY JANGKA PANJANG
+# MEMORY
 # ==================================================
 
 def siapkan_memory_context(
@@ -475,7 +469,7 @@ def siapkan_memory_context(
 
     try:
 
-        memory_context = (
+        memory = (
             get_memory_context(
                 user_id
             )
@@ -484,70 +478,69 @@ def siapkan_memory_context(
     except Exception as e:
 
         print(
-            "Long term memory context error:",
+            "[Memory] Error:",
             repr(e)
         )
 
         return ""
 
-    if not memory_context:
+    if not memory:
         return ""
 
-    memory_context = str(
-        memory_context
+    memory = str(
+        memory
     ).strip()
 
-    if not memory_context:
-        return ""
+    if len(memory) > MAX_MEMORY_CONTEXT_CHARS:
 
-    # Batas tambahan untuk berjaga-jaga
-    # agar memory tidak terlalu besar.
-    if len(memory_context) > MAX_MEMORY_CONTEXT_CHARS:
-
-        memory_context = (
-            memory_context[
+        memory = (
+            memory[
                 :MAX_MEMORY_CONTEXT_CHARS
             ]
             + "\n[Memory dipersingkat]"
         )
 
-    return memory_context
+    return memory
 
 
 # ==================================================
-# AMBIL WAKTU RETRY
+# RETRY TIME
 # ==================================================
 
-def ambil_waktu_retry(response):
-
-    """
-    Mengambil waktu tunggu dari header Retry-After
-    atau pesan error Groq.
-    """
+def ambil_waktu_retry(
+    response
+):
 
     if response is None:
-
         return 5
 
     # --------------------------------------------------
-    # HEADER RETRY-AFTER
+    # HEADER
     # --------------------------------------------------
 
-    retry_after = response.headers.get(
-        "Retry-After"
-    )
+    try:
+
+        retry_after = (
+            response.headers.get(
+                "Retry-After"
+            )
+        )
+
+    except Exception:
+
+        retry_after = None
 
     if retry_after:
 
         try:
 
-            waktu = float(
+            seconds = float(
                 retry_after
             )
 
             return min(
                 max(
-                    waktu + 1,
+                    seconds + 1,
                     2
                 ),
                 MAX_RETRY_WAIT
@@ -561,22 +554,37 @@ def ambil_waktu_retry(response):
             pass
 
     # --------------------------------------------------
-    # RESPONSE TEXT
+    # BODY
     # --------------------------------------------------
 
-    teks = response.text or ""
+    try:
 
-    pola = [
+        text = (
+            response.text
+            or ""
+        )
+
+    except Exception:
+
+        text = ""
+
+    patterns = [
+
         r"try again in\s+([\d.]+)s",
+
         r"retry after\s+([\d.]+)s",
-        r"retry-after[:\s]+([\d.]+)"
+
+        r"retry-after[:\s]+([\d.]+)",
+
+        r"wait\s+([\d.]+)s",
+
     ]
 
-    for pattern in pola:
+    for pattern in patterns:
 
         match = re.search(
             pattern,
-            teks,
+            text,
             flags=re.IGNORECASE
         )
 
@@ -584,13 +592,13 @@ def ambil_waktu_retry(response):
 
             try:
 
-                waktu = float(
+                seconds = float(
                     match.group(1)
                 )
 
                 return min(
                     max(
-                        waktu + 1,
+                        seconds + 1,
                         2
                     ),
                     MAX_RETRY_WAIT
@@ -607,13 +615,15 @@ def ambil_waktu_retry(response):
 
 
 # ==================================================
-# REQUEST KE GROQ
+# REQUEST GROQ
 # ==================================================
 
 def request_groq(
     headers,
     data
 ):
+
+    last_response = None
 
     for attempt in range(
         MAX_RETRIES
@@ -625,8 +635,10 @@ def request_groq(
                 BASE_URL,
                 headers=headers,
                 json=data,
-                timeout=90
+                timeout=REQUEST_TIMEOUT
             )
+
+            last_response = response
 
             # --------------------------------------------------
             # BERHASIL
@@ -643,41 +655,63 @@ def request_groq(
             if response.status_code == 429:
 
                 print(
-                    f"[Groq] Rate limit "
-                    f"percobaan {attempt + 1}/{MAX_RETRIES}"
-                )
-
-                print(
-                    "[Groq] Response:",
-                    response.text
+                    f"[Groq] 429 "
+                    f"{attempt + 1}/{MAX_RETRIES}"
                 )
 
                 if (
                     attempt
-                    < MAX_RETRIES - 1
+                    >= MAX_RETRIES - 1
                 ):
 
-                    retry_seconds = (
-                        ambil_waktu_retry(
-                            response
-                        )
+                    return response
+
+                wait_time = (
+                    ambil_waktu_retry(
+                        response
                     )
+                )
 
-                    print(
-                        f"[Groq] Menunggu "
-                        f"{retry_seconds:.1f} detik..."
-                    )
+                print(
+                    f"[Groq] Retry dalam "
+                    f"{wait_time:.1f} detik"
+                )
 
-                    time.sleep(
-                        retry_seconds
-                    )
+                time.sleep(
+                    wait_time
+                )
 
-                    continue
-
-                return response
+                continue
 
             # --------------------------------------------------
-            # ERROR LAIN
+            # SERVER ERROR
+            # --------------------------------------------------
+
+            if response.status_code >= 500:
+
+                print(
+                    f"[Groq] Server error "
+                    f"{response.status_code}"
+                )
+
+                if (
+                    attempt
+                    >= MAX_RETRIES - 1
+                ):
+
+                    return response
+
+                time.sleep(
+                    min(
+                        2 ** attempt,
+                        8
+                    )
+                )
+
+                continue
+
+            # --------------------------------------------------
+            # CLIENT ERROR
             # --------------------------------------------------
 
             return response
@@ -690,46 +724,265 @@ def request_groq(
 
             if (
                 attempt
-                < MAX_RETRIES - 1
+                >= MAX_RETRIES - 1
             ):
 
-                time.sleep(
-                    2
-                )
+                return None
 
-                continue
-
-            return None
+            time.sleep(
+                2 ** attempt
+            )
 
         except requests.exceptions.ConnectionError:
 
             print(
-                "[Groq] Connection Error"
+                "[Groq] Connection error"
             )
 
             if (
                 attempt
-                < MAX_RETRIES - 1
+                >= MAX_RETRIES - 1
             ):
 
-                time.sleep(
-                    2
-                )
+                return None
 
-                continue
-
-            return None
+            time.sleep(
+                2 ** attempt
+            )
 
         except requests.exceptions.RequestException as e:
 
             print(
-                "[Groq] Request Error:",
+                "[Groq] Request exception:",
                 repr(e)
             )
 
             return None
 
-    return None
+        except Exception as e:
+
+            print(
+                "[Groq] Unexpected request error:",
+                repr(e)
+            )
+
+            return None
+
+    return last_response
+
+
+# ==================================================
+# PARSE ERROR API
+# ==================================================
+
+def ambil_error_api(
+    response
+):
+
+    if response is None:
+        return ""
+
+    try:
+
+        data = response.json()
+
+    except Exception:
+
+        return (
+            response.text
+            or ""
+        )
+
+    if not isinstance(
+        data,
+        dict
+    ):
+
+        return ""
+
+    error = data.get(
+        "error"
+    )
+
+    if isinstance(
+        error,
+        dict
+    ):
+
+        return str(
+            error.get(
+                "message",
+                ""
+            )
+        )
+
+    if error:
+
+        return str(
+            error
+        )
+
+    return ""
+
+
+# ==================================================
+# EKSTRAK JAWABAN GROQ
+# ==================================================
+
+def ekstrak_jawaban_groq(
+    data
+):
+
+    if not isinstance(
+        data,
+        dict
+    ):
+
+        return ""
+
+    choices = data.get(
+        "choices"
+    )
+
+    if not isinstance(
+        choices,
+        list
+    ) or not choices:
+
+        return ""
+
+    first = choices[0]
+
+    if not isinstance(
+        first,
+        dict
+    ):
+
+        return ""
+
+    message = first.get(
+        "message"
+    )
+
+    if not isinstance(
+        message,
+        dict
+    ):
+
+        return ""
+
+    content = message.get(
+        "content"
+    )
+
+    # --------------------------------------------------
+    # NORMAL CONTENT
+    # --------------------------------------------------
+
+    answer = (
+        ekstrak_teks_content(
+            content
+        )
+    )
+
+    if answer:
+        return answer
+
+    # --------------------------------------------------
+    # BEBERAPA MODEL DAPAT MENGEMBALIKAN
+    # ALTERNATIVE FIELD
+    # --------------------------------------------------
+
+    for key in (
+        "text",
+        "output_text",
+        "reasoning_content"
+    ):
+
+        value = message.get(
+            key
+        )
+
+        if value:
+
+            answer = (
+                ekstrak_teks_content(
+                    value
+                )
+            )
+
+            if answer:
+                return answer
+
+    return ""
+
+
+# ==================================================
+# BANGUN SYSTEM PROMPT
+# ==================================================
+
+def buat_system_prompt(
+    user_id=None
+):
+
+    system_prompt = str(
+        SYSTEM_PROMPT
+    ).strip()
+
+    memory_context = (
+        siapkan_memory_context(
+            user_id
+        )
+    )
+
+    if memory_context:
+
+        system_prompt += (
+
+            "\n\n"
+            "==================================================\n"
+            "MEMORY RELEVAN PENGGUNA\n"
+            "==================================================\n"
+
+            + memory_context
+
+            + "\n\n"
+            "Gunakan memory hanya jika relevan. "
+            "Jangan menyebut sistem memory internal "
+            "kepada pengguna."
+        )
+
+    return system_prompt
+
+
+# ==================================================
+# BANGUN USER CONTENT
+# ==================================================
+
+def buat_user_content(
+    pesan_text,
+    image
+):
+
+    if not image:
+
+        return pesan_text
+
+    return [
+
+        {
+            "type": "text",
+            "text": pesan_text
+        },
+
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": image
+            }
+        }
+
+    ]
 
 
 # ==================================================
@@ -750,9 +1003,9 @@ def balas(
     if not API_KEY:
 
         return (
-            "API Key Groq belum ditemukan. "
-            "Pastikan GROQ_API_KEY sudah tersedia "
-            "di Backend/.env."
+            "API Key Groq belum tersedia. "
+            "Pastikan GROQ_API_KEY sudah diatur "
+            "di file .env."
         )
 
     # ==================================================
@@ -767,7 +1020,7 @@ def balas(
         history = []
 
     # ==================================================
-    # VALIDASI GAMBAR
+    # VALIDASI IMAGE
     # ==================================================
 
     try:
@@ -778,163 +1031,159 @@ def balas(
 
     except ValueError as e:
 
+        print(
+            "[AI.Ind] Image validation:",
+            str(e)
+        )
+
         return str(e)
-
-    # ==================================================
-    # SYSTEM PROMPT
-    # ==================================================
-
-    system_prompt = str(
-        SYSTEM_PROMPT
-    ).strip()
-
-    # ==================================================
-    # MEMORY JANGKA PANJANG
-    # ==================================================
-
-    memory_context = (
-        siapkan_memory_context(
-            user_id
-        )
-    )
-
-    # Memory ditempatkan setelah system prompt
-    # agar AI mengetahui konteks penting pengguna.
-    if memory_context:
-
-        system_prompt = (
-            system_prompt
-            + "\n\n"
-            + "==================================================\n"
-            + "MEMORY JANGKA PANJANG PENGGUNA\n"
-            + "==================================================\n"
-            + "\n"
-            + memory_context
-            + "\n\n"
-            + "Gunakan memory ini hanya jika relevan "
-              "dengan percakapan saat ini. "
-              "Jangan menyebutkan bahwa memory internal "
-              "sedang digunakan kecuali pengguna memang "
-              "menanyakannya."
-        )
-
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        }
-    ]
-
-    # ==================================================
-    # HISTORY
-    # ==================================================
-
-    history_terbaru = (
-        siapkan_history(
-            history
-        )
-    )
-
-    messages.extend(
-        history_terbaru
-    )
 
     # ==================================================
     # PESAN
     # ==================================================
 
-    pesan_text = ""
+    if pesan is None:
 
-    if pesan is not None:
+        pesan_text = ""
+
+    else:
 
         pesan_text = str(
             pesan
         ).strip()
 
-    # Kalau hanya gambar.
+    # ==================================================
+    # GAMBAR TANPA TEKS
+    # ==================================================
+
     if (
         not pesan_text
         and image
     ):
 
         pesan_text = (
-            "Analisis gambar ini dan jelaskan "
-            "apa yang terlihat dengan jelas."
+            "Analisis gambar ini. "
+            "Jelaskan informasi penting yang terlihat "
+            "dan jawab berdasarkan isi gambar. "
+            "Jangan mengarang bagian yang tidak terlihat."
         )
 
-    # Kalau benar-benar kosong.
+    # ==================================================
+    # KOSONG
+    # ==================================================
+
     if (
         not pesan_text
         and not image
     ):
 
         return (
-            "Silakan tulis pertanyaan atau pesan "
-            "yang ingin kamu tanyakan."
+            "Silakan tulis pertanyaan atau kirim "
+            "gambar yang ingin dianalisis."
         )
 
     # ==================================================
-    # KONTEN USER
+    # SYSTEM
     # ==================================================
 
-    if image:
+    system_prompt = (
+        buat_system_prompt(
+            user_id
+        )
+    )
 
-        user_content = [
+    messages = [
 
-            {
-                "type": "text",
-                "text": pesan_text
-            },
-
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": image
-                }
-            }
-
-        ]
-
-    else:
-
-        user_content = pesan_text
-
-    messages.append(
         {
-            "role": "user",
-            "content": user_content
+            "role":
+                "system",
+
+            "content":
+                system_prompt
         }
+
+    ]
+
+    # ==================================================
+    # HISTORY
+    # ==================================================
+
+    messages.extend(
+        siapkan_history(
+            history
+        )
     )
 
     # ==================================================
-    # MODEL
+    # USER
+    # ==================================================
+
+    user_content = (
+        buat_user_content(
+            pesan_text,
+            image
+        )
+    )
+
+    messages.append({
+
+        "role":
+            "user",
+
+        "content":
+            user_content
+
+    })
+
+    # ==================================================
+    # PILIH MODEL
     # ==================================================
 
     if image:
 
-        request_model = VISION_MODEL
+        request_model = (
+            IMAGE_MODEL
+        )
 
     else:
 
-        request_model = MODEL
+        request_model = (
+            TEXT_MODEL
+        )
+
+    print(
+        "[AI.Ind] Model:",
+        request_model
+    )
+
+    print(
+        "[AI.Ind] Vision:",
+        bool(image)
+    )
 
     # ==================================================
-    # HEADER
+    # HEADERS
     # ==================================================
 
     headers = {
+
         "Authorization":
             f"Bearer {API_KEY}",
 
         "Content-Type":
-            "application/json"
+            "application/json",
+
+        "Accept":
+            "application/json",
+
     }
 
     # ==================================================
-    # DATA REQUEST
+    # REQUEST DATA
     # ==================================================
 
     data = {
+
         "model":
             request_model,
 
@@ -945,7 +1194,8 @@ def balas(
             MAX_OUTPUT_TOKENS,
 
         "temperature":
-            0.4
+            0.4,
+
     }
 
     # ==================================================
@@ -960,14 +1210,15 @@ def balas(
         )
 
         # ==================================================
-        # TIDAK ADA RESPONSE
+        # NO RESPONSE
         # ==================================================
 
         if response is None:
 
             return (
-                "AI sedang mengalami gangguan koneksi. "
-                "Silakan coba lagi."
+                "AI.Ind tidak dapat terhubung ke "
+                "server AI. Periksa koneksi internet "
+                "atau backend lalu coba lagi."
             )
 
         # ==================================================
@@ -977,7 +1228,7 @@ def balas(
         if response.status_code == 429:
 
             print(
-                "========== GROQ RATE LIMIT =========="
+                "========== GROQ 429 =========="
             )
 
             print(
@@ -985,13 +1236,12 @@ def balas(
             )
 
             print(
-                "====================================="
+                "=============================="
             )
 
             return (
-                "AI sedang sibuk karena terlalu banyak "
-                "permintaan. Tunggu sebentar lalu kirim "
-                "pesan lagi ya."
+                "AI.Ind sedang terlalu sibuk. "
+                "Tunggu sebentar lalu coba lagi."
             )
 
         # ==================================================
@@ -1005,12 +1255,10 @@ def balas(
             )
 
             print(
-                "STATUS:",
                 response.status_code
             )
 
             print(
-                "RESPONSE:",
                 response.text
             )
 
@@ -1020,17 +1268,23 @@ def balas(
 
             return (
                 "Server AI sedang mengalami gangguan. "
-                "Silakan coba lagi sebentar."
+                "Coba lagi sebentar."
             )
 
         # ==================================================
-        # ERROR CLIENT
+        # CLIENT ERROR
         # ==================================================
 
         if response.status_code != 200:
 
+            error_message = (
+                ambil_error_api(
+                    response
+                )
+            )
+
             print(
-                "========== GROQ ERROR =========="
+                "========== GROQ CLIENT ERROR =========="
             )
 
             print(
@@ -1039,164 +1293,109 @@ def balas(
             )
 
             print(
-                "RESPONSE:",
+                "ERROR:",
+                error_message
+            )
+
+            print(
+                "RAW:",
                 response.text
             )
 
             print(
-                "================================"
+                "========================================"
             )
 
-            # Khusus error gambar.
-            if image and response.status_code == 400:
+            if image:
 
                 return (
-                    "Gambar tidak dapat diproses oleh "
-                    "model AI saat ini. Pastikan format "
-                    "gambar JPG, PNG, WEBP, atau GIF."
+                    "Gambar belum dapat diproses. "
+                    "Pastikan gambar JPG, PNG, WEBP, "
+                    "atau GIF dan ukurannya tidak terlalu besar."
                 )
 
             return (
-                "AI tidak dapat memproses permintaan "
-                "saat ini. Silakan coba lagi."
+                "AI.Ind belum dapat memproses "
+                "permintaan tersebut. Coba lagi."
             )
 
         # ==================================================
-        # PARSE JSON
+        # JSON
         # ==================================================
 
         try:
 
-            hasil = response.json()
+            result = response.json()
 
         except ValueError:
 
             print(
-                "Response Groq bukan JSON:",
+                "[AI.Ind] Invalid JSON:",
                 response.text
             )
 
             return (
-                "Respons dari AI tidak valid. "
-                "Silakan coba lagi."
+                "Respons dari server AI tidak valid. "
+                "Coba kirim ulang pesan."
             )
 
         # ==================================================
-        # ERROR DARI API
+        # API ERROR
         # ==================================================
 
         if isinstance(
-            hasil,
+            result,
             dict
         ):
 
-            if hasil.get(
+            if result.get(
                 "error"
             ):
 
                 print(
-                    "Groq API ERROR:",
-                    hasil["error"]
+                    "[AI.Ind] API error:",
+                    result.get("error")
                 )
 
                 return (
-                    "AI sedang mengalami kendala. "
-                    "Silakan coba lagi."
+                    "AI.Ind mengalami kendala "
+                    "saat memproses permintaan."
                 )
 
         # ==================================================
-        # CHOICES
+        # EXTRACT ANSWER
         # ==================================================
 
-        choices = hasil.get(
-            "choices"
-        )
-
-        if not isinstance(
-            choices,
-            list
-        ) or not choices:
-
-            print(
-                "Response AI tidak memiliki choices:",
-                hasil
-            )
-
-            return (
-                "AI belum memberikan jawaban. "
-                "Silakan coba kirim pesan lagi."
-            )
-
-        # ==================================================
-        # MESSAGE
-        # ==================================================
-
-        first_choice = choices[0]
-
-        if not isinstance(
-            first_choice,
-            dict
-        ):
-
-            print(
-                "Choice AI tidak valid:",
-                first_choice
-            )
-
-            return (
-                "AI belum memberikan jawaban yang valid."
-            )
-
-        message = first_choice.get(
-            "message",
-            {}
-        )
-
-        if not isinstance(
-            message,
-            dict
-        ):
-
-            print(
-                "Message AI tidak valid:",
-                message
-            )
-
-            return (
-                "AI belum memberikan jawaban yang valid."
-            )
-
-        # ==================================================
-        # CONTENT
-        # ==================================================
-
-        jawaban = message.get(
-            "content"
-        )
-
-        # Beberapa model/API bisa mengembalikan
-        # content dalam bentuk list.
         jawaban = (
-            ekstrak_teks_content(
-                jawaban
+            ekstrak_jawaban_groq(
+                result
             )
         )
 
-        # Jangan menggunakan reasoning sebagai jawaban.
+        # ==================================================
+        # EMPTY
+        # ==================================================
+
         if not jawaban:
 
             print(
-                "Message lengkap dari Groq:",
-                message
+                "[AI.Ind] Empty answer:"
+            )
+
+            print(
+                json.dumps(
+                    result,
+                    ensure_ascii=False
+                )[:5000]
             )
 
             return (
-                "Maaf, AI belum mendapatkan jawaban. "
-                "Coba kirim pertanyaan lagi."
+                "AI.Ind belum mendapatkan jawaban. "
+                "Coba kirim pertanyaan sekali lagi."
             )
 
         # ==================================================
-        # BERSIHKAN JAWABAN
+        # CLEAN
         # ==================================================
 
         jawaban = (
@@ -1206,14 +1405,14 @@ def balas(
         )
 
         # ==================================================
-        # CEK HASIL AKHIR
+        # FINAL
         # ==================================================
 
         if not jawaban:
 
             return (
-                "Maaf, AI belum mendapatkan jawaban. "
-                "Coba kirim lagi ya."
+                "AI.Ind belum menghasilkan jawaban "
+                "yang dapat ditampilkan."
             )
 
         return jawaban
@@ -1225,57 +1424,77 @@ def balas(
     except requests.exceptions.Timeout:
 
         print(
-            "Groq request timeout"
+            "[AI.Ind] Timeout"
         )
 
         return (
-            "Waktu respons AI terlalu lama. "
-            "Coba kirim pertanyaan lagi."
+            "Respons AI terlalu lama. "
+            "Coba kirim lagi."
         )
 
     # ==================================================
-    # CONNECTION ERROR
+    # CONNECTION
     # ==================================================
 
     except requests.exceptions.ConnectionError:
 
         print(
-            "Groq Connection Error"
+            "[AI.Ind] Connection error"
         )
 
         return (
-            "Tidak dapat terhubung ke server AI. "
-            "Periksa koneksi internet atau backend."
+            "Koneksi ke server AI terputus. "
+            "Periksa internet dan coba lagi."
         )
 
     # ==================================================
-    # REQUEST ERROR
+    # REQUEST
     # ==================================================
 
     except requests.exceptions.RequestException as e:
 
         print(
-            "Groq Request Exception:",
+            "[AI.Ind] Request error:",
             repr(e)
         )
 
         return (
             "Terjadi kesalahan saat menghubungi "
-            "server AI. Silakan coba lagi."
+            "server AI. Coba lagi."
         )
 
     # ==================================================
-    # ERROR UMUM
+    # JSON / PROGRAM ERROR
+    # ==================================================
+
+    except (
+        ValueError,
+        TypeError,
+        KeyError
+    ) as e:
+
+        print(
+            "[AI.Ind] Data error:",
+            repr(e)
+        )
+
+        return (
+            "Data dari AI tidak dapat diproses. "
+            "Coba kirim ulang."
+        )
+
+    # ==================================================
+    # UNKNOWN ERROR
     # ==================================================
 
     except Exception as e:
 
         print(
-            "Unexpected AI Error:",
+            "[AI.Ind] Unexpected error:",
             repr(e)
         )
 
         return (
-            "Terjadi kesalahan pada AI. "
-            "Silakan coba lagi."
+            "AI.Ind mengalami kesalahan internal. "
+            "Coba kirim ulang pesan."
         )
