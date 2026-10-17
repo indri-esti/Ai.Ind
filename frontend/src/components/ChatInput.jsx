@@ -1,6 +1,17 @@
+import { useEffect, useRef } from "react";
 import { Form, Button } from "react-bootstrap";
 import { FaPaperPlane } from "react-icons/fa";
 import { FiPlus } from "react-icons/fi";
+
+// Tinggi maksimal textarea sebelum mulai scroll di dalamnya
+const MAX_TEXTAREA_HEIGHT = 200;
+
+const TIPE_GAMBAR_DIIZINKAN = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
 
 function ChatInput({
   message,
@@ -11,6 +22,26 @@ function ChatInput({
   pilihGambar,
   imagePreview,
 }) {
+  const textareaRef = useRef(null);
+
+  // =========================================================
+  // AUTO-GROW TEXTAREA
+  // Tinggi menyesuaikan isi (ngetik / paste teks panjang),
+  // dibatasi MAX_TEXTAREA_HEIGHT lalu scroll di dalam.
+  // Saat message dikosongkan (setelah kirim), tinggi balik normal.
+  // =========================================================
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    el.style.height = "auto";
+
+    const tinggiBaru = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    el.style.height = `${tinggiBaru}px`;
+    el.style.overflowY =
+      el.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+  }, [message]);
+
   const handleKirim = () => {
     if (loading) return;
 
@@ -19,6 +50,39 @@ function ChatInput({
     }
 
     kirimPesan();
+  };
+
+  // =========================================================
+  // PASTE GAMBAR (Ctrl+V)
+  // Kalau clipboard berisi gambar, langsung diproses lewat
+  // pilihGambar yang sama dengan tombol +, jadi preview muncul
+  // tanpa klik +. Kalau yang dipaste teks, perilaku normal.
+  // =========================================================
+  const handlePaste = (e) => {
+    if (loading) return;
+
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (
+        item.kind === "file" &&
+        TIPE_GAMBAR_DIIZINKAN.includes(item.type)
+      ) {
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        e.preventDefault();
+
+        // Meniru event dari <input type="file">
+        pilihGambar({
+          target: { files: [file], value: "" },
+          currentTarget: { files: [file], value: "" },
+        });
+
+        break;
+      }
+    }
   };
 
   // =========================================================
@@ -86,11 +150,13 @@ function ChatInput({
           <div className="chat-input-box">
             <Form.Control
               as="textarea"
+              ref={textareaRef}
               rows={1}
               value={message}
               onChange={(e) => {
                 setMessage(e.target.value);
               }}
+              onPaste={handlePaste}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -105,6 +171,10 @@ function ChatInput({
               }}
               placeholder="Ketik pertanyaan untuk AI.Ind..."
               className="chat-input"
+              style={{
+                resize: "none",
+                maxHeight: MAX_TEXTAREA_HEIGHT,
+              }}
             />
 
             {/* ==================================================
@@ -131,4 +201,3 @@ function ChatInput({
 }
 
 export default ChatInput;
-
