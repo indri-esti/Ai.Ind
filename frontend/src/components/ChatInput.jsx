@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Form, Button } from "react-bootstrap";
-import { FaPaperPlane } from "react-icons/fa";
+import { FaArrowUp } from "react-icons/fa";
 import { FiPlus } from "react-icons/fi";
 
 // Tinggi maksimal textarea sebelum mulai scroll di dalamnya
@@ -85,23 +85,6 @@ function ChatInput({
     }
   };
 
-  // =========================================================
-  // TOMBOL PLUS
-  // Seluruh area button menjadi area touch.
-  // =========================================================
-  const handlePlusClick = () => {
-    if (loading) return;
-
-    const input = fileInputRef?.current;
-
-    if (!input) {
-      console.error("fileInputRef belum terhubung");
-      return;
-    }
-
-    input.click();
-  };
-
   return (
     <div className="chat-input-root">
       <Form
@@ -111,11 +94,11 @@ function ChatInput({
         }}
       >
         <div className="chat-input-row">
-
           {/* ==================================================
               TOMBOL PLUS / UPLOAD
+              Seluruh lingkaran adalah <label>, jadi semua area
+              bisa diklik/disentuh tanpa perlu onClick manual.
           ================================================== */}
-
           <div className="home-plus-wrapper">
             <input
               ref={fileInputRef}
@@ -123,30 +106,32 @@ function ChatInput({
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={pilihGambar}
+              onClick={(e) => {
+                // supaya memilih gambar yang sama 2x tetap terdeteksi
+                e.target.value = "";
+              }}
               disabled={loading}
               className="home-plus-file"
             />
 
-            <button
-              type="button"
-              className="home-plus-button"
-              onClick={handlePlusClick}
-              disabled={loading}
+            <label
+              htmlFor="home-image-input"
+              className={`home-plus-button ${loading ? "is-disabled" : ""}`}
               aria-label="Tambah gambar"
+              aria-disabled={loading}
               title="Tambah gambar"
             >
               <FiPlus
                 className="home-plus-icon"
-                size={23}
+                size={22}
                 strokeWidth={2.5}
               />
-            </button>
+            </label>
           </div>
 
           {/* ==================================================
               CHAT INPUT
           ================================================== */}
-
           <div className="chat-input-box">
             <Form.Control
               as="textarea"
@@ -161,10 +146,7 @@ function ChatInput({
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
 
-                  if (
-                    !loading &&
-                    (message.trim() || imagePreview)
-                  ) {
+                  if (!loading && (message.trim() || imagePreview)) {
                     handleKirim();
                   }
                 }
@@ -180,17 +162,14 @@ function ChatInput({
             {/* ==================================================
                 SEND
             ================================================== */}
-
             <Button
               type="submit"
               className="send-btn"
-              disabled={
-                loading ||
-                (!message.trim() && !imagePreview)
-              }
+              disabled={loading || (!message.trim() && !imagePreview)}
+              aria-label="Kirim"
             >
               <span className="send-icon">
-                <FaPaperPlane size={17} />
+                <FaArrowUp size={16} />
               </span>
             </Button>
           </div>
