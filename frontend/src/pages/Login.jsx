@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   FaEye,
   FaEyeSlash,
 } from "react-icons/fa";
-import { FiMail, FiLock } from "react-icons/fi";
+import {
+  FiMail,
+  FiLock,
+  FiCheckCircle,
+  FiAlertTriangle,
+  FiAlertCircle,
+  FiX,
+} from "react-icons/fi";
 import { useNavigate, Link } from "react-router-dom";
-import Swal from "sweetalert2";
 import axios from "../api";
 
 function Login() {
@@ -15,10 +21,29 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const alertStyle = {
-    background: "#122B3C",
-    color: "#fff",
-    confirmButtonColor: "#00C2FF",
+
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(toastTimer.current);
+  }, []);
+
+  const showToast = (type, title, text = "", duration = 3200) => {
+    clearTimeout(toastTimer.current);
+
+    setToast({
+      id: Date.now(),
+      type,
+      title,
+      text,
+      duration,
+    });
+
+    toastTimer.current = setTimeout(
+      () => setToast(null),
+      duration
+    );
   };
 
   const saveUserLogin = (user) => {
@@ -40,12 +65,11 @@ function Login() {
   // Login dengan email dan password
   const handleLogin = async () => {
     if (!email || !password) {
-      Swal.fire({
-        icon: "warning",
-        title: "Oops...",
-        text: "Email dan password harus diisi.",
-        ...alertStyle,
-      });
+      showToast(
+        "warning",
+        "Oops...",
+        "Email dan password harus diisi."
+      );
       return;
     }
 
@@ -58,24 +82,16 @@ function Login() {
       saveUserLogin(res.data.user);
 
       // Login Berhasil
-      Swal.fire({
-        icon: "success",
-        title: "Login Berhasil",
-        timer: 700,
-        showConfirmButton: false,
-        ...alertStyle,
-      });
+      showToast("success", "Login Berhasil", "", 700);
 
       setTimeout(() => navigate("/"), 700);
     } catch (err) {
-      Swal.fire({
-        icon: "error",
-        title: "Login Gagal",
-        text:
-          err.response?.data?.message ||
-          "Email atau password salah.",
-        ...alertStyle,
-      });
+      showToast(
+        "error",
+        "Login Gagal",
+        err.response?.data?.message ||
+          "Email atau password salah."
+      );
     }
   };
 
@@ -353,6 +369,125 @@ function Login() {
             color: #5b7385;
           }
 
+          /* ---------- Notifikasi (toast) ---------- */
+          @keyframes auToastIn {
+            from { opacity: 0; transform: translateY(-14px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+
+          @keyframes auToastBar {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
+          }
+
+          .au-toast-wrap {
+            position: fixed;
+            top: calc(env(safe-area-inset-top, 0px) + 14px);
+            left: 0;
+            right: 0;
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            padding: 0 14px;
+            pointer-events: none;
+          }
+
+          .au-toast {
+            --tc: #00c2ff;
+            position: relative;
+            width: 100%;
+            max-width: 380px;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 12px 15px 13px;
+            border-radius: 16px;
+            pointer-events: auto;
+            background: rgba(12, 30, 44, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            box-shadow:
+              0 16px 44px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.02);
+            -webkit-backdrop-filter: blur(16px);
+            backdrop-filter: blur(16px);
+            animation: auToastIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+          }
+
+          .au-toast.success { --tc: #34d399; }
+          .au-toast.warning { --tc: #fbbf24; }
+          .au-toast.error { --tc: #f87171; }
+
+          .au-toast-icon {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            color: var(--tc);
+            background: color-mix(in srgb, var(--tc) 14%, transparent);
+          }
+
+          .au-toast-body {
+            flex: 1;
+            min-width: 0;
+            padding-top: 1px;
+          }
+
+          .au-toast-title {
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.3;
+            color: #f1f7fb;
+          }
+
+          .au-toast-text {
+            margin-top: 3px;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #9fb4c4;
+            word-break: break-word;
+          }
+
+          .au-toast-close {
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #6f8798;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.2s ease, color 0.2s ease;
+          }
+
+          .au-toast-close:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: #cfe3ee;
+          }
+
+          .au-toast-bar {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 3px;
+            background: var(--tc);
+            transform-origin: left;
+            animation-name: auToastBar;
+            animation-timing-function: linear;
+            animation-fill-mode: forwards;
+          }
+
           @media (max-width: 480px) {
             .au-card {
               padding: 28px 20px 20px;
@@ -365,14 +500,70 @@ function Login() {
           }
 
           @media (prefers-reduced-motion: reduce) {
-            .au-card {
+            .au-card,
+            .au-toast {
               animation: none;
+            }
+
+            .au-toast-bar {
+              display: none;
             }
           }
         `}
       </style>
 
       <div className="au-root">
+        {/* Notifikasi */}
+        <div className="au-toast-wrap" aria-live="polite">
+          {toast && (
+            <div
+              key={toast.id}
+              className={`au-toast ${toast.type}`}
+              role="alert"
+            >
+              <span className="au-toast-icon">
+                {toast.type === "success" && (
+                  <FiCheckCircle size={18} />
+                )}
+                {toast.type === "warning" && (
+                  <FiAlertTriangle size={18} />
+                )}
+                {toast.type === "error" && (
+                  <FiAlertCircle size={18} />
+                )}
+              </span>
+
+              <div className="au-toast-body">
+                <div className="au-toast-title">
+                  {toast.title}
+                </div>
+
+                {toast.text && (
+                  <div className="au-toast-text">
+                    {toast.text}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="au-toast-close"
+                onClick={() => setToast(null)}
+                aria-label="Tutup notifikasi"
+              >
+                <FiX size={15} />
+              </button>
+
+              <span
+                className="au-toast-bar"
+                style={{
+                  animationDuration: `${toast.duration}ms`,
+                }}
+              />
+            </div>
+          )}
+        </div>
+
         <div className="au-glow one" />
         <div className="au-glow two" />
 
