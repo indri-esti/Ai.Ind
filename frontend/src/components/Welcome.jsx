@@ -1,3 +1,17 @@
+import {
+  FiBookOpen,
+  FiZap,
+  FiHelpCircle,
+  FiCode,
+} from "react-icons/fi";
+
+const SARAN = [
+  { label: "Bantu belajar", icon: FiBookOpen },
+  { label: "Cari ide", icon: FiZap },
+  { label: "Jelaskan sesuatu", icon: FiHelpCircle },
+  { label: "Bantu coding", icon: FiCode },
+];
+
 function Welcome({
   message,
   setMessage,
@@ -6,270 +20,271 @@ function Welcome({
     <>
       <style>
         {`
-          .welcome-modern {
+          @keyframes wlRise {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          .wl-root {
             width: 100%;
             min-height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding:
-              20px 10px 40px;
+            padding: 24px 16px 40px;
+            box-sizing: border-box;
           }
 
-          .welcome-content {
+          .wl-content {
             width: 100%;
-            max-width: 680px;
+            max-width: 560px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
           }
 
-          .welcome-logo {
+          /* ---------- Logo ---------- */
+          .wl-logo {
             position: relative;
-            width: 96px;
-            height: 96px;
-            margin: 0 auto 25px;
+            width: 72px;
+            height: 72px;
+            margin-bottom: 26px;
+            animation: wlRise 0.6s ease both;
           }
 
-          .welcome-glow {
+          .wl-logo::before {
+            content: "";
             position: absolute;
-            inset: -30px;
+            inset: -22px;
             border-radius: 50%;
-            background:
-              rgba(0,194,255,.09);
-            filter: blur(30px);
+            background: rgba(0, 194, 255, 0.12);
+            filter: blur(26px);
+            pointer-events: none;
           }
 
-          .welcome-logo img {
+          .wl-logo img {
             position: relative;
             width: 100%;
             height: 100%;
             display: block;
             object-fit: cover;
-            border-radius: 27px;
-            border:
-              1px solid
-              rgba(24,216,255,.2);
-            box-shadow:
-              0 20px 60px
-              rgba(0,194,255,.16);
+            border-radius: 22px;
+            border: 1px solid rgba(0, 194, 255, 0.22);
+            box-shadow: 0 14px 40px rgba(0, 194, 255, 0.16);
           }
 
-          .welcome-eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 7px;
-            padding: 6px 10px;
-            margin-bottom: 13px;
-            border:
-              1px solid
-              rgba(0,194,255,.12);
-            border-radius: 999px;
-            background:
-              rgba(0,194,255,.05);
-            color: #7191A2;
-            font-size: 10px;
-            font-weight: 600;
-          }
-
-          .welcome-dot {
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background: #00C2FF;
-            box-shadow:
-              0 0 9px
-              rgba(0,194,255,.75);
-          }
-
-          .welcome-title {
+          /* ---------- Teks ---------- */
+          .wl-hello {
             margin: 0;
-            color: #FFFFFF;
-            font-size:
-              clamp(28px, 5vw, 43px);
-            font-weight: 800;
-            letter-spacing: -1.5px;
-            line-height: 1.15;
+            color: #7f97a8;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+            animation: wlRise 0.6s ease 0.08s both;
           }
 
-          .welcome-title span {
-            color: #00C2FF;
-          }
-
-          .welcome-subtitle {
-            margin:
-              11px 0 0;
-            color: #CDE4ED;
-            font-size:
-              clamp(14px, 2vw, 18px);
-            font-weight: 600;
-          }
-
-          .welcome-description {
-            max-width: 570px;
-            margin:
-              11px auto 0;
-            color: #71899A;
-            font-size: 13px;
-            line-height: 1.75;
-          }
-
-          .welcome-suggestions {
-            margin-top: 23px;
+          .wl-title {
+            margin: 6px 0 0;
             display: flex;
+            align-items: flex-end;
             justify-content: center;
-            flex-wrap: wrap;
-            gap: 8px;
+            font-size: clamp(44px, 11vw, 60px);
+            line-height: 1;
+            letter-spacing: -2.5px;
+            animation: wlRise 0.6s ease 0.16s both;
           }
 
-          .welcome-suggestion {
-            padding: 9px 14px;
-            border:
-              1px solid
-              rgba(0,194,255,.13);
-            border-radius: 999px;
-            background:
-              rgba(13,35,49,.72);
-            color: #8EACBC;
-            font-size: 11px;
+          .wl-ai {
+            font-weight: 800;
+            color: #f1f7fb;
+          }
+
+          .wl-dot {
+            width: 0.15em;
+            height: 0.15em;
+            margin: 0 0.05em 0.14em;
+            border-radius: 50%;
+            background: #00c2ff;
+            box-shadow: 0 0 14px rgba(0, 194, 255, 0.85);
+            flex-shrink: 0;
+          }
+
+          .wl-ind {
+            font-weight: 300;
+            color: #00c2ff;
+          }
+
+          .wl-sub {
+            margin: 14px 0 0;
+            color: #cde4ed;
+            font-size: 16px;
+            font-weight: 600;
+            animation: wlRise 0.6s ease 0.24s both;
+          }
+
+          .wl-desc {
+            max-width: 440px;
+            margin: 10px 0 0;
+            color: #6f8798;
+            font-size: 14px;
+            line-height: 1.7;
+            animation: wlRise 0.6s ease 0.32s both;
+          }
+
+          /* ---------- Saran ---------- */
+          .wl-grid {
+            width: 100%;
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            animation: wlRise 0.6s ease 0.4s both;
+          }
+
+          .wl-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 56px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            background: rgba(255, 255, 255, 0.03);
+            color: #cde4ed;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: left;
             cursor: pointer;
-            transition: .2s ease;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition:
+              background 0.2s ease,
+              border-color 0.2s ease,
+              transform 0.15s ease;
           }
 
-          .welcome-suggestion:hover {
-            color: #DDF8FF;
-            border-color:
-              rgba(0,194,255,.35);
-            background:
-              rgba(0,194,255,.08);
-            transform:
-              translateY(-1px);
+          .wl-card:hover {
+            background: rgba(0, 194, 255, 0.08);
+            border-color: rgba(0, 194, 255, 0.32);
+            transform: translateY(-1px);
           }
 
-          .welcome-hint {
-            margin-top: 18px;
-            color: #405969;
-            font-size: 9px;
+          .wl-card:active {
+            transform: scale(0.97);
           }
 
+          .wl-card-icon {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            color: #00c2ff;
+            background: rgba(0, 194, 255, 0.1);
+          }
+
+          .wl-card-icon svg {
+            pointer-events: none;
+          }
+
+          /* ---------- HP ---------- */
           @media (max-width: 767px) {
-            .welcome-modern {
-              padding:
-                10px 8px 25px;
+            .wl-root {
+              padding: 16px 14px 28px;
             }
 
-            .welcome-logo {
-              width: 78px;
-              height: 78px;
-              margin-bottom: 18px;
+            .wl-logo {
+              width: 64px;
+              height: 64px;
+              margin-bottom: 22px;
             }
 
-            .welcome-logo img {
-              border-radius: 21px;
+            .wl-logo img {
+              border-radius: 19px;
             }
 
-            .welcome-eyebrow {
-              margin-bottom: 10px;
-              padding:
-                5px 8px;
-              font-size: 9px;
-            }
-
-            .welcome-title {
-              font-size:
-                clamp(25px, 8vw, 34px);
-              letter-spacing: -.9px;
-            }
-
-            .welcome-subtitle {
-              margin-top: 8px;
+            .wl-hello {
               font-size: 14px;
             }
 
-            .welcome-description {
-              padding: 0 12px;
-              font-size: 11px;
-              line-height: 1.6;
+            .wl-sub {
+              font-size: 15px;
             }
 
-            .welcome-suggestions {
-              margin-top: 15px;
-              gap: 6px;
+            .wl-desc {
+              font-size: 13px;
             }
 
-            .welcome-suggestion {
-              padding:
-                8px 10px;
-              font-size: 10px;
+            .wl-grid {
+              margin-top: 24px;
+              gap: 8px;
             }
 
-            .welcome-hint {
-              font-size: 8px;
-              margin-top: 13px;
+            .wl-card {
+              min-height: 52px;
+              padding: 10px 12px;
+              font-size: 13px;
+            }
+          }
+
+          @media (max-width: 340px) {
+            .wl-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .wl-logo,
+            .wl-hello,
+            .wl-title,
+            .wl-sub,
+            .wl-desc,
+            .wl-grid {
+              animation: none;
             }
           }
         `}
       </style>
 
-      <div className="welcome-modern">
-        <div className="welcome-content">
-
-          <div className="welcome-logo">
-            <div className="welcome-glow" />
-
-            <img
-              src="/logo.svg"
-              alt="AI.Ind"
-            />
+      <div className="wl-root">
+        <div className="wl-content">
+          <div className="wl-logo">
+            <img src="/logo.svg" alt="AI.Ind" />
           </div>
 
-          <div className="welcome-eyebrow">
-            <span className="welcome-dot" />
-            AI Assistant
-          </div>
+          <p className="wl-hello">Selamat datang di</p>
 
-          <h1 className="welcome-title">
-            Selamat datang di{" "}
-            <span>AI.Ind</span>
+          <h1 className="wl-title">
+            <span className="wl-ai">AI</span>
+            <span className="wl-dot" />
+            <span className="wl-ind">Ind</span>
           </h1>
 
-          <div className="welcome-subtitle">
-            Asisten AI buatan Indonesia 🇮🇩
-          </div>
+          <div className="wl-sub">Asisten AI buatan Indonesia</div>
 
-          <p className="welcome-description">
-            Teman cerdas untuk belajar,
-            mencari ide, memahami sesuatu,
-            membuat kode, menganalisis
-            gambar, dan membantu berbagai
-            aktivitasmu.
+          <p className="wl-desc">
+            Teman cerdas untuk belajar, mencari ide, memahami sesuatu,
+            membuat kode, dan menganalisis gambar.
           </p>
 
-          <div className="welcome-suggestions">
-
-            {[
-              "Bantu belajar",
-              "Cari ide",
-              "Jelaskan sesuatu",
-              "Bantu coding",
-            ].map((item) => (
+          <div className="wl-grid">
+            {SARAN.map(({ label, icon: Icon }) => (
               <button
-                key={item}
+                key={label}
                 type="button"
-                className="welcome-suggestion"
-                onClick={() =>
-                  setMessage(item)
-                }
+                className="wl-card"
+                onClick={() => setMessage(label)}
               >
-                {item}
+                <span className="wl-card-icon">
+                  <Icon size={17} />
+                </span>
+                <span>{label}</span>
               </button>
             ))}
-
           </div>
-
-          <div className="welcome-hint">
-            Tulis pesan di bawah untuk
-            memulai percakapan
-          </div>
-
         </div>
       </div>
     </>
