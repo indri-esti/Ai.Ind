@@ -1,7 +1,11 @@
 # ==================================================
-# main.py  -  SERVER UTAMA AI.Ind (Flask)
+# main.py  -  SERVER UTAMA AI.Ind
 #
-# - Menjalankan server dan mendaftarkan login/register/chats (auth.py)
+# Hosting (FastAPI Cloud) menjalankan aplikasi ASGI bernama `app`.
+# Logika login/chats (auth.py) dan /chat memakai Flask, jadi
+# Flask dibungkus ke dalam FastAPI di bagian paling bawah file ini.
+#
+# - Mendaftarkan login/register/chats (auth.py)
 # - Menyediakan POST /chat yang memanggil ai.py (versi baru)
 # - Route tersedia di dua alamat sekaligus: /chat dan /api/chat
 #   (begitu juga /login, /api/login, dst), jadi tetap jalan
@@ -13,6 +17,12 @@ import traceback
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from fastapi import FastAPI
+
+try:
+    from a2wsgi import WSGIMiddleware
+except ImportError:  # cadangan bila a2wsgi belum terpasang
+    from fastapi.middleware.wsgi import WSGIMiddleware
 
 from database import get_connection, init_db
 from auth import auth
@@ -23,12 +33,12 @@ from ai import balas
 # APP
 # ==================================================
 
-app = Flask(__name__)
+flask_app = Flask(__name__)
 
 # Foto sudah dikompres di frontend, tapi beri ruang aman.
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+flask_app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(flask_app, resources={r"/*": {"origins": "*"}})
 
 try:
     init_db()
@@ -36,8 +46,8 @@ except Exception as e:
     print("[DB] init_db gagal:", repr(e))
 
 # Didaftarkan dua kali: tanpa prefix dan dengan /api
-app.register_blueprint(auth, name="auth_root")
-app.register_blueprint(auth, url_prefix="/api", name="auth_api")
+flask_app.register_blueprint(auth, name="auth_root")
+flask_app.register_blueprint(auth, url_prefix="/api", name="auth_api")
 
 
 # ==================================================
@@ -57,8 +67,8 @@ def buat_judul(pesan):
 # HEALTH CHECK
 # ==================================================
 
-@app.route("/", methods=["GET"])
-@app.route("/api", methods=["GET"])
+@flask_app.route("/", methods=["GET"])
+@flask_app.route("/api", methods=["GET"])
 def home():
     return jsonify({"success": True, "message": "AI.Ind backend aktif."})
 
@@ -67,8 +77,8 @@ def home():
 # CHAT
 # ==================================================
 
-@app.route("/chat", methods=["POST"])
-@app.route("/api/chat", methods=["POST"])
+@flask_app.route("/chat", methods=["POST"])
+@flask_app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
 
@@ -204,7 +214,7 @@ def chat():
 # ERROR HANDLER
 # ==================================================
 
-@app.errorhandler(413)
+@flask_app.errorhandler(413)
 def terlalu_besar(e):
     return jsonify({
         "success": False,
@@ -213,9 +223,21 @@ def terlalu_besar(e):
 
 
 # ==================================================
+# APLIKASI UTAMA UNTUK HOSTING (ASGI)
+# FastAPI Cloud mencari variabel bernama `app` di main.py.
+# ==================================================
+
+app = FastAPI(title="AI.Ind")
+
+app.mount("/", WSGIMiddleware(flask_app))
+
+
+# ==================================================
 # JALANKAN LANGSUNG (python main.py)
 # ==================================================
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
+    import uvicorn
+
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
