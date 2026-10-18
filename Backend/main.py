@@ -229,6 +229,12 @@ def terlalu_besar(e):
 
 app = FastAPI(title="AI.Ind")
 
+# Suara AI (teks -> suara). Tersedia di /tts dan /api/tts.
+# Harus didaftarkan SEBELUM app.mount("/") di bawah.
+from voice import router as voice_router
+app.include_router(voice_router)
+app.include_router(voice_router, prefix="/api")
+
 app.mount("/", WSGIMiddleware(flask_app))
 
 
