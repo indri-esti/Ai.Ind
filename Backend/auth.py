@@ -233,6 +233,83 @@ def logout():
 
 
 # ==================================================
+# UBAH PASSWORD
+# ==================================================
+
+@auth.route("/change-password", methods=["POST"])
+def change_password():
+
+    data = request.get_json() or {}
+
+    user_id = data.get("user_id")
+    old_password = data.get("old_password", "")
+    new_password = data.get("new_password", "")
+
+    if not user_id or not old_password or not new_password:
+        return jsonify({
+            "success": False,
+            "message": "Semua field wajib diisi."
+        }), 400
+
+    if len(new_password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "Password baru minimal 6 karakter."
+        }), 400
+
+    if old_password == new_password:
+        return jsonify({
+            "success": False,
+            "message": "Password baru harus berbeda dari password lama."
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, password FROM users WHERE id=?",
+        (user_id,)
+    )
+
+    user = cursor.fetchone()
+
+    if not user:
+        conn.close()
+
+        return jsonify({
+            "success": False,
+            "message": "Akun tidak ditemukan."
+        }), 404
+
+    # Password lama wajib benar, supaya tidak ada orang lain
+    # yang bisa mengganti password hanya dengan menebak user_id.
+    if not check_password_hash(user["password"], old_password):
+        conn.close()
+
+        return jsonify({
+            "success": False,
+            "message": "Password lama salah."
+        }), 401
+
+    cursor.execute(
+        "UPDATE users SET password=? WHERE id=?",
+        (
+            generate_password_hash(new_password),
+            user_id
+        )
+    )
+
+    conn.commit()
+
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "Password berhasil diubah."
+    })
+
+
+# ==================================================
 # GET SEMUA CHAT USER
 # ==================================================
 
