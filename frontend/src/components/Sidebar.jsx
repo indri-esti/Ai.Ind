@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
 import {
+  FiMenu,
   FiPlus,
   FiMessageSquare,
   FiChevronDown,
@@ -292,6 +293,22 @@ function Sidebar({
       );
     };
   }, []);
+
+  // =====================================================
+  // KUNCI SCROLL SAAT SIDEBAR TERBUKA (HP)
+  // =====================================================
+
+  useEffect(() => {
+    if (!(mobile && open)) return;
+
+    const previous = document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobile, open]);
 
   // =====================================================
   // SWIPE
@@ -1745,6 +1762,50 @@ function Sidebar({
             3px;
         }
 
+        .ai-open-btn {
+          position: fixed;
+          top: calc(env(safe-area-inset-top, 0px) + 17px);
+          left: 16px;
+
+          width: 42px;
+          height: 42px;
+          padding: 0;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 13px;
+          border: 1px solid rgba(0,194,255,.22);
+
+          background: rgba(10,27,40,.92);
+          -webkit-backdrop-filter: blur(10px);
+          backdrop-filter: blur(10px);
+
+          color: #00C2FF;
+
+          box-shadow: 0 6px 18px rgba(0,0,0,.28);
+
+          cursor: pointer;
+          z-index: 999;
+
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+
+          transition:
+            transform .15s ease,
+            background .2s ease;
+        }
+
+        .ai-open-btn:active {
+          transform: scale(.92);
+          background: rgba(0,194,255,.16);
+        }
+
+        .ai-open-btn svg {
+          pointer-events: none;
+        }
+
         .ai-mobile-close {
           display:
             none;
@@ -1777,14 +1838,11 @@ function Sidebar({
               );
 
             transition:
-              transform
-              .28s
-              cubic-bezier(
-                .22,
-                .61,
-                .36,
-                1
-              );
+              transform .28s cubic-bezier(.22,.61,.36,1),
+              visibility 0s linear ${open ? "0s" : ".28s"};
+
+            visibility:
+              ${open ? "visible" : "hidden"};
 
             box-shadow:
               ${
@@ -1896,6 +1954,21 @@ function Sidebar({
           }
         }
       `}</style>
+
+      {/* ==================================================
+          TOMBOL BUKA SIDEBAR (HP)
+      ================================================== */}
+
+      {mobile && !open && (
+        <button
+          type="button"
+          className="ai-open-btn"
+          onClick={() => setOpen(true)}
+          aria-label="Buka sidebar"
+        >
+          <FiMenu size={20} strokeWidth={2.2} />
+        </button>
+      )}
 
       {/* ==================================================
           AREA SWIPE
