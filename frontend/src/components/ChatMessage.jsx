@@ -1,9 +1,75 @@
 import { useState, useRef, useEffect } from "react";
 import { FiCopy, FiCheck, FiVolume2, FiSquare } from "react-icons/fi";
 
-// Dukungan suara bawaan browser (text-to-speech)
-const TTS_DIDUKUNG =
+// =========================================================
+// ALAMAT ENDPOINT SUARA DI BACKEND (voice.py)
+// Isi ALAMAT_BACKEND dengan alamat server kamu (tanpa /api di akhir),
+// contoh: "https://nama-app-kamu.fastapicloud.dev"
+// Kalau dikosongkan, dicoba ambil dari VITE_API_URL, lalu dari
+// alamat situs yang sama.
+// =========================================================
+const ALAMAT_BACKEND = "";
+
+const BASIS_BACKEND = (
+  ALAMAT_BACKEND ||
+  (typeof import.meta !== "undefined" && import.meta.env
+    ? import.meta.env.VITE_API_URL
+    : "") ||
+  ""
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "");
+
+const TTS_URL = `${BASIS_BACKEND}/api/tts`;
+
+// Teks panjang dibacakan bertahap: dipecah per potongan (di batas kalimat),
+// potongan berikutnya disiapkan selagi potongan sekarang diputar,
+// jadi suara lanjut terus sampai habis tanpa terpotong.
+const MAKS_POTONGAN_SUARA = 700;
+
+// Minta audio dari backend untuk satu potongan teks
+const ambilAudio = async (teks, signal) => {
+  const res = await fetch(TTS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: teks }),
+    signal,
+  });
+
+  if (!res.ok) throw new Error("TTS gagal");
+
+  return res.blob();
+};
+
+// Cadangan: suara bawaan browser, dipakai kalau backend tidak bisa dihubungi
+const TTS_BROWSER =
   typeof window !== "undefined" && "speechSynthesis" in window;
+
+// Penghenti suara yang sedang aktif, supaya hanya satu pesan bersuara
+let penghentiAktif = null;
+
+// Pilih suara Indonesia perempuan (untuk cadangan)
+const pilihSuaraPerempuan = () => {
+  if (!TTS_BROWSER) return null;
+
+  const semua = window.speechSynthesis
+    .getVoices()
+    .filter(
+      (v) =>
+        v.lang &&
+        v.lang.toLowerCase().replace("_", "-").startsWith("id")
+    );
+
+  const cewek = /female|perempuan|wanita|gadis|damayanti/i;
+  const cowok = /\b(male|laki|pria|ardi)\b/i;
+
+  return (
+    semua.find((v) => cewek.test(v.name)) ||
+    semua.find((v) => !cowok.test(v.name)) ||
+    semua[0] ||
+    null
+  );
+};
 
 // Pecah teks jadi potongan pendek (Chrome sering berhenti
 // di tengah kalau satu ucapan terlalu panjang)
@@ -40,7 +106,11 @@ function ChatMessage({ msg }) {
   const [imageError, setImageError] = useState(false);
 
   const [speaking, setSpeaking] = useState(false);
+  const [memuat, setMemuat] = useState(false);
   const tokenSuaraRef = useRef(0);
+  const audioRef = useRef(null);
+  const urlRef = useRef(null);
+  const abortRef = useRef(null);
 
   // Bersihkan markdown di luar blok kode (```...```),
   // supaya kode seperti "# komentar" atau print('a') tidak rusak.
@@ -89,6 +159,8 @@ function ChatMessage({ msg }) {
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`/g, "")
     .replace(/https?:\/\/\S+/g, " ")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, " ")
     .replace(/[_~|]/g, " ")
     .replace(/[ \t]+/g, " ")
     .trim();
@@ -141,47 +213,63 @@ function ChatMessage({ msg }) {
   // Tekan 🔊 untuk memutar, tekan lagi untuk berhenti.
   // Hanya satu pesan yang bersuara pada satu waktu.
   // =========================================================
-  const berhentiSuara = () => {
+  const bersihAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    if (urlRef.current) {
+      URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    }
+  };
+
+  const hentikanSemua = () => {
     tokenSuaraRef.current += 1;
-    window.speechSynthesis.cancel();
+
+    try {
+      abortRef.current?.abort();
+    } catch (err) {
+      // abaikan
+    }
+    abortRef.current = null;
+
+    bersihAudio();
+
+    if (TTS_BROWSER) window.speechSynthesis.cancel();
+
+    setMemuat(false);
     setSpeaking(false);
   };
 
-  const putarSuara = () => {
-    if (!TTS_DIDUKUNG || !teksSuara) return;
-
-    if (speaking) {
-      berhentiSuara();
+  // Cadangan: suara bawaan browser (perempuan kalau tersedia)
+  const putarSuaraBrowser = (token, teks = teksSuara) => {
+    if (!TTS_BROWSER) {
+      setMemuat(false);
+      setSpeaking(false);
       return;
     }
 
-    // Hentikan suara dari pesan lain
     window.speechSynthesis.cancel();
 
-    const token = tokenSuaraRef.current + 1;
-    tokenSuaraRef.current = token;
+    const potongan = pecahTeks(teks, 220);
+    const suara = pilihSuaraPerempuan();
 
-    const potongan = pecahTeks(teksSuara);
-    const daftarSuara = window.speechSynthesis.getVoices();
-    const suaraIndo =
-      daftarSuara.find((v) => v.lang === "id-ID") ||
-      daftarSuara.find((v) => v.lang && v.lang.startsWith("id"));
-
+    setMemuat(false);
     setSpeaking(true);
 
     potongan.forEach((bagian, i) => {
       const u = new SpeechSynthesisUtterance(bagian);
       u.lang = "id-ID";
       u.rate = 1;
-      u.pitch = 1;
-      if (suaraIndo) u.voice = suaraIndo;
+      u.pitch = 1.05;
+      if (suara) u.voice = suara;
 
-      const selesai = () => {
+      u.onend = () => {
         if (tokenSuaraRef.current !== token) return;
         if (i === potongan.length - 1) setSpeaking(false);
       };
-
-      u.onend = selesai;
       u.onerror = () => {
         if (tokenSuaraRef.current !== token) return;
         setSpeaking(false);
@@ -191,11 +279,123 @@ function ChatMessage({ msg }) {
     });
   };
 
+  // Putar satu potongan audio sampai selesai
+  const putarBlob = (blob, token) =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+
+      audioRef.current = audio;
+      urlRef.current = url;
+
+      audio.onended = () => {
+        bersihAudio();
+        resolve();
+      };
+
+      audio.onerror = () => {
+        if (tokenSuaraRef.current !== token) {
+          resolve();
+          return;
+        }
+        bersihAudio();
+        reject(new Error("Audio gagal diputar"));
+      };
+
+      setMemuat(false);
+      setSpeaking(true);
+
+      audio.play().catch((err) => {
+        if (tokenSuaraRef.current !== token) {
+          resolve();
+          return;
+        }
+        reject(err);
+      });
+    });
+
+  const putarSuara = async () => {
+    if (!teksSuara) return;
+
+    // Tekan lagi untuk berhenti / batal
+    if (speaking || memuat) {
+      hentikanSemua();
+      return;
+    }
+
+    // Hentikan suara dari pesan lain
+    if (penghentiAktif) penghentiAktif();
+    penghentiAktif = hentikanSemua;
+
+    const token = tokenSuaraRef.current + 1;
+    tokenSuaraRef.current = token;
+
+    setMemuat(true);
+
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    const potongan = pecahTeks(teksSuara, MAKS_POTONGAN_SUARA);
+    const janji = [];
+
+    // Ambil audio potongan ke-idx (sekali saja), dan siapkan lebih awal
+    const ambil = (idx) => {
+      if (idx >= potongan.length) return null;
+
+      if (!janji[idx]) {
+        janji[idx] = ambilAudio(potongan[idx], ctrl.signal);
+        janji[idx].catch(() => {});
+      }
+
+      return janji[idx];
+    };
+
+    let idx = 0;
+
+    try {
+      ambil(0);
+
+      for (idx = 0; idx < potongan.length; idx++) {
+        const blob = await ambil(idx);
+        if (tokenSuaraRef.current !== token) return;
+
+        // Siapkan potongan berikutnya selagi yang ini diputar
+        ambil(idx + 1);
+
+        await putarBlob(blob, token);
+        if (tokenSuaraRef.current !== token) return;
+      }
+
+      if (tokenSuaraRef.current === token) hentikanSemua();
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      if (tokenSuaraRef.current !== token) return;
+
+      // Kalau ada yang gagal, lanjutkan sisa teks dengan suara cadangan
+      bersihAudio();
+      putarSuaraBrowser(token, potongan.slice(idx).join(" "));
+    }
+  };
+
   // Hentikan suara kalau pesan hilang dari layar (misal ganti chat)
   useEffect(() => {
     return () => {
-      if (tokenSuaraRef.current > 0 && TTS_DIDUKUNG) {
-        window.speechSynthesis.cancel();
+      if (tokenSuaraRef.current > 0) {
+        tokenSuaraRef.current += 1;
+        try {
+          abortRef.current?.abort();
+        } catch (err) {
+          // abaikan
+        }
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+        if (urlRef.current) {
+          URL.revokeObjectURL(urlRef.current);
+          urlRef.current = null;
+        }
+        if (TTS_BROWSER) window.speechSynthesis.cancel();
       }
     };
   }, []);
@@ -463,16 +663,22 @@ function ChatMessage({ msg }) {
               </button>
 
               {/* Tombol suara: hanya untuk jawaban AI */}
-              {!isUser && TTS_DIDUKUNG && teksSuara && (
+              {!isUser && teksSuara && (
                 <button
                   type="button"
-                  className={`cm-copy ${speaking ? "done" : ""}`}
+                  className={`cm-copy ${speaking || memuat ? "done" : ""}`}
                   onClick={putarSuara}
-                  aria-label={speaking ? "Hentikan suara" : "Putar suara"}
-                  title={speaking ? "Hentikan suara" : "Putar suara"}
+                  aria-label={
+                    speaking || memuat ? "Hentikan suara" : "Putar suara"
+                  }
+                  title={speaking || memuat ? "Hentikan suara" : "Putar suara"}
                 >
-                  {speaking ? <FiSquare size={14} /> : <FiVolume2 size={14} />}
-                  <span>{speaking ? "Stop" : "Suara"}</span>
+                  {speaking || memuat ? (
+                    <FiSquare size={14} />
+                  ) : (
+                    <FiVolume2 size={14} />
+                  )}
+                  <span>{memuat ? "Memuat" : speaking ? "Stop" : "Suara"}</span>
                 </button>
               )}
             </div>
