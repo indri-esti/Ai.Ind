@@ -3,6 +3,7 @@ import {
   FaEye,
   FaEyeSlash,
 } from "react-icons/fa";
+import { FiMail, FiLock } from "react-icons/fi";
 import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import axios from "../api";
@@ -56,19 +57,16 @@ function Login() {
 
       saveUserLogin(res.data.user);
 
-// Login Berhasil
-Swal.fire({
-  icon: "success",
-  title: "Login Berhasil",
-  timer: 700,
-  showConfirmButton: false,
-  ...alertStyle,
-});
+      // Login Berhasil
+      Swal.fire({
+        icon: "success",
+        title: "Login Berhasil",
+        timer: 700,
+        showConfirmButton: false,
+        ...alertStyle,
+      });
 
-setTimeout(() => navigate("/"), 700);
-
-
-
+      setTimeout(() => navigate("/"), 700);
     } catch (err) {
       Swal.fire({
         icon: "error",
@@ -81,322 +79,404 @@ setTimeout(() => navigate("/"), 700);
     }
   };
 
-  const inputStyle = {
-    width: "100%",
-    padding: "14px 15px",
-    borderRadius: "12px",
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(18,43,60,0.85)",
-    color: "#fff",
-    outline: "none",
-    boxSizing: "border-box",
-    fontSize: "14px",
-    transition: "0.2s",
-  };
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #12344a 0%, #081420 42%, #050c13 100%)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: "24px",
-        fontFamily:
-          "Inter, Poppins, Arial, sans-serif",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Background glow */}
-      <div
-        style={{
-          position: "absolute",
-          width: "320px",
-          height: "320px",
-          borderRadius: "50%",
-          background: "rgba(0,194,255,0.08)",
-          filter: "blur(80px)",
-          top: "-120px",
-          left: "-100px",
-        }}
-      />
+    <>
+      <style>
+        {`
+          @keyframes auIn {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
 
-      <div
-        style={{
-          position: "absolute",
-          width: "280px",
-          height: "280px",
-          borderRadius: "50%",
-          background: "rgba(0,194,255,0.06)",
-          filter: "blur(80px)",
-          bottom: "-100px",
-          right: "-80px",
-        }}
-      />
+          .au-root {
+            position: relative;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            overflow: hidden;
+            padding:
+              calc(24px + env(safe-area-inset-top, 0px))
+              20px
+              calc(24px + env(safe-area-inset-bottom, 0px));
+            font-family: Inter, Poppins, Arial, sans-serif;
+            background: radial-gradient(
+              circle at 50% 0%,
+              #0f2c40 0%,
+              #081420 45%,
+              #050c13 100%
+            );
+          }
 
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "430px",
-          background:
-            "linear-gradient(145deg, rgba(11,29,42,0.97), rgba(7,22,33,0.97))",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "24px",
-          padding: "38px",
-          boxShadow:
-            "0 25px 70px rgba(0,0,0,0.45), 0 0 35px rgba(0,194,255,0.08)",
-          position: "relative",
-          zIndex: 1,
-          backdropFilter: "blur(20px)",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "32px",
-          }}
-        >
-          <div
-            style={{
-              width: "100px",
-              height: "100px",
-              borderRadius: "28px",
-              background:
-                "linear-gradient(145deg, #0c2638, #071723)",
-              border:
-                "1px solid rgba(0,194,255,0.16)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto",
-              boxShadow:
-                "0 15px 35px rgba(0,0,0,0.3), 0 0 25px rgba(0,194,255,0.10)",
-              overflow: "hidden",
-            }}
-          >
-            <img
-  src="/logo.svg"
-  alt="AI.Ind"
-  style={{
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    display: "block",
-  }}
-/>
+          .au-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+          }
+
+          .au-glow.one {
+            width: 320px;
+            height: 320px;
+            top: -120px;
+            left: -100px;
+            background: rgba(0, 194, 255, 0.09);
+          }
+
+          .au-glow.two {
+            width: 280px;
+            height: 280px;
+            bottom: -100px;
+            right: -80px;
+            background: rgba(0, 194, 255, 0.06);
+          }
+
+          .au-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            padding: 32px 28px 24px;
+            border-radius: 24px;
+            background: linear-gradient(
+              160deg,
+              rgba(14, 34, 50, 0.92),
+              rgba(8, 22, 34, 0.94)
+            );
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow:
+              0 24px 70px rgba(0, 0, 0, 0.45),
+              0 0 40px rgba(0, 194, 255, 0.06);
+            -webkit-backdrop-filter: blur(18px);
+            backdrop-filter: blur(18px);
+            animation: auIn 0.5s ease both;
+          }
+
+          /* ---------- Kepala ---------- */
+          .au-head {
+            text-align: center;
+            margin-bottom: 28px;
+          }
+
+          .au-logo {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 18px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #0a1d2b;
+            border: 1px solid rgba(0, 194, 255, 0.2);
+            box-shadow: 0 10px 28px rgba(0, 194, 255, 0.14);
+          }
+
+          .au-logo img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+          }
+
+          .au-title {
+            margin: 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-size: 32px;
+            line-height: 1;
+            letter-spacing: -1.2px;
+          }
+
+          .au-ai {
+            font-weight: 800;
+            color: #f1f7fb;
+          }
+
+          .au-dot {
+            width: 6px;
+            height: 6px;
+            margin: 0 3px 5px;
+            border-radius: 50%;
+            background: #00c2ff;
+            box-shadow: 0 0 10px rgba(0, 194, 255, 0.85);
+            flex-shrink: 0;
+          }
+
+          .au-ind {
+            font-weight: 300;
+            color: #00c2ff;
+          }
+
+          .au-sub {
+            margin: 12px 0 0;
+            font-size: 14px;
+            color: #8a9bb5;
+          }
+
+          /* ---------- Form ---------- */
+          .au-field {
+            margin-bottom: 16px;
+          }
+
+          .au-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #cfe3ee;
+          }
+
+          .au-input-wrap {
+            display: flex;
+            align-items: center;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            background: rgba(255, 255, 255, 0.04);
+            transition:
+              border-color 0.2s ease,
+              box-shadow 0.2s ease,
+              background 0.2s ease;
+          }
+
+          .au-input-wrap:focus-within {
+            border-color: rgba(0, 194, 255, 0.7);
+            background: rgba(0, 194, 255, 0.04);
+            box-shadow: 0 0 0 4px rgba(0, 194, 255, 0.12);
+          }
+
+          .au-icon {
+            display: flex;
+            padding-left: 14px;
+            color: #6f8798;
+            transition: color 0.2s ease;
+          }
+
+          .au-input-wrap:focus-within .au-icon {
+            color: #00c2ff;
+          }
+
+          .au-input {
+            flex: 1;
+            min-width: 0;
+            height: 50px;
+            padding: 0 14px 0 10px;
+            border: 0;
+            outline: none;
+            background: transparent;
+            color: #ffffff;
+            font-size: 16px;
+            font-family: inherit;
+          }
+
+          .au-input::placeholder {
+            color: #5b7385;
+          }
+
+          .au-input:-webkit-autofill {
+            -webkit-text-fill-color: #ffffff;
+            -webkit-box-shadow: 0 0 0 1000px #10283a inset;
+            caret-color: #ffffff;
+            border-radius: 14px;
+          }
+
+          .au-eye {
+            width: 46px;
+            height: 50px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            background: transparent;
+            color: #8a9bb5;
+            font-size: 16px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: color 0.2s ease;
+          }
+
+          .au-eye:hover {
+            color: #00c2ff;
+          }
+
+          .au-btn {
+            width: 100%;
+            height: 50px;
+            margin-top: 10px;
+            border: 0;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #00c2ff, #009fe3);
+            color: #04131d;
+            font-size: 15px;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 8px 22px rgba(0, 194, 255, 0.22);
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition:
+              transform 0.15s ease,
+              box-shadow 0.2s ease;
+          }
+
+          .au-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 28px rgba(0, 194, 255, 0.32);
+          }
+
+          .au-btn:active {
+            transform: scale(0.98);
+          }
+
+          .au-switch {
+            margin: 20px 0 0;
+            text-align: center;
+            font-size: 14px;
+            color: #8a9bb5;
+          }
+
+          .au-switch a {
+            color: #00c2ff;
+            font-weight: 700;
+            text-decoration: none;
+          }
+
+          .au-foot {
+            margin: 22px 0 0;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: center;
+            font-size: 12px;
+            color: #5b7385;
+          }
+
+          @media (max-width: 480px) {
+            .au-card {
+              padding: 28px 20px 20px;
+              border-radius: 22px;
+            }
+
+            .au-title {
+              font-size: 30px;
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .au-card {
+              animation: none;
+            }
+          }
+        `}
+      </style>
+
+      <div className="au-root">
+        <div className="au-glow one" />
+        <div className="au-glow two" />
+
+        <div className="au-card">
+        <div className="au-head">
+          <div className="au-logo">
+            <img src="/logo.svg" alt="AI.Ind" />
           </div>
 
-          <h1
-            style={{
-              color: "#fff",
-              marginTop: "22px",
-              marginBottom: "7px",
-              fontSize: "28px",
-              fontWeight: "800",
-              letterSpacing: "-0.5px",
-            }}
-          >
-            AI<span style={{ color: "#00C2FF" }}>.Ind</span>
+          <h1 className="au-title">
+            <span className="au-ai">AI</span>
+            <span className="au-dot" />
+            <span className="au-ind">Ind</span>
           </h1>
 
-          <p
-            style={{
-              color: "#8A9BB5",
-              margin: 0,
-              fontSize: "14px",
-            }}
+          <p className="au-sub">Selamat datang kembali</p>
+        </div>
+
+          {/* Email */}
+          <div className="au-field">
+            <label className="au-label">Email</label>
+
+            <div className="au-input-wrap">
+              <span className="au-icon">
+                <FiMail size={17} />
+              </span>
+
+              <input
+                className="au-input"
+                type="email"
+                placeholder="Masukkan email kamu"
+                value={email}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          {/* Password */}
+          <div className="au-field">
+            <label className="au-label">Password</label>
+
+            <div className="au-input-wrap">
+              <span className="au-icon">
+                <FiLock size={17} />
+              </span>
+
+              <input
+                className="au-input"
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                placeholder="Masukkan password kamu"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+              />
+
+              <button
+                type="button"
+                className="au-eye"
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+                aria-label={
+                  showPassword
+                    ? "Sembunyikan password"
+                    : "Tampilkan password"
+                }
+              >
+                {showPassword ? (
+                  <FaEye />
+                ) : (
+                  <FaEyeSlash />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Login Button */}
+          <button
+            type="button"
+            className="au-btn"
+            onClick={handleLogin}
           >
-            Selamat datang kembali 
+            Login
+          </button>
+
+          {/* Register */}
+          <p className="au-switch">
+            Belum punya akun?{" "}
+            <Link to="/register">Daftar</Link>
+          </p>
+
+          <p className="au-foot">
+            © 2026 AI.Ind • Buatan Indonesia
           </p>
         </div>
-
-        {/* Email */}
-        <div style={{ marginBottom: "20px" }}>
-          <label
-            style={{
-              color: "#EAF4FA",
-              display: "block",
-              marginBottom: "9px",
-              fontSize: "14px",
-              fontWeight: "600",
-            }}
-          >
-            Email
-          </label>
-
-          <input
-            type="email"
-            placeholder="Masukkan email kamu"
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-            style={inputStyle}
-            onFocus={(e) => {
-              e.target.style.border =
-                "1px solid #00C2FF";
-              e.target.style.boxShadow =
-                "0 0 0 3px rgba(0,194,255,0.10)";
-            }}
-            onBlur={(e) => {
-              e.target.style.border =
-                "1px solid rgba(255,255,255,0.08)";
-              e.target.style.boxShadow = "none";
-            }}
-          />
-        </div>
-
-        {/* Password */}
-        <div style={{ marginBottom: "24px" }}>
-          <label
-            style={{
-              color: "#EAF4FA",
-              display: "block",
-              marginBottom: "9px",
-              fontSize: "14px",
-              fontWeight: "600",
-            }}
-          >
-            Password
-          </label>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background:
-                "rgba(18,43,60,0.85)",
-              border:
-                "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "12px",
-              paddingRight: "15px",
-              transition: "0.2s",
-            }}
-          >
-            <input
-              type={
-                showPassword
-                  ? "text"
-                  : "password"
-              }
-              placeholder="Masukkan password kamu"
-              value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
-              }
-              style={{
-                ...inputStyle,
-                flex: 1,
-                border: "none",
-                background: "transparent",
-                boxShadow: "none",
-              }}
-            />
-
-            <span
-              onClick={() =>
-                setShowPassword(!showPassword)
-              }
-              style={{
-                cursor: "pointer",
-                color: "#8A9BB5",
-                display: "flex",
-                padding: "5px",
-                fontSize: "16px",
-              }}
-            >
-              {showPassword ? (
-                <FaEye />
-              ) : (
-                <FaEyeSlash />
-              )}
-            </span>
-          </div>
-        </div>
-
-        {/* Login Button */}
-        <button
-          onClick={handleLogin}
-          style={{
-            width: "100%",
-            padding: "14px",
-            border: "none",
-            borderRadius: "12px",
-            background:
-              "linear-gradient(135deg, #00C2FF, #009FE3)",
-            color: "#04131D",
-            fontWeight: "800",
-            cursor: "pointer",
-            fontSize: "15px",
-            boxShadow:
-              "0 8px 22px rgba(0,194,255,0.20)",
-            transition: "0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform =
-              "translateY(-2px)";
-            e.currentTarget.style.boxShadow =
-              "0 12px 28px rgba(0,194,255,0.30)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform =
-              "translateY(0)";
-            e.currentTarget.style.boxShadow =
-              "0 8px 22px rgba(0,194,255,0.20)";
-          }}
-        >
-          Login
-        </button>
-
-        {/* Register */}
-        <p
-          style={{
-            textAlign: "center",
-            color: "#8A9BB5",
-            marginTop: "22px",
-            marginBottom: 0,
-            fontSize: "14px",
-          }}
-        >
-          Belum punya akun?{" "}
-          <Link
-            to="/register"
-            style={{
-              color: "#00C2FF",
-              textDecoration: "none",
-              fontWeight: "700",
-            }}
-          >
-            Daftar
-          </Link>
-        </p>
-
-        {/* Footer */}
-        <div
-          style={{
-            height: "1px",
-            background:
-              "rgba(255,255,255,0.06)",
-            margin: "26px 0 20px",
-          }}
-        />
-
-        <p
-          style={{
-            textAlign: "center",
-            color: "#61758A",
-            margin: 0,
-            fontSize: "12px",
-          }}
-        >
-          © 2026 AI.Ind • Buatan Indonesia 🇮🇩
-        </p>
       </div>
-    </div>
+    </>
   );
 }
 
