@@ -35,7 +35,7 @@ MODEL = (
 
 VISION_MODEL = (
     os.getenv("GROQ_VISION_MODEL")
-    or "meta-llama/llama-4-scout-17b-16e-instruct"
+    or "qwen/qwen3.8-27b"
 ).strip()
 
 

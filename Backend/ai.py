@@ -33,7 +33,7 @@ except Exception:
 
 # Penanda versi: kalau tulisan ini tidak muncul di log hosting,
 # berarti server masih menjalankan ai.py yang lama.
-VERSI = "2026-10-18-v3"
+VERSI = "2026-10-18-v4"
 print(f"[AI.Ind] ai.py {VERSI} dimuat")
 
 
@@ -63,15 +63,18 @@ PLAIN_TEXT = (os.getenv("AI_PLAIN_TEXT") or "").strip().lower() in (
 
 # Satu provider (Groq), tapi beberapa model. Tiap model punya limit
 # sendiri, jadi kalau satu penuh/error otomatis pindah ke berikutnya.
+# Catatan: llama-3.3-70b-versatile & llama-3.1-8b-instant sudah dimatikan
+# Groq (16 Agu 2026), jadi diganti qwen/qwen3.8-27b.
 FALLBACK_TEXT_MODELS = [
     "openai/gpt-oss-20b",
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
+    "qwen/qwen3.8-27b",
 ]
 
+# Catatan: llama-4-scout (17 Jul 2026), llama-4-maverick (9 Mar 2026) dan
+# qwen3.6-27b (14 Sep 2026) sudah dimatikan Groq untuk akun gratis.
+# Model vision yang masih aktif: qwen/qwen3.8-27b.
 FALLBACK_VISION_MODELS = [
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "qwen/qwen3.8-27b",
     "qwen/qwen3.6-27b",
 ]
 
@@ -664,6 +667,12 @@ def panggil_model(messages, models):
         if model.startswith("openai/gpt-oss"):
             data["reasoning_effort"] = "medium"
 
+        # Qwen 3.8: sembunyikan proses berpikir supaya content berisi
+        # jawaban akhir, dan batasi usaha berpikir agar tidak menghabiskan token.
+        if model.startswith("qwen/qwen3.8"):
+            data["reasoning_effort"] = "low"
+            data["reasoning_format"] = "hidden"
+
         response = request_groq(headers, data)
 
         if response is None:
@@ -671,6 +680,20 @@ def panggil_model(messages, models):
             continue
 
         status = response.status_code
+
+        # Kalau parameter reasoning ditolak, coba lagi tanpa parameter itu.
+        if status in (400, 422) and "reasoning_format" in data:
+            print(f"[Groq] {model} menolak parameter reasoning, coba tanpa itu")
+            data.pop("reasoning_format", None)
+            data.pop("reasoning_effort", None)
+
+            response = request_groq(headers, data)
+
+            if response is None:
+                kode_error = "network"
+                continue
+
+            status = response.status_code
 
         if status == 200:
             try:
