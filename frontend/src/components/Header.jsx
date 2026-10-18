@@ -1,172 +1,195 @@
 function Header() {
-  const isMobile = window.innerWidth < 768;
-
   return (
-    <header
-      style={{
-        width: "100%",
-        minWidth: 0,
-        boxSizing: "border-box",
+    <>
+      <style>
+        {`
+          @keyframes hdStatusPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(0, 194, 255, 0.55); }
+            50% { box-shadow: 0 0 0 5px rgba(0, 194, 255, 0); }
+          }
 
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "flex-start",
+          .hd-root {
+            position: relative;
+            z-index: 10;
+            flex-shrink: 0;
+            align-self: stretch;
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            min-height: 78px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: calc(18px + env(safe-area-inset-top, 0px)) 36px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            background: linear-gradient(
+              180deg,
+              rgba(8, 20, 32, 0.99),
+              rgba(8, 20, 32, 0.92)
+            );
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+          }
 
-        padding: isMobile
-          ? "16px 20px 16px 78px"
-          : "18px 28px",
+          .hd-glow {
+            position: absolute;
+            top: -90px;
+            left: 6%;
+            width: 340px;
+            height: 160px;
+            background: rgba(0, 194, 255, 0.09);
+            filter: blur(60px);
+            pointer-events: none;
+          }
 
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
+          .hd-line {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(
+              90deg,
+              rgba(0, 194, 255, 0.7),
+              rgba(0, 194, 255, 0.15) 45%,
+              transparent 85%
+            );
+            pointer-events: none;
+          }
 
-        background:
-          "linear-gradient(180deg, rgba(8,20,32,0.99), rgba(8,20,32,0.94))",
+          .hd-left {
+            position: relative;
+            z-index: 2;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+          }
 
-        position: "relative",
-        flexShrink: 0,
-        alignSelf: "stretch",
+          .hd-title {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: flex-end;
+            font-size: 28px;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            white-space: nowrap;
+          }
 
-        overflow: "hidden",
+          .hd-ai {
+            font-weight: 800;
+            color: #f1f7fb;
+          }
 
-        boxSizing: "border-box",
+          .hd-dot {
+            width: 7px;
+            height: 7px;
+            margin: 0 3px 5px;
+            border-radius: 50%;
+            background: #00c2ff;
+            box-shadow: 0 0 10px rgba(0, 194, 255, 0.85);
+            flex-shrink: 0;
+          }
 
-        zIndex: 10,
-      }}
-    >
-      {/* =========================
-          GLOW BIRU
-      ========================= */}
-      <div
-        style={{
-          position: "absolute",
+          .hd-ind {
+            font-weight: 300;
+            color: #00c2ff;
+          }
 
-          top: "-70px",
-          left: isMobile ? "15%" : "8%",
+          .hd-sub {
+            margin: 6px 0 0;
+            font-size: 13.5px;
+            font-weight: 400;
+            line-height: 1.3;
+            letter-spacing: 0.1px;
+            color: #8a9bb5;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+          }
 
-          width: isMobile ? "200px" : "260px",
-          height: "130px",
+          .hd-status {
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 34px;
+            padding: 0 14px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #bfeaff;
+            background: rgba(0, 194, 255, 0.08);
+            border: 1px solid rgba(0, 194, 255, 0.22);
+            user-select: none;
+          }
 
-          background: "rgba(0,194,255,0.08)",
+          .hd-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #00c2ff;
+            animation: hdStatusPulse 2s ease-in-out infinite;
+          }
 
-          filter: "blur(55px)",
+          /* ---------- HP ----------
+             padding kiri 78px dipertahankan supaya tidak
+             menimpa tombol buka/tutup sidebar */
+          @media (max-width: 767px) {
+            .hd-root {
+              min-height: 70px;
+              padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 14px 78px;
+            }
 
-          pointerEvents: "none",
-        }}
-      />
+            .hd-title { font-size: 25px; }
 
-      {/* =========================
-          HEADER CONTENT
-      ========================= */}
-      <div
-        style={{
-          position: "relative",
-          zIndex: 2,
+            .hd-sub { font-size: 12.5px; }
 
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
+            .hd-status {
+              height: 30px;
+              padding: 0 11px;
+              font-size: 11.5px;
+            }
+          }
 
-          width: "fit-content",
+          @media (max-width: 400px) {
+            .hd-status span:last-child { display: none; }
+            .hd-status { padding: 0 10px; }
+          }
 
-          margin: 0,
-          padding: 0,
-        }}
-      >
-        {/* LOGO / TITLE */}
-        <h2
-          style={{
-            margin: 0,
-            padding: 0,
+          @media (prefers-reduced-motion: reduce) {
+            .hd-status-dot { animation: none; }
+          }
+        `}
+      </style>
 
-            color: "#00C2FF",
+      <header className="hd-root">
+        <div className="hd-glow" />
 
-            fontSize: isMobile ? "25px" : "28px",
+        <div className="hd-left">
+          <h2 className="hd-title">
+            <span className="hd-ai">AI</span>
+            <span className="hd-dot" />
+            <span className="hd-ind">Ind</span>
+          </h2>
 
-            fontWeight: 750,
-
-            letterSpacing: "-0.8px",
-
-            lineHeight: 1.15,
-
-            whiteSpace: "nowrap",
-          }}
-        >
-          AI.Ind
-        </h2>
-
-        {/* =========================
-            SUBTITLE
-        ========================= */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-
-            gap: "7px",
-
-            marginTop: "7px",
-
-            color: "#8A9BB5",
-
-            fontSize: isMobile ? "13px" : "14px",
-
-            fontWeight: 400,
-
-            lineHeight: 1.2,
-
-            whiteSpace: "nowrap",
-          }}
-        >
-          {/* STATUS DOT */}
-          <span
-            style={{
-              display: "inline-block",
-
-              width: "6px",
-              height: "6px",
-
-              minWidth: "6px",
-
-              borderRadius: "50%",
-
-              background: "#00C2FF",
-
-              boxShadow:
-                "0 0 8px rgba(0,194,255,0.75)",
-            }}
-          />
-
-          <span>
-            Asisten AI buatan Indonesia
-          </span>
+          <p className="hd-sub">Asisten AI buatan Indonesia</p>
         </div>
-      </div>
 
-      {/* =========================
-          BLUE ACCENT LINE
-      ========================= */}
-      <div
-        style={{
-          position: "absolute",
+        <div className="hd-status">
+          <span className="hd-status-dot" />
+          <span>Siap membantu</span>
+        </div>
 
-          bottom: 0,
-
-          left: isMobile ? "78px" : "28px",
-
-          width: isMobile ? "45px" : "48px",
-
-          height: "2px",
-
-          borderRadius: "10px",
-
-          background: "#00C2FF",
-
-          boxShadow:
-            "0 0 12px rgba(0,194,255,0.55)",
-
-          zIndex: 3,
-        }}
-      />
-    </header>
+        <div className="hd-line" />
+      </header>
+    </>
   );
 }
 
