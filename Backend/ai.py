@@ -3,6 +3,7 @@ import io
 import os
 import re
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -10,8 +11,6 @@ import requests
 from config import (
     API_KEY,
     BASE_URL,
-    GEMINI_API_KEY,
-    GEMINI_MODEL,
     MODEL,
     VISION_MODEL,
 )
@@ -19,9 +18,11 @@ from config import (
 from prompt import SYSTEM_PROMPT
 
 try:
-    from memory import get_memory_context
-except Exception:
+    from memory import get_memory_context, deteksi_memory_penting
+except Exception as e:
+    print("[AI.Ind] memory.py tidak dimuat:", repr(e))
     get_memory_context = None
+    deteksi_memory_penting = None
 
 try:
     from PIL import Image, ImageOps
@@ -30,53 +31,106 @@ except Exception:
     ImageOps = None
 
 
+# Penanda versi: kalau tulisan ini tidak muncul di log hosting,
+# berarti server masih menjalankan ai.py yang lama.
+VERSI = "2026-10-18-v3"
+print(f"[AI.Ind] ai.py {VERSI} dimuat")
+
+
 # ==================================================
 # KONFIGURASI
 # ==================================================
 
-MAX_HISTORY_CHARS = 20000
-MAX_MESSAGE_CHARS = 6000
-MAX_OUTPUT_TOKENS = 4096
+# Batas token per menit Groq (gratis) cukup kecil (8K untuk gpt-oss),
+# jadi riwayat dan output dijaga supaya satu request tidak terlalu besar.
+MAX_HISTORY_CHARS = 8000
+MAX_MESSAGE_CHARS = 4000
+MAX_OUTPUT_TOKENS = 3000
 MAX_RETRIES = 2
-MAX_RETRY_WAIT = 20
-REQUEST_TIMEOUT = 120
-MAX_MEMORY_CONTEXT_CHARS = 8000
+MAX_RETRY_WAIT = 12
+REQUEST_TIMEOUT = 90
+MAX_MEMORY_CONTEXT_CHARS = 3000
 
 # Batas Groq untuk gambar base64 = 4MB. Sisakan margin.
 MAX_IMAGE_B64_CHARS = 3_900_000
-MAX_IMAGE_SIDE = 1600
+MAX_IMAGE_SIDE = 2000
 
-# Model cadangan. Tiap model punya limit sendiri, jadi kalau
-# satu kena limit / error, otomatis pindah ke berikutnya.
+# Isi AI_PLAIN_TEXT=1 di .env bila tampilan chat-mu TIDAK bisa
+# menampilkan Markdown (**tebal**, # judul). Blok kode tidak diubah.
+PLAIN_TEXT = (os.getenv("AI_PLAIN_TEXT") or "").strip().lower() in (
+    "1", "true", "ya", "yes"
+)
+
+# Satu provider (Groq), tapi beberapa model. Tiap model punya limit
+# sendiri, jadi kalau satu penuh/error otomatis pindah ke berikutnya.
 FALLBACK_TEXT_MODELS = [
+    "openai/gpt-oss-20b",
     "llama-3.3-70b-versatile",
-    "openai/gpt-oss-120b",
     "llama-3.1-8b-instant",
 ]
 
 FALLBACK_VISION_MODELS = [
     "meta-llama/llama-4-scout-17b-16e-instruct",
     "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "qwen/qwen3.6-27b",
 ]
 
 WIB = timezone(timedelta(hours=7))
 
+HARI = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+BULAN = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
+    "Agustus", "September", "Oktober", "November", "Desember",
+]
+
 INSTRUKSI_TAMBAHAN = """
-ATURAN KERJA TAMBAHAN:
-- Jawab dalam bahasa yang dipakai pengguna (default Bahasa Indonesia).
-- Jawab dengan benar dan teliti. Jika tidak yakin, katakan apa yang belum pasti, jangan mengarang.
-- Jika pengguna mengirim gambar, analisis isi gambar secara nyata: objek, teks (baca/OCR), angka, tabel, grafik, soal, kode, error, dokumen. Jawab pertanyaan berdasarkan gambar. Jika ada bagian yang buram atau tidak terbaca, sebutkan bagian itu.
-- Jika soal ada di gambar, kerjakan soalnya langkah demi langkah dan beri jawaban akhir yang jelas.
-- Jika informasi kurang, ajukan satu atau dua pertanyaan balik yang spesifik sebelum menjawab panjang.
-- Untuk permainan, kuis, latihan, atau tanya jawab interaktif: ajukan pertanyaan ke pengguna, tunggu jawabannya, nilai jawabannya, lalu lanjutkan ke langkah berikutnya sesuai alur percakapan. Ingat konteks sebelumnya.
-- Jangan menulis ulang lirik lagu utuh atau teks berhak cipta panjang. Untuk permainan lirik, beri petunjuk, tebak-tebakan, atau minta pengguna yang menulis, lalu tanggapi.
-- Jangan pernah menjawab dengan kalimat kosong seperti "AI tidak merespon". Selalu beri jawaban berguna.
+ATURAN KERJA (ikuti selalu):
+UMUM
+- Jawab dalam bahasa yang dipakai pengguna (default Bahasa Indonesia), jelas, ramah, dan langsung ke inti.
+- Jawab dengan benar dan teliti. Jika tidak yakin, katakan bagian mana yang belum pasti. Jangan mengarang fakta, sumber, atau hasil. Kamu tidak bisa membuka internet.
+- Jika informasi kurang untuk menjawab dengan baik, ajukan satu atau dua pertanyaan balik yang spesifik, lalu lanjutkan setelah pengguna menjawab.
+- Untuk permainan, kuis, latihan, atau tanya jawab interaktif: ajukan pertanyaan, tunggu jawaban pengguna, nilai jawabannya, lalu lanjutkan ke langkah berikutnya. Ingat alur percakapan sebelumnya.
+- Jika pengguna menyebut namanya atau info pribadi yang ada di bagian MEMORY, pakai itu secara wajar (sapa dengan nama, jawab langsung bila ditanya "siapa namaku"). Jangan menyebut kata "memory" atau sistem internal.
+- Jangan menulis ulang lirik lagu utuh atau teks berhak cipta yang panjang. Untuk permainan lirik, beri petunjuk atau minta pengguna yang menulis, lalu tanggapi.
+- Jangan pernah menulis proses berpikir internal. Jangan pernah menjawab hanya dengan "AI tidak merespon".
+
+GAMBAR / FOTO
+- Jika ada gambar, analisis isinya secara nyata: objek, teks (baca semua teks/OCR, termasuk tulisan tangan), angka, tabel, grafik, soal, kode, pesan error, dokumen.
+- Jawab pertanyaan pengguna berdasarkan gambar. Jika ada bagian buram atau tidak terbaca, sebutkan bagian itu, jangan menebak.
+- Jika gambar berisi soal, kerjakan langkah demi langkah dan beri jawaban akhir yang jelas. Jika gambar berisi jawaban siswa, periksa satu per satu: tandai benar/salah dan beri nilai yang benar beserta alasannya.
+
+CODING
+- Kamu bisa membantu semua bahasa pemrograman: tulis, jelaskan, debug, refactor, review, buat test, SQL, shell, dan arsitektur aplikasi.
+- Tulis kode LENGKAP dan siap jalan, bukan potongan dengan "..." atau "sisanya sama". Taruh di blok kode dengan nama bahasa, misalnya ```python.
+- Untuk debugging, cari akar masalahnya. Jika pesan error/traceback belum ada, minta dulu. Setelah kode, sebutkan singkat cara menjalankan, dependensi, dan hal yang perlu dicek.
+- Jangan pernah menaruh API key atau password asli ke dalam kode contoh; pakai variabel lingkungan.
+
+MATEMATIKA & SAINS
+- Kerjakan bertahap, tulis rumus yang dipakai, lalu cek ulang hasil akhirnya.
 """
 
 
 # ==================================================
 # BERSIHKAN JAWABAN
 # ==================================================
+
+def hapus_markdown_ringan(teks):
+    """Hapus **tebal**, # judul, > kutipan di luar blok kode."""
+    bagian = re.split(r"(```.*?```)", teks, flags=re.DOTALL)
+    hasil = []
+
+    for b in bagian:
+        if b.startswith("```"):
+            hasil.append(b)
+            continue
+
+        b = re.sub(r"^\s*#{1,6}\s*", "", b, flags=re.MULTILINE)
+        b = re.sub(r"\*\*(.+?)\*\*", r"\1", b)
+        b = re.sub(r"^\s*>\s?", "", b, flags=re.MULTILINE)
+        hasil.append(b)
+
+    return "".join(hasil)
+
 
 def bersihkan_jawaban(teks):
     if teks is None:
@@ -105,6 +159,9 @@ def bersihkan_jawaban(teks):
         teks,
         flags=re.MULTILINE | re.IGNORECASE,
     )
+
+    if PLAIN_TEXT:
+        teks = hapus_markdown_ringan(teks)
 
     teks = re.sub(r"\n{3,}", "\n\n", teks)
 
@@ -174,17 +231,18 @@ def kompres_gambar(raw):
     img.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
 
     kualitas = 88
+
     while True:
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=kualitas, optimize=True)
         data = buf.getvalue()
 
-        if len(data) * 4 / 3 <= MAX_IMAGE_B64_CHARS or kualitas <= 40:
+        if len(data) * 4 / 3 <= MAX_IMAGE_B64_CHARS:
             return data, "image/jpeg"
 
-        kualitas -= 12
-        if kualitas < 40:
-            kualitas = 40
+        if kualitas > 50:
+            kualitas -= 12
+        else:
             w, h = img.size
             img = img.resize((int(w * 0.8), int(h * 0.8)))
 
@@ -205,8 +263,7 @@ def validasi_gambar(image):
 
     if not match:
         raise ValueError(
-            "Format gambar tidak didukung. Gunakan JPG, PNG, WEBP, atau GIF "
-            "dalam format data:image/...;base64,..."
+            "Format gambar tidak didukung. Gunakan JPG, PNG, WEBP, atau GIF."
         )
 
     mime = match.group(1).lower()
@@ -221,13 +278,9 @@ def validasi_gambar(image):
     try:
         raw = base64.b64decode(encoded, validate=True)
     except Exception:
-        raise ValueError("Data Base64 gambar tidak valid.")
+        raise ValueError("Data gambar tidak valid.")
 
-    # Kompres bila ada Pillow (selalu untuk GIF, atau bila terlalu besar).
-    perlu_kompres = (
-        mime == "image/gif"
-        or len(encoded) > 1_500_000
-    )
+    perlu_kompres = mime == "image/gif" or len(encoded) > 1_500_000
 
     if Image is not None:
         try:
@@ -244,11 +297,42 @@ def validasi_gambar(image):
 
     if len(encoded) > MAX_IMAGE_B64_CHARS:
         raise ValueError(
-            "Ukuran gambar terlalu besar. Kompres atau potong gambar "
-            "terlebih dahulu (maksimal sekitar 3 MB)."
+            "Ukuran gambar terlalu besar. Kecilkan gambar dulu "
+            "(maksimal sekitar 3 MB) lalu kirim lagi."
         )
 
     return f"data:{mime};base64,{encoded}"
+
+
+def ambil_gambar_history(history, maks_pesan=4):
+    """Kalau history masih memuat gambar yang baru dikirim, pakai lagi
+    supaya pertanyaan lanjutan tentang foto tetap bisa dijawab."""
+    if not isinstance(history, list):
+        return None
+
+    for item in reversed(history[-maks_pesan:]):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+
+        kandidat = []
+
+        content = item.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    iu = part.get("image_url")
+                    kandidat.append(iu.get("url") if isinstance(iu, dict) else iu)
+
+        kandidat.append(item.get("image"))
+
+        for url in kandidat:
+            if isinstance(url, str) and url.lower().startswith("data:image/"):
+                try:
+                    return validasi_gambar(url)
+                except ValueError:
+                    return None
+
+    return None
 
 
 # ==================================================
@@ -311,8 +395,18 @@ def siapkan_history(history):
 # MEMORY
 # ==================================================
 
+def simpan_memory_dari_pesan(pesan_text, user_id):
+    if not user_id or deteksi_memory_penting is None or not pesan_text:
+        return
+
+    try:
+        deteksi_memory_penting(pesan_text, user_id)
+    except Exception as e:
+        print("[Memory] Gagal menyimpan:", repr(e))
+
+
 def siapkan_memory_context(user_id=None):
-    if user_id is None or get_memory_context is None:
+    if not user_id or get_memory_context is None:
         return ""
 
     try:
@@ -337,6 +431,7 @@ def siapkan_memory_context(user_id=None):
 # ==================================================
 
 def ambil_waktu_retry(response):
+    """Detik yang disarankan sebelum mencoba lagi (bisa lebih besar dari batas)."""
     if response is None:
         return 3
 
@@ -347,7 +442,7 @@ def ambil_waktu_retry(response):
 
     if retry_after:
         try:
-            return min(max(float(retry_after) + 1, 2), MAX_RETRY_WAIT)
+            return float(retry_after) + 1
         except (ValueError, TypeError):
             pass
 
@@ -356,19 +451,17 @@ def ambil_waktu_retry(response):
     except Exception:
         text = ""
 
-    for pattern in (
-        r"try again in\s+([\d.]+)s",
-        r"retry after\s+([\d.]+)s",
-        r"retry-after[:\s]+([\d.]+)",
-        r"wait\s+([\d.]+)s",
-    ):
-        match = re.search(pattern, text, flags=re.IGNORECASE)
+    match = re.search(
+        r"try again in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?",
+        text,
+        flags=re.IGNORECASE,
+    )
 
-        if match:
-            try:
-                return min(max(float(match.group(1)) + 1, 2), MAX_RETRY_WAIT)
-            except (ValueError, TypeError):
-                pass
+    if match and any(match.groups()):
+        jam = float(match.group(1) or 0)
+        menit = float(match.group(2) or 0)
+        detik = float(match.group(3) or 0)
+        return jam * 3600 + menit * 60 + detik + 1
 
     return 3
 
@@ -377,13 +470,13 @@ def ambil_waktu_retry(response):
 # REQUEST GROQ
 # ==================================================
 
-def request_groq(headers, data, url=None):
+def request_groq(headers, data):
     last_response = None
 
     for attempt in range(MAX_RETRIES):
         try:
             response = requests.post(
-                url or BASE_URL,
+                BASE_URL,
                 headers=headers,
                 json=data,
                 timeout=REQUEST_TIMEOUT,
@@ -400,7 +493,13 @@ def request_groq(headers, data, url=None):
                 if attempt >= MAX_RETRIES - 1:
                     return response
 
-                time.sleep(ambil_waktu_retry(response))
+                tunggu = ambil_waktu_retry(response)
+
+                # Tunggu lama (mis. limit harian) -> langsung ganti model.
+                if tunggu > MAX_RETRY_WAIT:
+                    return response
+
+                time.sleep(max(tunggu, 2))
                 continue
 
             if response.status_code >= 500:
@@ -430,15 +529,11 @@ def request_groq(headers, data, url=None):
             print("[Groq] Request exception:", repr(e))
             return None
 
-        except Exception as e:
-            print("[Groq] Unexpected request error:", repr(e))
-            return None
-
     return last_response
 
 
 # ==================================================
-# PARSE ERROR API
+# PARSE RESPON
 # ==================================================
 
 def ambil_error_api(response):
@@ -464,10 +559,6 @@ def ambil_error_api(response):
     return ""
 
 
-# ==================================================
-# EKSTRAK JAWABAN GROQ
-# ==================================================
-
 def ekstrak_jawaban_groq(data):
     if not isinstance(data, dict):
         return ""
@@ -487,7 +578,7 @@ def ekstrak_jawaban_groq(data):
     if not isinstance(message, dict):
         return ""
 
-    # Hanya ambil content final. "reasoning" sengaja TIDAK dipakai
+    # Hanya content final. Field "reasoning" sengaja tidak dipakai
     # supaya proses berpikir model tidak bocor ke pengguna.
     for key in ("content", "text", "output_text"):
         answer = ekstrak_teks_content(message.get(key))
@@ -501,13 +592,16 @@ def ekstrak_jawaban_groq(data):
 # SYSTEM PROMPT
 # ==================================================
 
+def waktu_sekarang():
+    n = datetime.now(WIB)
+    return f"{HARI[n.weekday()]}, {n.day} {BULAN[n.month - 1]} {n.year}, {n:%H:%M} WIB"
+
+
 def buat_system_prompt(user_id=None):
     system_prompt = str(SYSTEM_PROMPT).strip()
 
-    sekarang = datetime.now(WIB).strftime("%A, %d %B %Y, %H:%M WIB")
-
     system_prompt += "\n\n" + INSTRUKSI_TAMBAHAN.strip()
-    system_prompt += f"\n\nWaktu sekarang: {sekarang}."
+    system_prompt += f"\n\nWaktu sekarang: {waktu_sekarang()}."
 
     memory_context = siapkan_memory_context(user_id)
 
@@ -515,19 +609,15 @@ def buat_system_prompt(user_id=None):
         system_prompt += (
             "\n\n"
             "==================================================\n"
-            "MEMORY RELEVAN PENGGUNA\n"
+            "MEMORY TENTANG PENGGUNA (dari percakapan sebelumnya)\n"
             "==================================================\n"
             + memory_context
-            + "\n\nGunakan memory hanya jika relevan. "
-            "Jangan menyebut sistem memory internal kepada pengguna."
+            + "\n\nPakai informasi ini hanya bila relevan. "
+            "Jangan menyebut kata memory atau sistem internal."
         )
 
     return system_prompt
 
-
-# ==================================================
-# USER CONTENT
-# ==================================================
 
 def buat_user_content(pesan_text, image):
     if not image:
@@ -538,10 +628,6 @@ def buat_user_content(pesan_text, image):
         {"type": "image_url", "image_url": {"url": image}},
     ]
 
-
-# ==================================================
-# DAFTAR MODEL
-# ==================================================
 
 def daftar_model(utama, cadangan):
     hasil = []
@@ -557,63 +643,28 @@ def daftar_model(utama, cadangan):
 # PANGGIL MODEL (DENGAN FALLBACK)
 # ==================================================
 
-GEMINI_OPENAI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-)
+def panggil_model(messages, models):
+    """Coba model satu per satu. Return (jawaban, kode_error)."""
 
-# Urutan provider, bisa diubah lewat .env: AI_PROVIDER_ORDER=groq,gemini
-URUTAN_PROVIDER = [
-    p.strip().lower()
-    for p in (os.getenv("AI_PROVIDER_ORDER") or "gemini,groq").split(",")
-    if p.strip()
-]
-
-
-def buat_targets(ada_gambar):
-    """Daftar (provider, model) yang dicoba berurutan sampai ada yang berhasil."""
-    targets = []
-
-    for provider in URUTAN_PROVIDER:
-        if provider == "gemini" and GEMINI_API_KEY:
-            targets.append({
-                "url": GEMINI_OPENAI_URL,
-                "key": GEMINI_API_KEY,
-                "model": GEMINI_MODEL,
-            })
-
-        elif provider == "groq" and API_KEY:
-            if ada_gambar:
-                models = daftar_model(VISION_MODEL, FALLBACK_VISION_MODELS)
-            else:
-                models = daftar_model(MODEL, FALLBACK_TEXT_MODELS)
-
-            for m in models:
-                targets.append({"url": BASE_URL, "key": API_KEY, "model": m})
-
-    return targets
-
-
-def panggil_model(messages, targets):
-    """Coba target satu per satu. Return (jawaban, kode_error)."""
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+    }
 
     kode_error = "unknown"
 
-    for target in targets:
-        model = target["model"]
-
-        headers = {
-            "Authorization": f"Bearer {target['key']}",
-            "Content-Type": "application/json",
-        }
-
+    for model in models:
         data = {
             "model": model,
             "messages": messages,
-            "temperature": 0.6,
-            "max_tokens": MAX_OUTPUT_TOKENS,
+            "temperature": 0.5,
+            "max_completion_tokens": MAX_OUTPUT_TOKENS,
         }
 
-        response = request_groq(headers, data, target["url"])
+        if model.startswith("openai/gpt-oss"):
+            data["reasoning_effort"] = "medium"
+
+        response = request_groq(headers, data)
 
         if response is None:
             kode_error = "network"
@@ -629,6 +680,7 @@ def panggil_model(messages, targets):
                 jawaban = ""
 
             if jawaban:
+                print(f"[Groq] OK dengan {model}")
                 return jawaban, None
 
             print(f"[Groq] Jawaban kosong dari {model}, coba model lain")
@@ -640,13 +692,18 @@ def panggil_model(messages, targets):
 
         if status in (401, 403):
             kode_error = "auth"
-            continue
+            # Key salah berlaku untuk semua model, tidak perlu lanjut.
+            return "", kode_error
 
         if status == 429:
             kode_error = "rate_limit"
             continue
 
-        if status in (400, 404, 413, 422):
+        if status == 413:
+            kode_error = "too_large"
+            continue
+
+        if status in (400, 404, 422):
             kode_error = "bad_request"
             continue
 
@@ -657,18 +714,30 @@ def panggil_model(messages, targets):
 
 def pesan_error_pengguna(kode, ada_gambar):
     if kode == "auth":
-        return "API Key tidak valid atau sudah dicabut. Buat key baru lalu isi di file .env."
+        return (
+            "API Key Groq tidak valid atau sudah dicabut. "
+            "Buat key baru di console.groq.com lalu isi di GROQ_API_KEY."
+        )
 
     if kode == "rate_limit":
-        return "Batas pemakaian AI sedang penuh. Tunggu sekitar 1 menit lalu kirim ulang pesanmu."
+        return (
+            "Batas pemakaian AI sedang penuh. Tunggu sekitar 1 menit lalu "
+            "kirim ulang pesanmu."
+        )
 
     if kode == "network":
-        return "Koneksi ke server AI terputus. Periksa internet lalu coba kirim lagi."
+        return "Koneksi ke server AI terputus. Coba kirim lagi sebentar lagi."
+
+    if kode == "too_large":
+        return (
+            "Pesan atau percakapan ini terlalu panjang untuk diproses. "
+            "Coba mulai chat baru atau kirim pesan yang lebih pendek."
+        )
 
     if ada_gambar and kode in ("bad_request", "empty"):
         return (
-            "Gambar belum bisa dibaca. Coba kirim ulang dengan gambar yang lebih kecil "
-            "(JPG/PNG, di bawah 3 MB), dan tulis pertanyaanmu tentang gambar itu."
+            "Gambar belum bisa dibaca. Coba kirim ulang dengan gambar yang lebih "
+            "kecil atau lebih jelas (JPG/PNG), dan tulis pertanyaanmu tentang gambar itu."
         )
 
     return "Server AI sedang bermasalah. Coba kirim ulang pesanmu sebentar lagi."
@@ -679,11 +748,23 @@ def pesan_error_pengguna(kode, ada_gambar):
 # ==================================================
 
 def balas(pesan, history=None, image=None, user_id=None):
-
-    if not API_KEY and not GEMINI_API_KEY:
+    """Tidak pernah melempar error: selalu mengembalikan teks."""
+    try:
+        return _balas(pesan, history, image, user_id)
+    except Exception:
+        traceback.print_exc()
         return (
-            "API Key belum tersedia. Isi GROQ_API_KEY dan/atau "
-            "GEMINI_API_KEY di file .env."
+            "Terjadi kesalahan di server saat memproses pesanmu. "
+            "Coba kirim ulang. Jika terus berulang, cek log server."
+        )
+
+
+def _balas(pesan, history, image, user_id):
+
+    if not API_KEY:
+        return (
+            "API Key Groq belum tersedia. Isi GROQ_API_KEY di Environment "
+            "Variables hosting atau di file .env."
         )
 
     if not isinstance(history, list):
@@ -693,25 +774,32 @@ def balas(pesan, history=None, image=None, user_id=None):
     try:
         image = validasi_gambar(image)
     except ValueError as e:
-        print("[AI.Ind] Image validation:", str(e))
+        print("[AI.Ind] Validasi gambar:", str(e))
         return str(e)
+
+    if image is None:
+        image = ambil_gambar_history(history)
 
     # ---------------- PESAN ----------------
     pesan_text = "" if pesan is None else str(pesan).strip()
 
-    if len(pesan_text) > MAX_MESSAGE_CHARS * 2:
-        pesan_text = pesan_text[: MAX_MESSAGE_CHARS * 2] + "\n[Pesan dipersingkat]"
+    if len(pesan_text) > MAX_MESSAGE_CHARS:
+        pesan_text = pesan_text[:MAX_MESSAGE_CHARS] + "\n[Pesan dipersingkat]"
 
     if not pesan_text and image:
         pesan_text = (
             "Analisis gambar ini secara teliti. Jelaskan apa yang terlihat, "
             "baca semua teks atau angka penting, dan jika ada soal atau "
             "pertanyaan di dalamnya, jawab. Jangan mengarang bagian yang "
-            "tidak terlihat. Di akhir, tanyakan apa yang ingin kuketahui lebih lanjut."
+            "tidak terlihat. Di akhir, tanyakan apa yang ingin diketahui lebih lanjut."
         )
 
     if not pesan_text and not image:
         return "Pesanmu kosong. Tulis pertanyaan atau kirim gambar ya."
+
+    # ---------------- MEMORY ----------------
+    # Simpan dulu agar info di pesan ini (mis. nama) langsung terpakai.
+    simpan_memory_dari_pesan(pesan_text, user_id)
 
     # ---------------- HISTORY ----------------
     hist = siapkan_history(history)
@@ -724,10 +812,13 @@ def balas(pesan, history=None, image=None, user_id=None):
     messages.extend(hist)
     messages.append({"role": "user", "content": buat_user_content(pesan_text, image)})
 
-    # ---------------- PILIH MODEL ----------------
-    targets = buat_targets(bool(image))
+    # ---------------- MODEL ----------------
+    if image:
+        models = daftar_model(VISION_MODEL, FALLBACK_VISION_MODELS)
+    else:
+        models = daftar_model(MODEL, FALLBACK_TEXT_MODELS)
 
-    jawaban, kode_error = panggil_model(messages, targets)
+    jawaban, kode_error = panggil_model(messages, models)
 
     if jawaban:
         return jawaban
