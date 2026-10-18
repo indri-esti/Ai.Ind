@@ -3,14 +3,15 @@ import re
 import time
 import base64
 
-from config import API_KEY, BASE_URL, MODEL
+from config import API_KEY, BASE_URL, MODEL, VISION_MODEL
 from prompt import SYSTEM_PROMPT
 
 
 # ==================================================
 # MODEL VISION
 # ==================================================
-VISION_MODEL = "qwen/qwen3.6-27b"
+# Diambil dari config.py (GROQ_VISION_MODEL di .env).
+# Bawaan: meta-llama/llama-4-scout-17b-16e-instruct.
 
 
 # ==================================================
@@ -530,7 +531,8 @@ def request_groq(headers, data):
 def balas(
     pesan,
     history=None,
-    image=None
+    image=None,
+    user_id=None
 ):
 
     # ==================================================
