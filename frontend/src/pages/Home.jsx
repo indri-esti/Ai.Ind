@@ -276,7 +276,10 @@ function Home() {
         }
 
         const parsed = JSON.parse(savedHistory);
-        const cleaned = cleanHistory(parsed);
+        const cleaned =
+          siapkanHistoryUntukDisimpan(
+            cleanHistory(parsed)
+          );
 
         setHistory(cleaned);
 
@@ -382,7 +385,9 @@ function Home() {
       return;
     }
 
-    const cleaned = cleanHistory(history);
+    const cleaned = siapkanHistoryUntukDisimpan(
+      cleanHistory(history)
+    );
 
     if (historySaveTimeoutRef.current) {
       clearTimeout(
@@ -402,6 +407,25 @@ function Home() {
             "Gagal menyimpan history:",
             error
           );
+
+          // Penyimpanan penuh: simpan teksnya saja
+          // tanpa gambar supaya riwayat tidak hilang.
+          try {
+            localStorage.setItem(
+              userKey,
+              JSON.stringify(
+                siapkanHistoryUntukDisimpan(
+                  cleaned,
+                  true
+                )
+              )
+            );
+          } catch (error2) {
+            console.error(
+              "Gagal menyimpan history (tanpa gambar):",
+              error2
+            );
+          }
         }
       }, 200);
 
@@ -826,6 +850,124 @@ function Home() {
   };
 
   // ==========================================
+  // KOMPRES GAMBAR
+  // Semua gambar diubah jadi JPEG yang lebih kecil.
+  // - Versi besar (1280px) dikirim ke AI
+  // - Versi kecil (thumbnail) dipakai untuk tampilan
+  //   & riwayat, supaya localStorage tidak penuh
+  // ==========================================
+  const kompresGambar = (
+    file,
+    maxSide = 1280,
+    quality = 0.8
+  ) => {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = () => {
+        try {
+          const skala = Math.min(
+            1,
+            maxSide /
+              Math.max(img.width, img.height)
+          );
+
+          const w = Math.max(
+            1,
+            Math.round(img.width * skala)
+          );
+
+          const h = Math.max(
+            1,
+            Math.round(img.height * skala)
+          );
+
+          const canvas =
+            document.createElement("canvas");
+
+          canvas.width = w;
+          canvas.height = h;
+
+          const ctx = canvas.getContext("2d");
+
+          // Latar putih supaya PNG transparan tidak jadi hitam
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+
+          URL.revokeObjectURL(url);
+
+          resolve(
+            canvas.toDataURL(
+              "image/jpeg",
+              quality
+            )
+          );
+        } catch (error) {
+          URL.revokeObjectURL(url);
+          reject(error);
+        }
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+
+        reject(
+          new Error("Gagal membaca gambar.")
+        );
+      };
+
+      img.src = url;
+    });
+  };
+
+  // ==========================================
+  // BERSIHKAN GAMBAR UNTUK DISIMPAN
+  // - blob: URL sudah tidak berlaku setelah aplikasi
+  //   dibuka ulang, jadi dibuang
+  // - gambar besar dibuang agar tidak memenuhi
+  //   localStorage (batas sekitar 5 MB)
+  // ==========================================
+  const MAKS_GAMBAR_SIMPAN = 120000;
+
+  const gambarBolehDisimpan = (image) => {
+    if (typeof image !== "string") return false;
+    if (!image.startsWith("data:image/")) return false;
+    return image.length <= MAKS_GAMBAR_SIMPAN;
+  };
+
+  const siapkanHistoryUntukDisimpan = (
+    list,
+    tanpaGambar = false
+  ) => {
+    if (!Array.isArray(list)) return [];
+
+    return list.map((chat) => {
+      if (!chat || !Array.isArray(chat.messages)) {
+        return chat;
+      }
+
+      return {
+        ...chat,
+
+        messages: chat.messages.map((msg) => {
+          if (!msg || !msg.image) return msg;
+
+          if (
+            tanpaGambar ||
+            !gambarBolehDisimpan(msg.image)
+          ) {
+            return { ...msg, image: null };
+          }
+
+          return msg;
+        }),
+      };
+    });
+  };
+
+  // ==========================================
   // KIRIM PESAN
   // ==========================================
   const kirimPesan = async () => {
@@ -881,9 +1023,6 @@ function Home() {
     const imageFile =
       selectedImage;
 
-    const previewAtSend =
-      imagePreview;
-
     const userMessageId =
       `user_${Date.now()}_${Math.random()
         .toString(36)
@@ -899,11 +1038,31 @@ function Home() {
     try {
       setLoading(true);
 
+      // Kompres dulu SEBELUM pesan ditampilkan.
+      // thumbnail = untuk tampilan & riwayat
+      // imageBase64 = untuk dikirim ke AI
+      let imageBase64 = null;
+      let thumbnail = null;
+
+      if (imageFile) {
+        thumbnail = await kompresGambar(
+          imageFile,
+          400,
+          0.6
+        );
+
+        imageBase64 = await kompresGambar(
+          imageFile,
+          1280,
+          0.8
+        );
+      }
+
       const userMessage = {
         id: userMessageId,
         role: "user",
         content: pesanText,
-        image: previewAtSend || null,
+        image: thumbnail,
       };
 
       setMessages((prev) => [
@@ -919,24 +1078,6 @@ function Home() {
           block: "end",
         });
       });
-
-      let imageBase64 = null;
-
-      if (imageFile) {
-        imageBase64 =
-          await fileToBase64(imageFile);
-
-        setMessages((prev) =>
-          prev.map((item) =>
-            item.id === userMessageId
-              ? {
-                  ...item,
-                  image: imageBase64,
-                }
-              : item
-          )
-        );
-      }
 
       if (imageFile) {
         hapusGambar();

@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
+import axios from "../api";
+
 import {
   FiMenu,
   FiPlus,
@@ -17,7 +19,7 @@ import {
   FiTrash2,
   FiMail,
   FiLock,
-  FiUserCheck,
+  FiSearch,
 } from "react-icons/fi";
 
 function Sidebar({
@@ -39,6 +41,9 @@ function Sidebar({
   );
 
   const [settingOpen, setSettingOpen] = useState(false);
+
+  // Pencarian riwayat percakapan
+  const [search, setSearch] = useState("");
 
   // =====================================================
   // REF
@@ -208,6 +213,84 @@ function Sidebar({
   const uniqueHistory = useMemo(() => {
     return cleanHistory(history);
   }, [history]);
+
+  // =====================================================
+  // CARI RIWAYAT
+  // =====================================================
+
+  const filteredHistory = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
+    if (!q) {
+      return uniqueHistory;
+    }
+
+    return uniqueHistory.filter((chat) => {
+      const title = String(
+        chat.title || ""
+      ).toLowerCase();
+
+      if (title.includes(q)) {
+        return true;
+      }
+
+      return (
+        Array.isArray(chat.messages) &&
+        chat.messages.some(
+          (m) =>
+            typeof m?.content === "string" &&
+            m.content.toLowerCase().includes(q)
+        )
+      );
+    });
+  }, [uniqueHistory, search]);
+
+  // =====================================================
+  // KELOMPOKKAN RIWAYAT PER TANGGAL
+  // =====================================================
+
+  const groupedHistory = useMemo(() => {
+    const now = new Date();
+
+    const startToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ).getTime();
+
+    const day = 24 * 60 * 60 * 1000;
+
+    const labelOf = (timestamp) => {
+      const t = Number(timestamp) || 0;
+
+      if (t >= startToday) return "Hari ini";
+      if (t >= startToday - day) return "Kemarin";
+      if (t >= startToday - 7 * day) {
+        return "7 hari terakhir";
+      }
+
+      return "Lebih lama";
+    };
+
+    const groups = [];
+
+    filteredHistory.forEach((chat) => {
+      const label = labelOf(chat.updatedAt);
+
+      let group = groups.find(
+        (g) => g.label === label
+      );
+
+      if (!group) {
+        group = { label, items: [] };
+        groups.push(group);
+      }
+
+      group.items.push(chat);
+    });
+
+    return groups;
+  }, [filteredHistory]);
 
   // =====================================================
   // LOAD USER
@@ -562,6 +645,10 @@ function Sidebar({
       confirmButtonText: "Tutup",
       confirmButtonColor: "#00C2FF",
 
+      showDenyButton: true,
+      denyButtonText: "Ubah Password",
+      denyButtonColor: "#1E3A4C",
+
       html: `
         <div style="
           text-align:left;
@@ -781,9 +868,10 @@ function Sidebar({
             font-size:10px;
             line-height:1.6;
           ">
-            Demi keamanan, password asli tidak
-            ditampilkan kembali. Sistem hanya menyimpan
-            password dalam bentuk hash.
+            Lupa password? Password asli tidak bisa
+            ditampilkan karena disimpan terenkripsi (hash),
+            tapi kamu bisa menggantinya lewat tombol
+            Ubah Password di bawah.
           </div>
 
         </div>
@@ -816,23 +904,259 @@ function Sidebar({
             </svg>`;
         }
       },
+    }).then((result) => {
+      if (result.isDenied) {
+        handleChangePassword();
+      }
     });
   };
 
   // =====================================================
-  // CHANGE ACCOUNT
+  // UBAH PASSWORD
   // =====================================================
 
-  const handleChangeAccount = () => {
-    if (!user) {
+  const handleChangePassword = () => {
+    if (!user?.id) {
       navigate("/login");
       return;
     }
 
+    const EYE =
+      `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+
+    const EYE_OFF =
+      `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+
+    const esc = (text) =>
+      String(text)
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    const field = (
+      id,
+      label,
+      placeholder,
+      autocomplete
+    ) => `
+      <label class="ai-pw-label" for="${id}">
+        ${label}
+      </label>
+
+      <div class="ai-pw-wrap">
+        <input
+          id="${id}"
+          type="password"
+          class="ai-pw-input"
+          placeholder="${placeholder}"
+          autocomplete="${autocomplete}"
+        />
+
+        <button
+          type="button"
+          class="ai-pw-eye"
+          data-target="${id}"
+          aria-label="Tampilkan password"
+        >
+          ${EYE}
+        </button>
+      </div>
+    `;
+
     Swal.fire({
-      title: "Ganti Akun?",
-      text:
-        "Kamu akan keluar dari akun saat ini.",
+      title: "Ubah Password",
+
+      background: "#0B1D2A",
+      color: "#fff",
+
+      width: 380,
+
+      html: `
+        <div class="ai-pw-form">
+          ${field(
+            "ai-pw-old",
+            "Password lama",
+            "Masukkan password lama",
+            "current-password"
+          )}
+
+          ${field(
+            "ai-pw-new",
+            "Password baru",
+            "Minimal 6 karakter",
+            "new-password"
+          )}
+
+          ${field(
+            "ai-pw-confirm",
+            "Ulangi password baru",
+            "Ketik ulang password baru",
+            "new-password"
+          )}
+        </div>
+      `,
+
+      focusConfirm: false,
+
+      showCancelButton: true,
+      confirmButtonText: "Simpan",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#00C2FF",
+      cancelButtonColor: "#334155",
+      reverseButtons: true,
+
+      allowOutsideClick: () => !Swal.isLoading(),
+
+      didOpen: () => {
+        document
+          .querySelectorAll(".ai-pw-eye")
+          .forEach((button) => {
+            button.addEventListener(
+              "click",
+              () => {
+                const input =
+                  document.getElementById(
+                    button.dataset.target
+                  );
+
+                if (!input) return;
+
+                const show =
+                  input.type === "password";
+
+                input.type = show
+                  ? "text"
+                  : "password";
+
+                button.innerHTML = show
+                  ? EYE_OFF
+                  : EYE;
+
+                button.setAttribute(
+                  "aria-label",
+                  show
+                    ? "Sembunyikan password"
+                    : "Tampilkan password"
+                );
+              }
+            );
+          });
+
+        const first =
+          document.getElementById("ai-pw-old");
+
+        if (first) first.focus();
+      },
+
+      preConfirm: async () => {
+        const oldPw =
+          document.getElementById("ai-pw-old")
+            ?.value || "";
+
+        const newPw =
+          document.getElementById("ai-pw-new")
+            ?.value || "";
+
+        const confirmPw =
+          document.getElementById(
+            "ai-pw-confirm"
+          )?.value || "";
+
+        if (!oldPw || !newPw || !confirmPw) {
+          Swal.showValidationMessage(
+            "Semua kolom wajib diisi."
+          );
+          return false;
+        }
+
+        if (newPw.length < 6) {
+          Swal.showValidationMessage(
+            "Password baru minimal 6 karakter."
+          );
+          return false;
+        }
+
+        if (newPw !== confirmPw) {
+          Swal.showValidationMessage(
+            "Konfirmasi password tidak sama."
+          );
+          return false;
+        }
+
+        if (newPw === oldPw) {
+          Swal.showValidationMessage(
+            "Password baru harus berbeda dari password lama."
+          );
+          return false;
+        }
+
+        try {
+          const res = await axios.post(
+            "/change-password",
+            {
+              user_id: Number(user.id),
+              old_password: oldPw,
+              new_password: newPw,
+            }
+          );
+
+          if (res.data?.success === false) {
+            Swal.showValidationMessage(
+              esc(
+                res.data?.message ||
+                  "Gagal mengubah password."
+              )
+            );
+            return false;
+          }
+
+          return true;
+        } catch (err) {
+          const message =
+            err?.response?.data?.message ||
+            (err?.request
+              ? "Server tidak dapat dihubungi. Periksa koneksi internet."
+              : "Gagal mengubah password. Coba lagi.");
+
+          Swal.showValidationMessage(
+            esc(message)
+          );
+
+          return false;
+        }
+      },
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        Swal.fire({
+          icon: "success",
+          title: "Password berhasil diubah",
+          text: "Gunakan password baru saat login berikutnya.",
+
+          background: "#0B1D2A",
+          color: "#fff",
+
+          confirmButtonText: "OK",
+          confirmButtonColor: "#00C2FF",
+        });
+      }
+    });
+  };
+
+  // =====================================================
+  // HAPUS SEMUA RIWAYAT
+  // =====================================================
+
+  const handleClearAllHistory = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (uniqueHistory.length === 0) return;
+
+    Swal.fire({
+      title: "Hapus semua riwayat?",
+
+      text: `${uniqueHistory.length} percakapan akan dihapus dari perangkat ini.`,
 
       icon: "warning",
 
@@ -841,39 +1165,36 @@ function Sidebar({
 
       showCancelButton: true,
 
-      confirmButtonText:
-        "Ganti Akun",
+      confirmButtonText: "Hapus semua",
+      cancelButtonText: "Batal",
 
-      cancelButtonText:
-        "Batal",
-
-      confirmButtonColor:
-        "#00C2FF",
-
-      cancelButtonColor:
-        "#334155",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#334155",
 
       reverseButtons: true,
-
     }).then((result) => {
-      if (result.isConfirmed) {
-        setMessages([]);
-        setSettingOpen(false);
+      if (!result.isConfirmed) return;
 
-        localStorage.removeItem(
-          "user"
-        );
+      setHistory([]);
 
-        setUser(null);
+      window.dispatchEvent(
+        new CustomEvent(
+          "aiind-history-updated",
+          {
+            detail: {
+              history: [],
+            },
+          }
+        )
+      );
 
-        window.dispatchEvent(
-          new Event(
-            "aiind-user-updated"
-          )
-        );
-
-        navigate("/login");
+      if (typeof chatBaru === "function") {
+        chatBaru();
       }
+
+      setSearch("");
+
+      closeMobileSidebar();
     });
   };
 
@@ -1953,6 +2274,157 @@ function Sidebar({
               48px;
           }
         }
+
+        /* ---------- Hapus semua + cari riwayat ---------- */
+        .ai-history-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .ai-history-clear {
+          border: 0;
+          background: transparent;
+          color: #ff7b7b;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .3px;
+          text-transform: none;
+          padding: 3px 4px;
+          border-radius: 6px;
+          cursor: pointer;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .ai-history-clear:hover {
+          background: rgba(255,107,107,.1);
+        }
+
+        .ai-search {
+          position: relative;
+          display: flex;
+          align-items: center;
+          margin: 2px 0 10px;
+        }
+
+        .ai-search-icon {
+          position: absolute;
+          left: 11px;
+          color: #60798B;
+          pointer-events: none;
+        }
+
+        .ai-search-input {
+          width: 100%;
+          height: 36px;
+          padding: 0 32px 0 33px;
+          border-radius: 10px;
+          border: 1px solid rgba(255,255,255,.07);
+          background: rgba(255,255,255,.035);
+          color: #DDEBF2;
+          font-size: 12px;
+          outline: none;
+          transition: border-color .16s ease, background .16s ease;
+        }
+
+        .ai-search-input::placeholder {
+          color: #536B7D;
+        }
+
+        .ai-search-input:focus {
+          border-color: rgba(0,194,255,.4);
+          background: rgba(0,194,255,.05);
+        }
+
+        .ai-search-clear {
+          position: absolute;
+          right: 6px;
+          width: 24px;
+          height: 24px;
+          border: 0;
+          border-radius: 50%;
+          background: transparent;
+          color: #71899A;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          touch-action: manipulation;
+        }
+
+        .ai-history-group {
+          margin-bottom: 6px;
+        }
+
+        .ai-history-group-label {
+          padding: 8px 7px 5px;
+          color: #4F677A;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: .6px;
+        }
+
+        /* ---------- Form ubah password (SweetAlert) ---------- */
+        .ai-pw-form {
+          text-align: left;
+        }
+
+        .ai-pw-label {
+          display: block;
+          margin: 10px 2px 6px;
+          color: #8EACBC;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .ai-pw-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .ai-pw-input {
+          width: 100%;
+          height: 44px;
+          padding: 0 44px 0 14px;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,.1);
+          background: rgba(255,255,255,.04);
+          color: #F1FAFF;
+          font-size: 14px;
+          outline: none;
+          box-sizing: border-box;
+        }
+
+        .ai-pw-input:focus {
+          border-color: rgba(0,194,255,.55);
+          background: rgba(0,194,255,.05);
+        }
+
+        .ai-pw-input::placeholder {
+          color: #536B7D;
+        }
+
+        .ai-pw-eye {
+          position: absolute;
+          right: 6px;
+          width: 34px;
+          height: 34px;
+          border: 0;
+          border-radius: 9px;
+          background: transparent;
+          color: #71899A;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          touch-action: manipulation;
+        }
+
+        .ai-pw-eye:hover {
+          color: #00C2FF;
+        }
       `}</style>
 
       {/* ==================================================
@@ -2128,12 +2600,57 @@ function Sidebar({
             </span>
 
             {uniqueHistory.length > 0 && (
-              <span className="ai-history-count">
-                {uniqueHistory.length}
-              </span>
+              <div className="ai-history-right">
+
+                <span className="ai-history-count">
+                  {uniqueHistory.length}
+                </span>
+
+                <button
+                  type="button"
+                  className="ai-history-clear"
+                  onClick={handleClearAllHistory}
+                >
+                  Hapus semua
+                </button>
+
+              </div>
             )}
 
           </div>
+
+          {uniqueHistory.length > 0 && (
+            <div className="ai-search">
+
+              <FiSearch
+                size={14}
+                className="ai-search-icon"
+              />
+
+              <input
+                type="text"
+                className="ai-search-input"
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                placeholder="Cari percakapan..."
+                aria-label="Cari percakapan"
+              />
+
+              {search && (
+                <button
+                  type="button"
+                  className="ai-search-clear"
+                  onClick={() => setSearch("")}
+                  aria-label="Hapus pencarian"
+                >
+                  <FiX size={13} />
+                </button>
+              )}
+
+            </div>
+          )}
 
           {uniqueHistory.length === 0 ? (
 
@@ -2154,13 +2671,43 @@ function Sidebar({
 
             </div>
 
+          ) : groupedHistory.length === 0 ? (
+
+            <div className="ai-empty">
+
+              <div className="ai-empty-icon">
+                <FiSearch size={20} />
+              </div>
+
+              <p>
+                Tidak ada hasil
+              </p>
+
+              <small>
+                Coba kata kunci lain
+              </small>
+
+            </div>
+
           ) : (
 
-            uniqueHistory.map(
-              (chat, index) => {
+            groupedHistory.map((group) => (
+              <div
+                key={group.label}
+                className="ai-history-group"
+              >
+
+                <div className="ai-history-group-label">
+                  {group.label}
+                </div>
+
+                {group.items.map((chat) => {
 
                 const chatKey =
                   getChatKey(chat);
+
+                const index =
+                  uniqueHistory.indexOf(chat);
 
                 return (
                   <div
@@ -2214,8 +2761,10 @@ function Sidebar({
 
                   </div>
                 );
-              }
-            )
+                })}
+
+              </div>
+            ))
 
           )}
 
@@ -2268,7 +2817,7 @@ function Sidebar({
 
               {user && (
                 <div className="ai-profile-hint">
-                  Klik untuk melihat profil
+                  Klik untuk profil dan ubah password
                 </div>
               )}
 
@@ -2338,24 +2887,6 @@ function Sidebar({
                 />
 
                 Profil Akun
-
-              </div>
-
-              {/* GANTI AKUN */}
-
-              <div
-                className="ai-submenu-item"
-                onClick={
-                  handleChangeAccount
-                }
-              >
-
-                <FiUserCheck
-                  size={14}
-                  color="#7DD3FC"
-                />
-
-                Ganti Akun
 
               </div>
 

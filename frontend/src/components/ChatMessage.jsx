@@ -1,10 +1,62 @@
-import { useState } from "react";
-import { FiCopy, FiCheck } from "react-icons/fi";
+import { useState, useRef, useEffect } from "react";
+import { FiCopy, FiCheck, FiVolume2, FiSquare } from "react-icons/fi";
+
+// Dukungan suara bawaan browser (text-to-speech)
+const TTS_DIDUKUNG =
+  typeof window !== "undefined" && "speechSynthesis" in window;
+
+// Pecah teks jadi potongan pendek (Chrome sering berhenti
+// di tengah kalau satu ucapan terlalu panjang)
+const pecahTeks = (teks, maks = 180) => {
+  const kalimat = teks.split(/(?<=[.!?\n])\s+/);
+  const hasil = [];
+  let sekarang = "";
+
+  for (const k of kalimat) {
+    if ((sekarang + " " + k).trim().length > maks && sekarang) {
+      hasil.push(sekarang.trim());
+      sekarang = k;
+    } else {
+      sekarang = (sekarang + " " + k).trim();
+    }
+  }
+
+  if (sekarang.trim()) hasil.push(sekarang.trim());
+
+  // Potong paksa kalau ada kalimat tunggal yang masih terlalu panjang
+  return hasil.flatMap((h) => {
+    if (h.length <= maks * 1.5) return [h];
+    const bagian = [];
+    for (let i = 0; i < h.length; i += maks) {
+      bagian.push(h.slice(i, i + maks));
+    }
+    return bagian;
+  });
+};
 
 function ChatMessage({ msg }) {
   const [copied, setCopied] = useState(false);
 
+  const [imageError, setImageError] = useState(false);
+
+  const [speaking, setSpeaking] = useState(false);
+  const tokenSuaraRef = useRef(0);
+
+  // Bersihkan markdown di luar blok kode (```...```),
+  // supaya kode seperti "# komentar" atau print('a') tidak rusak.
   const cleanContent = (content = "") => {
+    return String(content || "")
+      .split(/(```[\s\S]*?```)/g)
+      .map((bagian) =>
+        bagian.startsWith("```")
+          ? bagian
+          : cleanBagian(bagian)
+      )
+      .join("")
+      .trim();
+  };
+
+  const cleanBagian = (content = "") => {
     return content
       // Hilangkan tanda # di awal baris
       .replace(/^\s*#+\s?/gm, "")
@@ -22,15 +74,24 @@ function ChatMessage({ msg }) {
       .replace(/'/g, "")
 
       // Rapikan spasi berlebihan
-      .replace(/[ \t]+$/gm, "")
-      .trim();
+      .replace(/[ \t]+$/gm, "");
   };
 
   const content = cleanContent(msg.content);
 
   const isUser = msg.role === "user";
 
-  const hasImage = isUser && Boolean(msg.image);
+  const hasImage =
+    isUser && Boolean(msg.image) && !imageError;
+
+  // Teks untuk dibacakan: tanpa blok kode, link, dan simbol yang aneh jika dibaca
+  const teksSuara = content
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`/g, "")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[_~|]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 
   // =========================================================
   // SALIN TEKS
@@ -74,6 +135,70 @@ function ChatMessage({ msg }) {
       setTimeout(() => setCopied(false), 1800);
     }
   };
+
+  // =========================================================
+  // SUARA AI (TEKS -> SUARA)
+  // Tekan 🔊 untuk memutar, tekan lagi untuk berhenti.
+  // Hanya satu pesan yang bersuara pada satu waktu.
+  // =========================================================
+  const berhentiSuara = () => {
+    tokenSuaraRef.current += 1;
+    window.speechSynthesis.cancel();
+    setSpeaking(false);
+  };
+
+  const putarSuara = () => {
+    if (!TTS_DIDUKUNG || !teksSuara) return;
+
+    if (speaking) {
+      berhentiSuara();
+      return;
+    }
+
+    // Hentikan suara dari pesan lain
+    window.speechSynthesis.cancel();
+
+    const token = tokenSuaraRef.current + 1;
+    tokenSuaraRef.current = token;
+
+    const potongan = pecahTeks(teksSuara);
+    const daftarSuara = window.speechSynthesis.getVoices();
+    const suaraIndo =
+      daftarSuara.find((v) => v.lang === "id-ID") ||
+      daftarSuara.find((v) => v.lang && v.lang.startsWith("id"));
+
+    setSpeaking(true);
+
+    potongan.forEach((bagian, i) => {
+      const u = new SpeechSynthesisUtterance(bagian);
+      u.lang = "id-ID";
+      u.rate = 1;
+      u.pitch = 1;
+      if (suaraIndo) u.voice = suaraIndo;
+
+      const selesai = () => {
+        if (tokenSuaraRef.current !== token) return;
+        if (i === potongan.length - 1) setSpeaking(false);
+      };
+
+      u.onend = selesai;
+      u.onerror = () => {
+        if (tokenSuaraRef.current !== token) return;
+        setSpeaking(false);
+      };
+
+      window.speechSynthesis.speak(u);
+    });
+  };
+
+  // Hentikan suara kalau pesan hilang dari layar (misal ganti chat)
+  useEffect(() => {
+    return () => {
+      if (tokenSuaraRef.current > 0 && TTS_DIDUKUNG) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -216,6 +341,7 @@ function ChatMessage({ msg }) {
           /* ---------- Tombol salin ---------- */
           .cm-actions {
             display: flex;
+            gap: 8px;
             margin-top: 6px;
             padding: 0 4px;
           }
@@ -300,6 +426,7 @@ function ChatMessage({ msg }) {
                   className="cm-image"
                   src={msg.image}
                   alt="Gambar yang dikirim"
+                  onError={() => setImageError(true)}
                 />
               </div>
             )}
@@ -319,7 +446,7 @@ function ChatMessage({ msg }) {
           </div>
 
           {/* =========================
-              TOMBOL SALIN
+              TOMBOL SALIN + SUARA
           ========================== */}
 
           {content && (
@@ -334,6 +461,20 @@ function ChatMessage({ msg }) {
                 {copied ? <FiCheck size={14} /> : <FiCopy size={14} />}
                 <span>{copied ? "Tersalin" : "Salin"}</span>
               </button>
+
+              {/* Tombol suara: hanya untuk jawaban AI */}
+              {!isUser && TTS_DIDUKUNG && teksSuara && (
+                <button
+                  type="button"
+                  className={`cm-copy ${speaking ? "done" : ""}`}
+                  onClick={putarSuara}
+                  aria-label={speaking ? "Hentikan suara" : "Putar suara"}
+                  title={speaking ? "Hentikan suara" : "Putar suara"}
+                >
+                  {speaking ? <FiSquare size={14} /> : <FiVolume2 size={14} />}
+                  <span>{speaking ? "Stop" : "Suara"}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
