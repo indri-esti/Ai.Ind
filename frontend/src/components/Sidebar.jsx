@@ -1032,14 +1032,14 @@ function Sidebar({
                 // Saat password tersembunyi -> ikon mata biasa
                 // (aksi berikutnya: tampilkan).
                 button.innerHTML = show
-                  ? EYE_OFF
-                  : EYE;
+                  ? EYE
+                  : EYE_OFF;
 
                 button.setAttribute(
                   "aria-label",
                   show
-                    ? "Sembunyikan password"
-                    : "Tampilkan password"
+                    ? "Tampilkan password"
+                    : "Sembunyikan password"
                 );
               }
             );
