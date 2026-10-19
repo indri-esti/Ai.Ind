@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Form, Button } from "react-bootstrap";
+import { Form } from "react-bootstrap";
 import { FaArrowUp } from "react-icons/fa";
-import { FiPlus, FiMic } from "react-icons/fi";
+import { FiPlus, FiMic, FiImage } from "react-icons/fi";
 
 // Tinggi maksimal textarea sebelum mulai scroll di dalamnya
 const MAX_TEXTAREA_HEIGHT = 200;
@@ -29,6 +29,10 @@ function ChatInput({
   imagePreview,
 }) {
   const textareaRef = useRef(null);
+
+  // Status tampilan: fokus (untuk petunjuk keyboard) & drag-drop gambar
+  const [focused, setFocused] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   // =========================================================
   // VOICE NOTE (SUARA -> TEKS)
@@ -182,8 +186,52 @@ function ChatInput({
     }
   };
 
+  // =========================================================
+  // DRAG & DROP GAMBAR
+  // Seret gambar dari komputer langsung ke kotak input.
+  // Diproses lewat pilihGambar yang sama dengan tombol +.
+  // =========================================================
+  const adaFile = (e) =>
+    Array.from(e.dataTransfer?.types || []).includes("Files");
+
+  const handleDragOver = (e) => {
+    if (loading || !adaFile(e)) return;
+
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+
+    setDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    if (!adaFile(e)) return;
+
+    // Cegah browser membuka file yang dilepas
+    e.preventDefault();
+    setDragging(false);
+
+    if (loading) return;
+
+    const file = Array.from(e.dataTransfer.files || []).find((f) =>
+      TIPE_GAMBAR_DIIZINKAN.includes(f.type)
+    );
+
+    if (!file) return;
+
+    pilihGambar({
+      target: { files: [file], value: "" },
+      currentTarget: { files: [file], value: "" },
+    });
+  };
+
+  const bisaKirim = !loading && (!!message.trim() || !!imagePreview);
+
   return (
-    <div className="chat-input-root">
+    <div className="chat-input-root ci-root">
       <style>
         {`
           @keyframes ciMicPulse {
@@ -192,14 +240,190 @@ function ChatInput({
             100% { box-shadow: 0 0 0 0 rgba(0, 194, 255, 0); }
           }
 
+          @keyframes ciSpin {
+            to { transform: rotate(360deg); }
+          }
+
+          @keyframes ciDropIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+          }
+
+          .ci-root *,
+          .ci-root *::before,
+          .ci-root *::after {
+            box-sizing: border-box;
+          }
+
+          .ci-root .ci-row {
+            display: flex;
+            align-items: flex-end;
+            width: 100%;
+          }
+
+          /* ---------- Kotak input (tombol + ada di dalam) ---------- */
+          .ci-box {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            width: 100%;
+            padding: 6px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            background: linear-gradient(
+              180deg,
+              rgba(19, 42, 58, 0.94) 0%,
+              rgba(12, 30, 44, 0.94) 100%
+            );
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            box-shadow:
+              0 10px 30px rgba(0, 0, 0, 0.28),
+              inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            transition:
+              border-color 0.2s ease,
+              box-shadow 0.25s ease,
+              background 0.2s ease;
+          }
+
+          .ci-box:hover {
+            border-color: rgba(255, 255, 255, 0.14);
+          }
+
+          .ci-box:focus-within {
+            border-color: rgba(0, 194, 255, 0.5);
+            box-shadow:
+              0 0 0 4px rgba(0, 194, 255, 0.1),
+              0 12px 36px rgba(0, 0, 0, 0.34),
+              inset 0 1px 0 rgba(255, 255, 255, 0.04);
+          }
+
+          .ci-box.is-listening {
+            border-color: rgba(0, 194, 255, 0.6);
+          }
+
+          .ci-box.is-dragging {
+            border-color: #00c2ff;
+            border-style: dashed;
+            box-shadow:
+              0 0 0 4px rgba(0, 194, 255, 0.14),
+              0 12px 36px rgba(0, 0, 0, 0.34);
+          }
+
+          /* ---------- Tombol + (upload gambar) ---------- */
+          .ci-file-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            padding: 0;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+            opacity: 0;
+          }
+
+          .ci-plus {
+            position: relative;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            margin: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.06);
+            color: #9fb4c4;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition:
+              background 0.2s ease,
+              color 0.2s ease,
+              transform 0.15s ease;
+          }
+
+          .ci-plus:hover {
+            background: rgba(0, 194, 255, 0.14);
+            color: #7fdcff;
+          }
+
+          .ci-plus:active {
+            transform: scale(0.92);
+          }
+
+          .ci-plus .ci-plus-icon {
+            transition: transform 0.25s ease;
+          }
+
+          .ci-plus:hover .ci-plus-icon {
+            transform: rotate(90deg);
+          }
+
+          .ci-plus.is-disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+          }
+
+          /* titik penanda: ada gambar yang sudah dipilih */
+          .ci-plus.has-image {
+            background: rgba(0, 194, 255, 0.16);
+            color: #00c2ff;
+          }
+
+          .ci-plus.has-image::after {
+            content: "";
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #00c2ff;
+            box-shadow: 0 0 0 2px #10293a;
+          }
+
+          .ci-file-input:focus-visible + .ci-plus {
+            outline: 2px solid rgba(0, 194, 255, 0.7);
+            outline-offset: 2px;
+          }
+
+          /* ---------- Textarea ---------- */
+          .ci-root .ci-textarea.form-control,
+          .ci-root .ci-textarea.form-control:focus {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 40px;
+            padding: 8px 6px;
+            border: 0 !important;
+            border-radius: 0;
+            background: transparent !important;
+            box-shadow: none !important;
+            outline: none;
+            color: #eaf8ff !important;
+            caret-color: #00c2ff;
+            font-size: 15px;
+            line-height: 24px;
+            scrollbar-width: thin;
+            scrollbar-color: #24465a transparent;
+          }
+
+          .ci-root .ci-textarea.form-control::placeholder {
+            color: #5f788a;
+            opacity: 1;
+          }
+
+          /* ---------- Mic ---------- */
           .ci-mic-btn {
             flex-shrink: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 38px;
-            height: 38px;
-            margin-right: 6px;
+            width: 40px;
+            height: 40px;
             padding: 0;
             border: none;
             border-radius: 50%;
@@ -227,8 +451,139 @@ function ChatInput({
             cursor: not-allowed;
           }
 
+          /* ---------- Kirim ---------- */
+          .ci-send-btn {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00c2ff, #008fe8);
+            color: #06131c;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(0, 194, 255, 0.3);
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition:
+              transform 0.15s ease,
+              box-shadow 0.2s ease,
+              background 0.2s ease,
+              color 0.2s ease,
+              opacity 0.2s ease;
+          }
+
+          .ci-send-btn:hover:not(:disabled) {
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 8px 22px rgba(0, 194, 255, 0.45);
+          }
+
+          .ci-send-btn:active:not(:disabled) {
+            transform: scale(0.94);
+          }
+
+          .ci-send-btn:disabled {
+            background: rgba(255, 255, 255, 0.07);
+            color: rgba(255, 255, 255, 0.28);
+            box-shadow: none;
+            cursor: not-allowed;
+          }
+
+          .ci-send-btn.is-loading:disabled {
+            background: linear-gradient(135deg, #00c2ff, #008fe8);
+            color: #06131c;
+            box-shadow: 0 6px 16px rgba(0, 194, 255, 0.3);
+            opacity: 0.8;
+            cursor: progress;
+          }
+
+          .ci-spinner {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(6, 19, 28, 0.25);
+            border-top-color: #06131c;
+            animation: ciSpin 0.7s linear infinite;
+          }
+
+          .ci-send-btn:focus-visible,
+          .ci-mic-btn:focus-visible {
+            outline: 2px solid rgba(0, 194, 255, 0.7);
+            outline-offset: 2px;
+          }
+
+          /* ---------- Overlay saat menyeret gambar ---------- */
+          .ci-drop {
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border-radius: inherit;
+            background: rgba(7, 21, 31, 0.92);
+            color: #7fdcff;
+            font-size: 14px;
+            font-weight: 600;
+            pointer-events: none;
+            animation: ciDropIn 0.15s ease;
+          }
+
+          /* ---------- Petunjuk keyboard (hanya di desktop) ---------- */
+          .ci-hint {
+            display: none;
+          }
+
+          @media (hover: hover) and (pointer: fine) {
+            .ci-hint {
+              display: block;
+              margin-top: 8px;
+              text-align: center;
+              font-size: 11px;
+              color: #4f6878;
+              opacity: 0.7;
+              user-select: none;
+              transition: opacity 0.2s ease, color 0.2s ease;
+            }
+
+            .ci-hint.is-active {
+              opacity: 1;
+              color: #6f8798;
+            }
+          }
+
+          .ci-root .ci-hint kbd {
+            padding: 1px 6px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: inherit;
+            font-family: inherit;
+            font-size: 10px;
+            box-shadow: none;
+          }
+
+          /* ---------- HP ---------- */
+          @media (max-width: 767px) {
+            .ci-root .ci-textarea.form-control,
+            .ci-root .ci-textarea.form-control:focus {
+              font-size: 16px; /* mencegah auto-zoom di iOS */
+            }
+
+            .ci-hint {
+              display: none !important;
+            }
+          }
+
           @media (prefers-reduced-motion: reduce) {
             .ci-mic-btn.listening { animation: none; }
+            .ci-spinner { animation-duration: 1.6s; }
+            .ci-plus:hover .ci-plus-icon { transform: none; }
+            .ci-drop { animation: none; }
           }
         `}
       </style>
@@ -239,13 +594,20 @@ function ChatInput({
           handleKirim();
         }}
       >
-        <div className="chat-input-row">
-          {/* ==================================================
-              TOMBOL PLUS / UPLOAD
-              Seluruh lingkaran adalah <label>, jadi semua area
-              bisa diklik/disentuh tanpa perlu onClick manual.
-          ================================================== */}
-          <div className="home-plus-wrapper">
+        <div className="chat-input-row ci-row">
+          <div
+            className={`ci-box ${listening ? "is-listening" : ""} ${
+              dragging ? "is-dragging" : ""
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {/* ==================================================
+                TOMBOL PLUS / UPLOAD (di dalam kotak input)
+                Seluruh lingkaran adalah <label>, jadi semua area
+                bisa diklik/disentuh tanpa perlu onClick manual.
+            ================================================== */}
             <input
               ref={fileInputRef}
               id="home-image-input"
@@ -257,28 +619,28 @@ function ChatInput({
                 e.target.value = "";
               }}
               disabled={loading}
-              className="home-plus-file"
+              className="ci-file-input"
             />
 
             <label
               htmlFor="home-image-input"
-              className={`home-plus-button ${loading ? "is-disabled" : ""}`}
+              className={`ci-plus ${loading ? "is-disabled" : ""} ${
+                imagePreview ? "has-image" : ""
+              }`}
               aria-label="Tambah gambar"
               aria-disabled={loading}
               title="Tambah gambar"
             >
               <FiPlus
-                className="home-plus-icon"
+                className="ci-plus-icon"
                 size={22}
                 strokeWidth={2.5}
               />
             </label>
-          </div>
 
-          {/* ==================================================
-              CHAT INPUT
-          ================================================== */}
-          <div className="chat-input-box">
+            {/* ==================================================
+                CHAT INPUT
+            ================================================== */}
             <Form.Control
               as="textarea"
               ref={textareaRef}
@@ -288,6 +650,8 @@ function ChatInput({
                 setMessage(e.target.value);
               }}
               onPaste={handlePaste}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -302,7 +666,9 @@ function ChatInput({
                   ? "Mendengarkan..."
                   : "Ketik pertanyaan untuk AI.Ind..."
               }
-              className="chat-input"
+              aria-label="Pesan untuk AI.Ind"
+              enterKeyHint="send"
+              className="ci-textarea"
               style={{
                 resize: "none",
                 maxHeight: MAX_TEXTAREA_HEIGHT,
@@ -329,17 +695,37 @@ function ChatInput({
             {/* ==================================================
                 SEND
             ================================================== */}
-            <Button
+            <button
               type="submit"
-              className="send-btn"
-              disabled={loading || (!message.trim() && !imagePreview)}
+              className={`ci-send-btn ${loading ? "is-loading" : ""}`}
+              disabled={!bisaKirim}
               aria-label="Kirim"
+              aria-busy={loading}
+              title="Kirim"
             >
-              <span className="send-icon">
+              {loading ? (
+                <span className="ci-spinner" />
+              ) : (
                 <FaArrowUp size={16} />
-              </span>
-            </Button>
+              )}
+            </button>
+
+            {/* Overlay saat gambar diseret ke kotak input */}
+            {dragging && (
+              <div className="ci-drop">
+                <FiImage size={18} />
+                <span>Lepaskan gambar di sini</span>
+              </div>
+            )}
           </div>
+        </div>
+
+        <div
+          className={`ci-hint ${focused ? "is-active" : ""}`}
+          aria-hidden="true"
+        >
+          <kbd>Enter</kbd> kirim · <kbd>Shift</kbd> + <kbd>Enter</kbd> baris
+          baru
         </div>
       </Form>
     </div>
