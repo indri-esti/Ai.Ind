@@ -957,7 +957,7 @@ function Sidebar({
           data-target="${id}"
           aria-label="Tampilkan password"
         >
-          ${EYE}
+          ${EYE_OFF}
         </button>
       </div>
     `;
@@ -1027,10 +1027,9 @@ function Sidebar({
                   ? "text"
                   : "password";
 
-                // Saat password tampil -> ikon mata dicoret
-                // (aksi berikutnya: sembunyikan).
-                // Saat password tersembunyi -> ikon mata biasa
-                // (aksi berikutnya: tampilkan).
+                // Ikon mengikuti keadaan password:
+                // tampil -> mata terbuka,
+                // tersembunyi -> mata tertutup (dicoret).
                 button.innerHTML = show
                   ? EYE
                   : EYE_OFF;
@@ -1038,8 +1037,8 @@ function Sidebar({
                 button.setAttribute(
                   "aria-label",
                   show
-                    ? "Tampilkan password"
-                    : "Sembunyikan password"
+                    ? "Sembunyikan password"
+                    : "Tampilkan password"
                 );
               }
             );
