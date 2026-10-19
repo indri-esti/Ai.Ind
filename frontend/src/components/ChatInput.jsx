@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Form } from "react-bootstrap";
 import { FaArrowUp } from "react-icons/fa";
 import { FiPlus, FiMic, FiImage } from "react-icons/fi";
@@ -37,6 +37,30 @@ function ChatInput({
   imagePreview,
 }) {
   const textareaRef = useRef(null);
+
+  // Input file disembunyikan; tombol + membukanya lewat .click()
+  // supaya seluruh permukaan tombol (termasuk tengah ikon) bisa diklik.
+  const inputGambarRef = useRef(null);
+
+  const setInputGambarRef = useCallback(
+    (el) => {
+      inputGambarRef.current = el;
+
+      // tetap teruskan ke fileInputRef milik parent
+      if (typeof fileInputRef === "function") {
+        fileInputRef(el);
+      } else if (fileInputRef) {
+        fileInputRef.current = el;
+      }
+    },
+    [fileInputRef]
+  );
+
+  const bukaPilihGambar = () => {
+    if (loading) return;
+
+    inputGambarRef.current?.click();
+  };
 
   // Status tampilan: fokus (untuk petunjuk keyboard) & drag-drop gambar
   const [focused, setFocused] = useState(false);
@@ -334,29 +358,44 @@ function ChatInput({
             opacity: 0;
           }
 
-          /* Tanpa lingkaran. Area sentuh 44px (margin negatif menjaga
-             tinggi kotak tetap rapi), dan ikon tidak menangkap klik
-             sendiri, jadi menekan tepat di tengah + tetap membuka
-             pilihan gambar. */
+          /* Tombol + gaya "ghost" seperti di Claude / ChatGPT: ikon tipis
+             tanpa lingkaran saat diam, latar lembut hanya saat disorot
+             atau ditekan. Ini <button> sungguhan, jadi SELURUH permukaan
+             tombol (termasuk tengah ikon) bisa diklik. Area sentuh
+             diperluas 4px ke segala arah lewat ::before. */
           .ci-plus {
             position: relative;
             flex-shrink: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 44px;
-            height: 44px;
-            margin: -2px;
+            width: 40px;
+            height: 40px;
+            margin: 0;
             padding: 0;
-            border-radius: 12px;
+            border: 0;
+            border-radius: 50%;
             background: transparent;
-            color: #9fb4c4;
+            color: #b4c7d4;
+            font: inherit;
+            line-height: 1;
             cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
             user-select: none;
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
-            transition: color 0.2s ease, transform 0.15s ease;
+            transition:
+              background 0.2s ease,
+              color 0.2s ease,
+              transform 0.15s ease;
+          }
+
+          .ci-plus::before {
+            content: "";
+            position: absolute;
+            inset: -4px;
           }
 
           .ci-plus svg,
@@ -364,29 +403,22 @@ function ChatInput({
             pointer-events: none;
           }
 
-          .ci-plus:active {
-            transform: scale(0.88);
-          }
-
-          .ci-plus .ci-plus-icon {
-            transition: transform 0.25s ease;
+          .ci-plus:active:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(0.92);
           }
 
           /* hover hanya untuk mouse, supaya tidak "nyangkut" di HP */
           @media (hover: hover) {
-            .ci-plus:hover {
-              color: #7fdcff;
-            }
-
-            .ci-plus:hover .ci-plus-icon {
-              transform: rotate(90deg);
+            .ci-plus:hover:not(:disabled) {
+              background: rgba(255, 255, 255, 0.08);
+              color: #ffffff;
             }
           }
 
-          .ci-plus.is-disabled {
+          .ci-plus:disabled {
             opacity: 0.4;
             cursor: not-allowed;
-            pointer-events: none;
           }
 
           /* titik penanda: ada gambar yang sudah dipilih */
@@ -397,8 +429,8 @@ function ChatInput({
           .ci-plus.has-image::after {
             content: "";
             position: absolute;
-            top: 9px;
-            right: 9px;
+            top: 8px;
+            right: 8px;
             width: 9px;
             height: 9px;
             border-radius: 50%;
@@ -406,7 +438,7 @@ function ChatInput({
             box-shadow: 0 0 0 2px #10293a;
           }
 
-          .ci-file-input:focus-visible + .ci-plus {
+          .ci-plus:focus-visible {
             outline: 2px solid rgba(0, 194, 255, 0.7);
             outline-offset: 2px;
           }
@@ -600,12 +632,24 @@ function ChatInput({
               font-size: 16px; /* mencegah auto-zoom di iOS */
             }
 
+            /* placeholder lebih kecil supaya muat satu baris di HP
+               (ukuran 16px hanya perlu untuk teks yang diketik) */
+            .ci-root .ci-textarea.form-control::placeholder {
+              font-size: 14px;
+            }
+
             .ci-hint {
               display: none !important;
             }
           }
 
-          /* HP layar sempit (mis. 320-380px) */
+          /* HP layar sempit (mis. 320-420px) */
+          @media (max-width: 420px) {
+            .ci-root .ci-textarea.form-control::placeholder {
+              font-size: 13px;
+            }
+          }
+
           @media (max-width: 380px) {
             .ci-box {
               padding: 4px;
@@ -617,7 +661,6 @@ function ChatInput({
           @media (prefers-reduced-motion: reduce) {
             .ci-mic-btn.listening { animation: none; }
             .ci-spinner { animation-duration: 1.6s; }
-            .ci-plus:hover .ci-plus-icon { transform: none; }
             .ci-drop { animation: none; }
           }
         `}
@@ -640,11 +683,11 @@ function ChatInput({
           >
             {/* ==================================================
                 TOMBOL PLUS / UPLOAD (di dalam kotak input)
-                Seluruh area tombol adalah <label>, jadi semua area
-                bisa diklik/disentuh tanpa perlu onClick manual.
+                Tombol sungguhan: seluruh permukaannya (termasuk
+                tengah ikon +) bisa diklik dan membuka input file.
             ================================================== */}
             <input
-              ref={fileInputRef}
+              ref={setInputGambarRef}
               id="home-image-input"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
@@ -655,23 +698,20 @@ function ChatInput({
               }}
               disabled={loading}
               className="ci-file-input"
+              tabIndex={-1}
+              aria-hidden="true"
             />
 
-            <label
-              htmlFor="home-image-input"
-              className={`ci-plus ${loading ? "is-disabled" : ""} ${
-                imagePreview ? "has-image" : ""
-              }`}
+            <button
+              type="button"
+              className={`ci-plus ${imagePreview ? "has-image" : ""}`}
+              onClick={bukaPilihGambar}
+              disabled={loading}
               aria-label="Tambah gambar"
-              aria-disabled={loading}
               title="Tambah gambar"
             >
-              <FiPlus
-                className="ci-plus-icon"
-                size={24}
-                strokeWidth={2.5}
-              />
-            </label>
+              <FiPlus size={22} strokeWidth={1.75} />
+            </button>
 
             {/* ==================================================
                 CHAT INPUT
