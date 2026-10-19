@@ -38,8 +38,9 @@ function ChatInput({
 }) {
   const textareaRef = useRef(null);
 
-  // Input file disembunyikan; tombol + membukanya lewat .click()
-  // supaya seluruh permukaan tombol (termasuk tengah ikon) bisa diklik.
+  // Input file disembunyikan; tombol + adalah <label htmlFor> yang
+  // terhubung langsung ke input ini, jadi browser yang membukanya
+  // (bukan JavaScript .click()).
   const inputGambarRef = useRef(null);
 
   const setInputGambarRef = useCallback(
@@ -56,10 +57,15 @@ function ChatInput({
     [fileInputRef]
   );
 
-  const bukaPilihGambar = () => {
-    if (loading) return;
+  // Hanya dipakai untuk akses keyboard (Enter / Spasi) pada tombol +
+  const bukaPilihGambarKeyboard = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
 
-    inputGambarRef.current?.click();
+      if (loading) return;
+
+      inputGambarRef.current?.click();
+    }
   };
 
   // Status tampilan: fokus (untuk petunjuk keyboard) & drag-drop gambar
@@ -352,6 +358,8 @@ function ChatInput({
           }
 
           /* ---------- Tombol + (upload gambar) ---------- */
+          /* Input file disembunyikan secara visual (bukan display:none)
+             supaya tetap bisa dibuka lewat <label htmlFor>. */
           .ci-file-input {
             position: absolute;
             width: 1px;
@@ -362,16 +370,15 @@ function ChatInput({
             clip: rect(0, 0, 0, 0);
             border: 0;
             opacity: 0;
-            pointer-events: none;
           }
 
-          /* Tombol + gaya "ghost" seperti di Claude / ChatGPT.
-             PENTING: tombol itu sendiri TIDAK pernah di-scale / digeser,
-             jadi area kliknya selalu tetap 40x40 (+4px lewat ::before)
-             dan bagian tengah selalu bisa diklik. Semua animasi dipindah
-             ke elemen DALAM tombol (.ci-plus-bg dan .ci-plus-icon) yang
-             pointer-events-nya dimatikan, sehingga klik di mana pun pada
-             tombol selalu jatuh ke <button> itu sendiri. */
+          /* Tombol + adalah <label htmlFor="home-image-input">.
+             Klik di mana pun pada label (termasuk tengah ikon) dibuka
+             langsung oleh browser, tanpa JavaScript .click().
+             Tombol itu sendiri TIDAK pernah di-scale / digeser; semua
+             animasi ada di elemen DALAM (.ci-plus-bg dan .ci-plus-icon)
+             yang pointer-events-nya dimatikan, jadi area klik tetap
+             40x40 (+4px lewat ::before). */
           .ci-plus {
             position: relative;
             flex-shrink: 0;
@@ -389,10 +396,9 @@ function ChatInput({
             font: inherit;
             line-height: 1;
             cursor: pointer;
-            -webkit-appearance: none;
-            appearance: none;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-user-drag: none;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
             transition: color 0.2s ease;
@@ -438,34 +444,34 @@ function ChatInput({
 
           /* hover hanya untuk mouse, supaya tidak "nyangkut" di HP */
           @media (hover: hover) {
-            .ci-plus:hover:not(:disabled) {
+            .ci-plus:not(.is-disabled):hover {
               color: #ffffff;
             }
 
-            .ci-plus:hover:not(:disabled) .ci-plus-bg {
+            .ci-plus:not(.is-disabled):hover .ci-plus-bg {
               opacity: 1;
               transform: scale(1);
             }
 
-            .ci-plus:hover:not(:disabled) .ci-plus-icon {
+            .ci-plus:not(.is-disabled):hover .ci-plus-icon {
               transform: rotate(90deg);
             }
           }
 
           /* saat ditekan: latar sedikit mengecil, ikon ikut mengecil
              (yang berubah hanya elemen dalam, bukan tombolnya) */
-          .ci-plus:active:not(:disabled) .ci-plus-bg {
+          .ci-plus:not(.is-disabled):active .ci-plus-bg {
             opacity: 1;
             transform: scale(0.92);
             background: rgba(255, 255, 255, 0.16);
           }
 
-          .ci-plus:active:not(:disabled) .ci-plus-icon {
+          .ci-plus:not(.is-disabled):active .ci-plus-icon {
             transform: rotate(90deg) scale(0.86);
             transition-duration: 0.12s;
           }
 
-          .ci-plus:disabled {
+          .ci-plus.is-disabled {
             opacity: 0.4;
             cursor: not-allowed;
           }
@@ -737,10 +743,10 @@ function ChatInput({
           >
             {/* ==================================================
                 TOMBOL PLUS / UPLOAD (di dalam kotak input)
-                Tombol sungguhan: seluruh permukaannya (termasuk
-                tengah ikon +) bisa diklik dan membuka input file.
-                Animasi ada di elemen dalam (bg + ikon), bukan di
-                tombolnya, jadi area klik tidak pernah berubah.
+                Pakai <label htmlFor> yang terhubung langsung ke
+                <input type="file">, jadi browser sendiri yang
+                membuka pemilih gambar. Klik di tengah maupun
+                pinggir tombol sama-sama bekerja.
             ================================================== */}
             <input
               ref={setInputGambarRef}
@@ -758,19 +764,27 @@ function ChatInput({
               aria-hidden="true"
             />
 
-            <button
-              type="button"
-              className={`ci-plus ${imagePreview ? "has-image" : ""}`}
-              onClick={bukaPilihGambar}
-              disabled={loading}
+            <label
+              htmlFor="home-image-input"
+              className={`ci-plus ${imagePreview ? "has-image" : ""} ${
+                loading ? "is-disabled" : ""
+              }`}
+              role="button"
+              tabIndex={loading ? -1 : 0}
               aria-label="Tambah gambar"
+              aria-disabled={loading}
               title="Tambah gambar"
+              onKeyDown={bukaPilihGambarKeyboard}
+              onClick={(e) => {
+                if (loading) e.preventDefault();
+              }}
+              draggable={false}
             >
               <span className="ci-plus-bg" aria-hidden="true" />
               <span className="ci-plus-icon" aria-hidden="true">
                 <FiPlus size={22} strokeWidth={1.75} />
               </span>
-            </button>
+            </label>
 
             {/* ==================================================
                 CHAT INPUT
