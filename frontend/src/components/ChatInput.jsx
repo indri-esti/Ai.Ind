@@ -521,7 +521,7 @@ function ChatInput({
           }
 
           .ci-root .ci-textarea.form-control::placeholder {
-            color: #5f788a;
+            color: #8aa3b4;
             opacity: 1;
           }
 
@@ -595,8 +595,8 @@ function ChatInput({
           }
 
           .ci-send-btn:disabled {
-            background: rgba(255, 255, 255, 0.07);
-            color: rgba(255, 255, 255, 0.28);
+            background: rgba(0, 194, 255, 0.14);
+            color: rgba(127, 220, 255, 0.6);
             box-shadow: none;
             cursor: not-allowed;
           }
@@ -652,16 +652,16 @@ function ChatInput({
               display: block;
               margin-top: 8px;
               text-align: center;
-              font-size: 11px;
-              color: #4f6878;
-              opacity: 0.7;
+              font-size: 12px;
+              color: #7f97a8;
+              opacity: 0.9;
               user-select: none;
               transition: opacity 0.2s ease, color 0.2s ease;
             }
 
             .ci-hint.is-active {
               opacity: 1;
-              color: #6f8798;
+              color: #a9bfcc;
             }
           }
 

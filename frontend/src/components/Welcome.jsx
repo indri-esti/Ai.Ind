@@ -3,6 +3,8 @@ import {
   FiZap,
   FiHelpCircle,
   FiCode,
+  FiGlobe,
+  FiEdit3,
 } from "react-icons/fi";
 
 const SARAN = [
@@ -10,6 +12,8 @@ const SARAN = [
   { label: "Cari ide", icon: FiZap },
   { label: "Jelaskan sesuatu", icon: FiHelpCircle },
   { label: "Bantu coding", icon: FiCode },
+  { label: "Terjemahkan", icon: FiGlobe },
+  { label: "Tulis teks", icon: FiEdit3 },
 ];
 
 function Welcome({
@@ -77,7 +81,7 @@ function Welcome({
           /* ---------- Teks ---------- */
           .wl-hello {
             margin: 0;
-            color: #7f97a8;
+            color: #a9bfcc;
             font-size: 15px;
             font-weight: 500;
             letter-spacing: 0.2px;
@@ -117,7 +121,7 @@ function Welcome({
 
           .wl-sub {
             margin: 14px 0 0;
-            color: #cde4ed;
+            color: #e3f1f7;
             font-size: 16px;
             font-weight: 600;
             animation: wlRise 0.6s ease 0.24s both;
@@ -126,8 +130,8 @@ function Welcome({
           .wl-desc {
             max-width: 440px;
             margin: 10px 0 0;
-            color: #6f8798;
-            font-size: 14px;
+            color: #a9bfcc;
+            font-size: 15px;
             line-height: 1.7;
             animation: wlRise 0.6s ease 0.32s both;
           }
@@ -215,7 +219,7 @@ function Welcome({
             }
 
             .wl-desc {
-              font-size: 13px;
+              font-size: 14px;
             }
 
             .wl-grid {
