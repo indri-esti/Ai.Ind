@@ -283,6 +283,12 @@ function ChatInput({
             to { opacity: 1; transform: scale(1); }
           }
 
+          @keyframes ciDotPop {
+            0% { transform: scale(0); }
+            60% { transform: scale(1.35); }
+            100% { transform: scale(1); }
+          }
+
           .ci-root *,
           .ci-root *::before,
           .ci-root *::after {
@@ -356,13 +362,16 @@ function ChatInput({
             clip: rect(0, 0, 0, 0);
             border: 0;
             opacity: 0;
+            pointer-events: none;
           }
 
-          /* Tombol + gaya "ghost" seperti di Claude / ChatGPT: ikon tipis
-             tanpa lingkaran saat diam, latar lembut hanya saat disorot
-             atau ditekan. Ini <button> sungguhan, jadi SELURUH permukaan
-             tombol (termasuk tengah ikon) bisa diklik. Area sentuh
-             diperluas 4px ke segala arah lewat ::before. */
+          /* Tombol + gaya "ghost" seperti di Claude / ChatGPT.
+             PENTING: tombol itu sendiri TIDAK pernah di-scale / digeser,
+             jadi area kliknya selalu tetap 40x40 (+4px lewat ::before)
+             dan bagian tengah selalu bisa diklik. Semua animasi dipindah
+             ke elemen DALAM tombol (.ci-plus-bg dan .ci-plus-icon) yang
+             pointer-events-nya dimatikan, sehingga klik di mana pun pada
+             tombol selalu jatuh ke <button> itu sendiri. */
           .ci-plus {
             position: relative;
             flex-shrink: 0;
@@ -386,34 +395,74 @@ function ChatInput({
             -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
-            transition:
-              background 0.2s ease,
-              color 0.2s ease,
-              transform 0.15s ease;
+            transition: color 0.2s ease;
           }
 
+          /* area sentuh diperluas 4px ke segala arah */
           .ci-plus::before {
             content: "";
             position: absolute;
             inset: -4px;
+            border-radius: 50%;
           }
 
-          .ci-plus svg,
-          .ci-plus svg * {
-            pointer-events: none;
-          }
-
-          .ci-plus:active:not(:disabled) {
+          /* lingkaran latar: membesar halus dari tengah saat disorot / ditekan */
+          .ci-plus-bg {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
             background: rgba(255, 255, 255, 0.1);
-            transform: scale(0.92);
+            opacity: 0;
+            transform: scale(0.55);
+            pointer-events: none;
+            transition:
+              opacity 0.2s ease,
+              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.2s ease;
+          }
+
+          /* ikon: berputar 90 derajat dengan efek pegas */
+          .ci-plus-icon {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+          }
+
+          .ci-plus-icon svg,
+          .ci-plus-icon svg * {
+            pointer-events: none;
           }
 
           /* hover hanya untuk mouse, supaya tidak "nyangkut" di HP */
           @media (hover: hover) {
             .ci-plus:hover:not(:disabled) {
-              background: rgba(255, 255, 255, 0.08);
               color: #ffffff;
             }
+
+            .ci-plus:hover:not(:disabled) .ci-plus-bg {
+              opacity: 1;
+              transform: scale(1);
+            }
+
+            .ci-plus:hover:not(:disabled) .ci-plus-icon {
+              transform: rotate(90deg);
+            }
+          }
+
+          /* saat ditekan: latar sedikit mengecil, ikon ikut mengecil
+             (yang berubah hanya elemen dalam, bukan tombolnya) */
+          .ci-plus:active:not(:disabled) .ci-plus-bg {
+            opacity: 1;
+            transform: scale(0.92);
+            background: rgba(255, 255, 255, 0.16);
+          }
+
+          .ci-plus:active:not(:disabled) .ci-plus-icon {
+            transform: rotate(90deg) scale(0.86);
+            transition-duration: 0.12s;
           }
 
           .ci-plus:disabled {
@@ -436,6 +485,8 @@ function ChatInput({
             border-radius: 50%;
             background: #00c2ff;
             box-shadow: 0 0 0 2px #10293a;
+            pointer-events: none;
+            animation: ciDotPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
           }
 
           .ci-plus:focus-visible {
@@ -662,6 +713,9 @@ function ChatInput({
             .ci-mic-btn.listening { animation: none; }
             .ci-spinner { animation-duration: 1.6s; }
             .ci-drop { animation: none; }
+            .ci-plus-bg,
+            .ci-plus-icon { transition: none; }
+            .ci-plus.has-image::after { animation: none; }
           }
         `}
       </style>
@@ -685,6 +739,8 @@ function ChatInput({
                 TOMBOL PLUS / UPLOAD (di dalam kotak input)
                 Tombol sungguhan: seluruh permukaannya (termasuk
                 tengah ikon +) bisa diklik dan membuka input file.
+                Animasi ada di elemen dalam (bg + ikon), bukan di
+                tombolnya, jadi area klik tidak pernah berubah.
             ================================================== */}
             <input
               ref={setInputGambarRef}
@@ -710,7 +766,10 @@ function ChatInput({
               aria-label="Tambah gambar"
               title="Tambah gambar"
             >
-              <FiPlus size={22} strokeWidth={1.75} />
+              <span className="ci-plus-bg" aria-hidden="true" />
+              <span className="ci-plus-icon" aria-hidden="true">
+                <FiPlus size={22} strokeWidth={1.75} />
+              </span>
             </button>
 
             {/* ==================================================
