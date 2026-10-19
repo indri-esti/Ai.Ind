@@ -1027,15 +1027,19 @@ function Sidebar({
                   ? "text"
                   : "password";
 
+                // Saat password tampil -> ikon mata dicoret
+                // (aksi berikutnya: sembunyikan).
+                // Saat password tersembunyi -> ikon mata biasa
+                // (aksi berikutnya: tampilkan).
                 button.innerHTML = show
-                  ? EYE
-                  : EYE_OFF;
+                  ? EYE_OFF
+                  : EYE;
 
                 button.setAttribute(
                   "aria-label",
                   show
-                    ? "Tampilkan password"
-                    : "Sembunyikan password"
+                    ? "Sembunyikan password"
+                    : "Tampilkan password"
                 );
               }
             );
