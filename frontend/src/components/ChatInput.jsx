@@ -6,6 +6,14 @@ import { FiPlus, FiMic, FiImage } from "react-icons/fi";
 // Tinggi maksimal textarea sebelum mulai scroll di dalamnya
 const MAX_TEXTAREA_HEIGHT = 200;
 
+// Di HP tinggi maksimal dikecilkan supaya tidak menutupi layar saat keyboard terbuka
+const MAX_TEXTAREA_HEIGHT_HP = 140;
+
+const ambilTinggiMaks = () =>
+  typeof window !== "undefined" && window.innerWidth < 768
+    ? MAX_TEXTAREA_HEIGHT_HP
+    : MAX_TEXTAREA_HEIGHT;
+
 const TIPE_GAMBAR_DIIZINKAN = [
   "image/jpeg",
   "image/png",
@@ -125,12 +133,14 @@ function ChatInput({
     const el = textareaRef.current;
     if (!el) return;
 
+    const tinggiMaks = ambilTinggiMaks();
+
     el.style.height = "auto";
 
-    const tinggiBaru = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    const tinggiBaru = Math.min(el.scrollHeight, tinggiMaks);
     el.style.height = `${tinggiBaru}px`;
     el.style.overflowY =
-      el.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+      el.scrollHeight > tinggiMaks ? "auto" : "hidden";
   }, [message]);
 
   const handleKirim = () => {
@@ -324,42 +334,53 @@ function ChatInput({
             opacity: 0;
           }
 
+          /* Tanpa lingkaran. Area sentuh 44px (margin negatif menjaga
+             tinggi kotak tetap rapi), dan ikon tidak menangkap klik
+             sendiri, jadi menekan tepat di tengah + tetap membuka
+             pilihan gambar. */
           .ci-plus {
             position: relative;
             flex-shrink: 0;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
-            margin: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.06);
+            width: 44px;
+            height: 44px;
+            margin: -2px;
+            padding: 0;
+            border-radius: 12px;
+            background: transparent;
             color: #9fb4c4;
             cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
-            transition:
-              background 0.2s ease,
-              color 0.2s ease,
-              transform 0.15s ease;
+            transition: color 0.2s ease, transform 0.15s ease;
           }
 
-          .ci-plus:hover {
-            background: rgba(0, 194, 255, 0.14);
-            color: #7fdcff;
+          .ci-plus svg,
+          .ci-plus svg * {
+            pointer-events: none;
           }
 
           .ci-plus:active {
-            transform: scale(0.92);
+            transform: scale(0.88);
           }
 
           .ci-plus .ci-plus-icon {
             transition: transform 0.25s ease;
           }
 
-          .ci-plus:hover .ci-plus-icon {
-            transform: rotate(90deg);
+          /* hover hanya untuk mouse, supaya tidak "nyangkut" di HP */
+          @media (hover: hover) {
+            .ci-plus:hover {
+              color: #7fdcff;
+            }
+
+            .ci-plus:hover .ci-plus-icon {
+              transform: rotate(90deg);
+            }
           }
 
           .ci-plus.is-disabled {
@@ -370,15 +391,14 @@ function ChatInput({
 
           /* titik penanda: ada gambar yang sudah dipilih */
           .ci-plus.has-image {
-            background: rgba(0, 194, 255, 0.16);
             color: #00c2ff;
           }
 
           .ci-plus.has-image::after {
             content: "";
             position: absolute;
-            top: 6px;
-            right: 6px;
+            top: 9px;
+            right: 9px;
             width: 9px;
             height: 9px;
             border-radius: 50%;
@@ -569,6 +589,12 @@ function ChatInput({
 
           /* ---------- HP ---------- */
           @media (max-width: 767px) {
+            .ci-box {
+              padding: 5px;
+              gap: 2px;
+              border-radius: 26px;
+            }
+
             .ci-root .ci-textarea.form-control,
             .ci-root .ci-textarea.form-control:focus {
               font-size: 16px; /* mencegah auto-zoom di iOS */
@@ -576,6 +602,15 @@ function ChatInput({
 
             .ci-hint {
               display: none !important;
+            }
+          }
+
+          /* HP layar sempit (mis. 320-380px) */
+          @media (max-width: 380px) {
+            .ci-box {
+              padding: 4px;
+              gap: 0;
+              border-radius: 24px;
             }
           }
 
@@ -605,7 +640,7 @@ function ChatInput({
           >
             {/* ==================================================
                 TOMBOL PLUS / UPLOAD (di dalam kotak input)
-                Seluruh lingkaran adalah <label>, jadi semua area
+                Seluruh area tombol adalah <label>, jadi semua area
                 bisa diklik/disentuh tanpa perlu onClick manual.
             ================================================== */}
             <input
@@ -633,7 +668,7 @@ function ChatInput({
             >
               <FiPlus
                 className="ci-plus-icon"
-                size={22}
+                size={24}
                 strokeWidth={2.5}
               />
             </label>
@@ -671,7 +706,7 @@ function ChatInput({
               className="ci-textarea"
               style={{
                 resize: "none",
-                maxHeight: MAX_TEXTAREA_HEIGHT,
+                maxHeight: ambilTinggiMaks(),
               }}
             />
 
