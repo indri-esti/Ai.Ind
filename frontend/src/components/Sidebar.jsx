@@ -1028,14 +1028,14 @@ function Sidebar({
                   : "password";
 
                 button.innerHTML = show
-                  ? EYE_OFF
-                  : EYE;
+                  ? EYE
+                  : EYE_OFF;
 
                 button.setAttribute(
                   "aria-label",
                   show
-                    ? "Sembunyikan password"
-                    : "Tampilkan password"
+                    ? "Tampilkan password"
+                    : "Sembunyikan password"
                 );
               }
             );
