@@ -307,7 +307,7 @@ function ChatInput({
             width: 100%;
           }
 
-          /* ---------- Kotak input (tombol + ada di dalam) ---------- */
+          /* ---------- Kotak input (teks di kiri, tombol di kanan) ---------- */
           .ci-box {
             position: relative;
             display: flex;
@@ -506,7 +506,7 @@ function ChatInput({
             flex: 1 1 auto;
             min-width: 0;
             min-height: 40px;
-            padding: 8px 6px;
+            padding: 8px 6px 8px 14px;
             border: 0 !important;
             border-radius: 0;
             background: transparent !important;
@@ -686,6 +686,7 @@ function ChatInput({
 
             .ci-root .ci-textarea.form-control,
             .ci-root .ci-textarea.form-control:focus {
+              padding-left: 12px;
               font-size: 16px; /* mencegah auto-zoom di iOS */
             }
 
@@ -742,7 +743,44 @@ function ChatInput({
             onDrop={handleDrop}
           >
             {/* ==================================================
-                TOMBOL PLUS / UPLOAD (di dalam kotak input)
+                CHAT INPUT (di kiri)
+            ================================================== */}
+            <Form.Control
+              as="textarea"
+              ref={textareaRef}
+              rows={1}
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+              }}
+              onPaste={handlePaste}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+
+                  if (!loading && (message.trim() || imagePreview)) {
+                    handleKirim();
+                  }
+                }
+              }}
+              placeholder={
+                listening
+                  ? "Mendengarkan..."
+                  : "Ketik pertanyaan untuk AI.Ind..."
+              }
+              aria-label="Pesan untuk AI.Ind"
+              enterKeyHint="send"
+              className="ci-textarea"
+              style={{
+                resize: "none",
+                maxHeight: ambilTinggiMaks(),
+              }}
+            />
+
+            {/* ==================================================
+                TOMBOL PLUS / UPLOAD (di kanan, sebelum mic)
                 Pakai <label htmlFor> yang terhubung langsung ke
                 <input type="file">, jadi browser sendiri yang
                 membuka pemilih gambar. Klik di tengah maupun
@@ -787,43 +825,6 @@ function ChatInput({
             </label>
 
             {/* ==================================================
-                CHAT INPUT
-            ================================================== */}
-            <Form.Control
-              as="textarea"
-              ref={textareaRef}
-              rows={1}
-              value={message}
-              onChange={(e) => {
-                setMessage(e.target.value);
-              }}
-              onPaste={handlePaste}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-
-                  if (!loading && (message.trim() || imagePreview)) {
-                    handleKirim();
-                  }
-                }
-              }}
-              placeholder={
-                listening
-                  ? "Mendengarkan..."
-                  : "Ketik pertanyaan untuk AI.Ind..."
-              }
-              aria-label="Pesan untuk AI.Ind"
-              enterKeyHint="send"
-              className="ci-textarea"
-              style={{
-                resize: "none",
-                maxHeight: ambilTinggiMaks(),
-              }}
-            />
-
-            {/* ==================================================
                 MIC (VOICE NOTE)
                 Hanya tampil kalau browser mendukung.
             ================================================== */}
@@ -841,7 +842,7 @@ function ChatInput({
             )}
 
             {/* ==================================================
-                SEND
+                SEND (paling kanan)
             ================================================== */}
             <button
               type="submit"
