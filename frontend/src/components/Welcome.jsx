@@ -136,64 +136,6 @@ function Welcome({
             animation: wlRise 0.6s ease 0.32s both;
           }
 
-          /* ---------- Saran ---------- */
-          .wl-grid {
-            width: 100%;
-            margin-top: 30px;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-            animation: wlRise 0.6s ease 0.4s both;
-          }
-
-          .wl-card {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-height: 56px;
-            padding: 12px 14px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            background: rgba(255, 255, 255, 0.03);
-            color: #cde4ed;
-            font-size: 14px;
-            font-weight: 600;
-            text-align: left;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-            transition:
-              background 0.2s ease,
-              border-color 0.2s ease,
-              transform 0.15s ease;
-          }
-
-          .wl-card:hover {
-            background: rgba(0, 194, 255, 0.08);
-            border-color: rgba(0, 194, 255, 0.32);
-            transform: translateY(-1px);
-          }
-
-          .wl-card:active {
-            transform: scale(0.97);
-          }
-
-          .wl-card-icon {
-            width: 34px;
-            height: 34px;
-            min-width: 34px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            color: #00c2ff;
-            background: rgba(0, 194, 255, 0.1);
-          }
-
-          .wl-card-icon svg {
-            pointer-events: none;
-          }
-
           /* ---------- HP ---------- */
           @media (max-width: 767px) {
             .wl-root {
@@ -221,23 +163,6 @@ function Welcome({
             .wl-desc {
               font-size: 14px;
             }
-
-            .wl-grid {
-              margin-top: 24px;
-              gap: 8px;
-            }
-
-            .wl-card {
-              min-height: 52px;
-              padding: 10px 12px;
-              font-size: 13px;
-            }
-          }
-
-          @media (max-width: 340px) {
-            .wl-grid {
-              grid-template-columns: 1fr;
-            }
           }
 
           @media (prefers-reduced-motion: reduce) {
@@ -245,8 +170,7 @@ function Welcome({
             .wl-hello,
             .wl-title,
             .wl-sub,
-            .wl-desc,
-            .wl-grid {
+            .wl-desc {
               animation: none;
             }
           }
@@ -270,25 +194,9 @@ function Welcome({
           <div className="wl-sub">Asisten AI buatan Indonesia</div>
 
           <p className="wl-desc">
-            Teman cerdas untuk belajar, mencari ide, memahami sesuatu,
-            membuat kode, dan menganalisis gambar.
+            Teman cerdas untuk belajar, mencari ide, membuat kode, dan
+            menganalisis gambar.
           </p>
-
-          <div className="wl-grid">
-            {SARAN.map(({ label, icon: Icon }) => (
-              <button
-                key={label}
-                type="button"
-                className="wl-card"
-                onClick={() => setMessage(label)}
-              >
-                <span className="wl-card-icon">
-                  <Icon size={17} />
-                </span>
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     </>
