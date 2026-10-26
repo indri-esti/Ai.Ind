@@ -873,8 +873,6 @@ function ChatInput({
           className={`ci-hint ${focused ? "is-active" : ""}`}
           aria-hidden="true"
         >
-          <kbd>Enter</kbd> kirim · <kbd>Shift</kbd> + <kbd>Enter</kbd> baris
-          baru
         </div>
       </Form>
     </div>
