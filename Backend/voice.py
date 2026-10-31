@@ -10,9 +10,11 @@ router = APIRouter()
 # Suara perempuan Indonesia (Microsoft Neural, bukan Google)
 SUARA = "id-ID-GadisNeural"
 
-# Sedikit lebih cepat supaya terdengar santai seperti orang ngobrol
-KECEPATAN = "+10%"
-NADA = "+0Hz"
+# Nada sedikit dinaikkan supaya terdengar lebih muda (remaja),
+# dan sedikit lebih cepat supaya santai seperti orang ngobrol.
+# Kalau terdengar terlalu cempreng, turunkan NADA (mis. "+6Hz").
+KECEPATAN = "+8%"
+NADA = "+12Hz"
 
 # Batas per permintaan (frontend mengirim teks panjang per potongan)
 MAKS_KARAKTER = 5000
