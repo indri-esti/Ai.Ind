@@ -33,7 +33,7 @@ except Exception:
 
 # Penanda versi: kalau tulisan ini tidak muncul di log hosting,
 # berarti server masih menjalankan ai.py yang lama.
-VERSI = "2026-10-18-v4"
+VERSI = "2026-10-31-v5"
 print(f"[AI.Ind] ai.py {VERSI} dimuat")
 
 
@@ -89,9 +89,9 @@ BULAN = [
 INSTRUKSI_TAMBAHAN = """
 ATURAN KERJA (ikuti selalu):
 UMUM
-- Jawab dalam bahasa yang dipakai pengguna (default Bahasa Indonesia), jelas, ramah, dan langsung ke inti.
+- Jawab dalam bahasa yang dipakai pengguna (default Bahasa Indonesia) dengan gaya ngobrol santai seperti teman, bukan kaku atau formal. Untuk obrolan dan curhat, jangan memberi daftar solusi kecuali diminta.
 - Jawab dengan benar dan teliti. Jika tidak yakin, katakan bagian mana yang belum pasti. Jangan mengarang fakta, sumber, atau hasil. Kamu tidak bisa membuka internet.
-- Jika informasi kurang untuk menjawab dengan baik, ajukan satu atau dua pertanyaan balik yang spesifik, lalu lanjutkan setelah pengguna menjawab.
+- Jika informasi kurang, tanyakan satu hal saja dengan santai, jangan membuat daftar pertanyaan.
 - Untuk permainan, kuis, latihan, atau tanya jawab interaktif: ajukan pertanyaan, tunggu jawaban pengguna, nilai jawabannya, lalu lanjutkan ke langkah berikutnya. Ingat alur percakapan sebelumnya.
 - Jika pengguna menyebut namanya atau info pribadi yang ada di bagian MEMORY, pakai itu secara wajar (sapa dengan nama, jawab langsung bila ditanya "siapa namaku"). Jangan menyebut kata "memory" atau sistem internal.
 - Jangan menulis ulang lirik lagu utuh atau teks berhak cipta yang panjang. Untuk permainan lirik, beri petunjuk atau minta pengguna yang menulis, lalu tanggapi.
@@ -657,10 +657,12 @@ def panggil_model(messages, models):
     kode_error = "unknown"
 
     for model in models:
+        ada_gambar = isinstance(messages[-1].get("content"), list)
+
         data = {
             "model": model,
             "messages": messages,
-            "temperature": 0.5,
+            "temperature": 0.4 if ada_gambar else 0.85,
             "max_completion_tokens": MAX_OUTPUT_TOKENS,
         }
 
@@ -670,7 +672,7 @@ def panggil_model(messages, models):
         # Qwen 3.8: sembunyikan proses berpikir supaya content berisi
         # jawaban akhir, dan batasi usaha berpikir agar tidak menghabiskan token.
         if model.startswith("qwen/qwen3.8"):
-            data["reasoning_effort"] = "low"
+            data["reasoning_effort"] = "medium" if ada_gambar else "low"
             data["reasoning_format"] = "hidden"
 
         response = request_groq(headers, data)
@@ -846,4 +848,4 @@ def _balas(pesan, history, image, user_id):
     if jawaban:
         return jawaban
 
-    return pesan_error_pengguna(kode_error, bool(image))
+    return pesan_error_pengguna(kode_error, bool(image)) 
