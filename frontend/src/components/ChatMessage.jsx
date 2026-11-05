@@ -27,18 +27,72 @@ const TTS_URL = `${BASIS_BACKEND}/api/tts`;
 // jadi suara lanjut terus sampai habis tanpa terpotong.
 const MAKS_POTONGAN_SUARA = 700;
 
-// Minta audio dari backend untuk satu potongan teks
-const ambilAudio = async (teks, signal) => {
-  const res = await fetch(TTS_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: teks }),
-    signal,
-  });
+// Alamat streaming untuk satu potongan teks. Dipakai langsung sebagai
+// sumber <audio>, jadi suara mulai terdengar begitu potongan pertama datang.
+const buatUrlSuara = (teks, mode) => {
+  const p = new URLSearchParams({ text: teks });
+  if (mode) p.set("mode", mode);
+  return `${TTS_URL}?${p.toString()}`;
+};
+
+// Siapkan audio potongan berikutnya di belakang layar (dipakai kalau
+// sudah selesai diunduh saat gilirannya tiba, supaya tidak ada jeda)
+const ambilAudio = async (teks, mode, signal) => {
+  const res = await fetch(buatUrlSuara(teks, mode), { signal });
 
   if (!res.ok) throw new Error("TTS gagal");
 
   return res.blob();
+};
+
+// Deteksi lirik lagu (sama dengan di backend), supaya semua potongan
+// dikirim dengan mode nyanyi dan nadanya konsisten dari awal sampai akhir
+const apakahLirik = (teks) => {
+  if (
+    /\[\s*(verse|chorus|reff?|refrain|intro|bridge|outro|pre-?chorus|hook|bait)[^\]]*\]/i.test(
+      teks
+    )
+  ) {
+    return true;
+  }
+
+  if (/[\u266A\u266B\u{1F3B5}\u{1F3B6}]/u.test(teks)) return true;
+
+  const baris = teks
+    .split("\n")
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  if (baris.length < 3) return false;
+
+  const jumlahKata = (b) => b.split(/\s+/).length;
+
+  const pendek = baris.filter(
+    (b) =>
+      jumlahKata(b) >= 2 && jumlahKata(b) <= 9 && !/[.!?:]$/.test(b)
+  ).length;
+
+  if (baris.length >= 4 && pendek / baris.length >= 0.7) return true;
+
+  const sangatPendek = baris.filter((b) => jumlahKata(b) <= 10).length;
+
+  if (
+    /\b(lirik|lyrics?|nyanyi\w*|bernyanyi|lagu)\b/i.test(teks) &&
+    sangatPendek / baris.length >= 0.6
+  ) {
+    return true;
+  }
+
+  const normal = baris.map((b) =>
+    b.toLowerCase().replace(/\W+/g, " ").trim()
+  );
+  const adaUlang = new Set(normal).size < normal.length;
+
+  if (baris.length >= 6 && adaUlang && sangatPendek / baris.length >= 0.8) {
+    return true;
+  }
+
+  return false;
 };
 
 // Cadangan: suara bawaan browser, dipakai kalau backend tidak bisa dihubungi
@@ -72,19 +126,36 @@ const pilihSuaraPerempuan = () => {
 };
 
 // Pecah teks jadi potongan pendek (Chrome sering berhenti
-// di tengah kalau satu ucapan terlalu panjang)
+// di tengah kalau satu ucapan terlalu panjang).
+// Pergantian baris dipertahankan (penting untuk lirik lagu).
 const pecahTeks = (teks, maks = 180) => {
-  const kalimat = teks.split(/(?<=[.!?\n])\s+/);
+  const unit = [];
+
+  teks.split("\n").forEach((baris, b) => {
+    const isi = baris.trim();
+    if (!isi) return;
+
+    isi.split(/(?<=[.!?])\s+/).forEach((k) => {
+      if (k.trim()) unit.push({ t: k.trim(), b });
+    });
+  });
+
   const hasil = [];
   let sekarang = "";
+  let barisAkhir = -1;
 
-  for (const k of kalimat) {
-    if ((sekarang + " " + k).trim().length > maks && sekarang) {
-      hasil.push(sekarang.trim());
-      sekarang = k;
+  for (const u of unit) {
+    const sambung = u.b === barisAkhir ? " " : "\n";
+    const gabung = sekarang ? sekarang + sambung + u.t : u.t;
+
+    if (sekarang && gabung.length > maks) {
+      hasil.push(sekarang);
+      sekarang = u.t;
     } else {
-      sekarang = (sekarang + " " + k).trim();
+      sekarang = gabung;
     }
+
+    barisAkhir = u.b;
   }
 
   if (sekarang.trim()) hasil.push(sekarang.trim());
@@ -165,6 +236,11 @@ function ChatMessage({ msg }) {
     .replace(/[ \t]+/g, " ")
     .trim();
 
+  // Lirik dideteksi dari isi asli (sebelum emoji not musik dibuang)
+  const modeSuara = apakahLirik(content.replace(/```[\s\S]*?```/g, " "))
+    ? "nyanyi"
+    : null;
+
   // =========================================================
   // SALIN TEKS
   // Pakai Clipboard API, dengan cadangan untuk WebView/HP
@@ -215,8 +291,12 @@ function ChatMessage({ msg }) {
   // =========================================================
   const bersihAudio = () => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
+      const a = audioRef.current;
+      a.onended = null;
+      a.onerror = null;
+      a.onplaying = null;
+      a.pause();
+      a.src = "";
       audioRef.current = null;
     }
     if (urlRef.current) {
@@ -279,17 +359,11 @@ function ChatMessage({ msg }) {
     });
   };
 
-  // Putar satu potongan audio sampai selesai
-  const putarBlob = (blob, token) =>
+  // Putar satu sumber audio (alamat streaming atau blob) sampai selesai,
+  // memakai elemen audio yang sama supaya tetap diizinkan di HP
+  const putarSumber = (audio, sumber, token) =>
     new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-
-      audioRef.current = audio;
-      urlRef.current = url;
-
       audio.onended = () => {
-        bersihAudio();
         resolve();
       };
 
@@ -298,23 +372,31 @@ function ChatMessage({ msg }) {
           resolve();
           return;
         }
-        bersihAudio();
         reject(new Error("Audio gagal diputar"));
       };
 
-      setMemuat(false);
-      setSpeaking(true);
+      audio.onplaying = () => {
+        if (tokenSuaraRef.current !== token) return;
+        setMemuat(false);
+        setSpeaking(true);
+      };
 
-      audio.play().catch((err) => {
-        if (tokenSuaraRef.current !== token) {
-          resolve();
-          return;
-        }
-        reject(err);
-      });
+      audio.src = sumber;
+
+      const p = audio.play();
+
+      if (p && typeof p.catch === "function") {
+        p.catch((err) => {
+          if (tokenSuaraRef.current !== token) {
+            resolve();
+            return;
+          }
+          reject(err);
+        });
+      }
     });
 
-  const putarSuara = async () => {
+  const putarSuara = () => {
     if (!teksSuara) return;
 
     // Tekan lagi untuk berhenti / batal
@@ -336,45 +418,71 @@ function ChatMessage({ msg }) {
     abortRef.current = ctrl;
 
     const potongan = pecahTeks(teksSuara, MAKS_POTONGAN_SUARA);
-    const janji = [];
+    const siap = [];
 
-    // Ambil audio potongan ke-idx (sekali saja), dan siapkan lebih awal
-    const ambil = (idx) => {
-      if (idx >= potongan.length) return null;
+    // Unduh potongan ke-idx lebih awal (sekali saja) selagi yang lain diputar
+    const siapkan = (idx) => {
+      if (idx >= potongan.length || siap[idx]) return;
 
-      if (!janji[idx]) {
-        janji[idx] = ambilAudio(potongan[idx], ctrl.signal);
-        janji[idx].catch(() => {});
-      }
+      const entri = { blob: null };
+      siap[idx] = entri;
 
-      return janji[idx];
+      ambilAudio(potongan[idx], modeSuara, ctrl.signal)
+        .then((blob) => {
+          entri.blob = blob;
+        })
+        .catch(() => {});
     };
 
-    let idx = 0;
+    // Satu elemen audio dibuat langsung saat diklik, supaya
+    // pemutaran pertama tidak diblokir browser / WebView HP
+    const audio = new Audio();
+    audio.preload = "auto";
+    audioRef.current = audio;
 
-    try {
-      ambil(0);
+    const jalankan = async () => {
+      let idx = 0;
 
-      for (idx = 0; idx < potongan.length; idx++) {
-        const blob = await ambil(idx);
+      try {
+        for (idx = 0; idx < potongan.length; idx++) {
+          if (tokenSuaraRef.current !== token) return;
+
+          // Pakai hasil unduhan kalau sudah selesai, kalau belum
+          // langsung streaming supaya suara tidak menunggu
+          let sumber;
+          const entri = siap[idx];
+
+          if (entri && entri.blob) {
+            sumber = URL.createObjectURL(entri.blob);
+            urlRef.current = sumber;
+          } else {
+            sumber = buatUrlSuara(potongan[idx], modeSuara);
+          }
+
+          // Siapkan potongan berikutnya selagi yang ini diputar
+          siapkan(idx + 1);
+
+          await putarSumber(audio, sumber, token);
+          if (tokenSuaraRef.current !== token) return;
+
+          if (urlRef.current) {
+            URL.revokeObjectURL(urlRef.current);
+            urlRef.current = null;
+          }
+        }
+
+        if (tokenSuaraRef.current === token) hentikanSemua();
+      } catch (err) {
+        if (err && err.name === "AbortError") return;
         if (tokenSuaraRef.current !== token) return;
 
-        // Siapkan potongan berikutnya selagi yang ini diputar
-        ambil(idx + 1);
-
-        await putarBlob(blob, token);
-        if (tokenSuaraRef.current !== token) return;
+        // Kalau ada yang gagal, lanjutkan sisa teks dengan suara cadangan
+        bersihAudio();
+        putarSuaraBrowser(token, potongan.slice(idx).join("\n"));
       }
+    };
 
-      if (tokenSuaraRef.current === token) hentikanSemua();
-    } catch (err) {
-      if (err && err.name === "AbortError") return;
-      if (tokenSuaraRef.current !== token) return;
-
-      // Kalau ada yang gagal, lanjutkan sisa teks dengan suara cadangan
-      bersihAudio();
-      putarSuaraBrowser(token, potongan.slice(idx).join(" "));
-    }
+    jalankan();
   };
 
   // Hentikan suara kalau pesan hilang dari layar (misal ganti chat)
@@ -388,6 +496,9 @@ function ChatMessage({ msg }) {
           // abaikan
         }
         if (audioRef.current) {
+          audioRef.current.onended = null;
+          audioRef.current.onerror = null;
+          audioRef.current.onplaying = null;
           audioRef.current.pause();
           audioRef.current = null;
         }

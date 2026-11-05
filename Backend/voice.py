@@ -38,9 +38,15 @@ KECEPATAN = "+8%"
 NADA = "+12Hz"
 
 # Mode nyanyi (otomatis aktif kalau teks terdeteksi sebagai lirik):
-# lebih lambat, nada lebih tinggi, dan naik-turun antar baris seperti melodi.
-KECEPATAN_NYANYI = "-12%"
-NADA_NYANYI = ["+24Hz", "+32Hz", "+20Hz", "+36Hz"]
+# tiap baris dipecah jadi frasa pendek, tiap frasa punya nada berbeda
+# (naik-turun seperti melodi), dan ujung baris ditahan lebih lambat.
+KECEPATAN_NYANYI = "-10%"        # frasa di tengah baris
+KECEPATAN_NYANYI_AKHIR = "-22%"  # ujung baris (nada ditahan)
+# Pola melodi (Hz) yang berputar antar frasa. Nilai dijaga di rentang aman.
+NADA_NYANYI = [24, 30, 27, 35, 29, 37, 26, 32]
+TURUN_AKHIR_BARIS = 6            # ujung baris nadanya turun (kadens)
+FRASA_MAKS_KATA = 5              # baris lebih dari ini dipecah jadi frasa
+FRASA_IDEAL_KATA = 4
 
 # Batas per permintaan (frontend mengirim teks panjang per potongan)
 MAKS_KARAKTER = 5000
@@ -267,16 +273,52 @@ def _apakah_lirik(teks: str) -> bool:
     if re.search(r"[\u266A\u266B\U0001F3B5\U0001F3B6]", teks):
         return True
 
-    # Ciri bentuk lirik: banyak baris pendek tanpa tanda titik di akhir
     baris = [b.strip() for b in teks.split("\n") if b.strip()]
-    if len(baris) < 4:
+    if len(baris) < 3:
         return False
+
+    # Ciri bentuk lirik: banyak baris pendek tanpa tanda titik di akhir
     pendek = sum(
         1
         for b in baris
         if 2 <= len(b.split()) <= 9 and not re.search(r"[.!?:]$", b)
     )
-    return pendek / len(baris) >= 0.75
+    if len(baris) >= 4 and pendek / len(baris) >= 0.7:
+        return True
+
+    # Ada kata petunjuk (lirik / lagu / nyanyi) dan mayoritas baris pendek
+    sangat_pendek = sum(1 for b in baris if 1 <= len(b.split()) <= 10)
+    if (
+        re.search(r"\b(lirik|lyrics?|nyanyi\w*|bernyanyi|lagu)\b", teks, re.IGNORECASE)
+        and sangat_pendek / len(baris) >= 0.6
+    ):
+        return True
+
+    # Lirik biasanya ada baris yang berulang (reff) dan semuanya pendek
+    normal = [re.sub(r"\W+", " ", b.lower()).strip() for b in baris]
+    ada_ulang = len(set(normal)) < len(normal)
+    if len(baris) >= 6 and ada_ulang and sangat_pendek / len(baris) >= 0.8:
+        return True
+
+    return False
+
+
+def _fmt_nada(hz: int) -> str:
+    return f"{hz:+d}Hz"
+
+
+def _pecah_frasa(baris: str) -> list:
+    # Baris panjang dipecah jadi frasa pendek (3-5 kata) supaya tiap frasa
+    # bisa diberi nada berbeda dan terdengar seperti melodi, bukan datar.
+    kata = baris.split()
+    if len(kata) <= FRASA_MAKS_KATA:
+        return [baris]
+    jumlah = -(-len(kata) // FRASA_IDEAL_KATA)  # pembulatan ke atas
+    ukuran = -(-len(kata) // jumlah)
+    return [
+        " ".join(kata[i:i + ukuran])
+        for i in range(0, len(kata), ukuran)
+    ]
 
 
 def _segmen_nyanyi(teks: str, paksa: Optional[str]) -> list:
@@ -294,18 +336,33 @@ def _segmen_nyanyi(teks: str, paksa: Optional[str]) -> list:
         if not baris or not re.search(r"\w", baris):
             continue
         for potongan in _pecah_panjang(baris, SEGMEN_MAKS):
-            if potongan[-1] not in ",.!?":
-                potongan += ","  # jeda tipis di ujung baris, seperti napas penyanyi
-            b = _deteksi_bahasa(potongan, paksa)
-            segmen.append(
-                Segmen(
-                    potongan,
-                    SUARA_BAHASA.get(b, SUARA),
-                    KECEPATAN_NYANYI,
-                    NADA_NYANYI[urutan % len(NADA_NYANYI)],
+            frasa_list = _pecah_frasa(potongan)
+            for i, frasa in enumerate(frasa_list):
+                frasa = frasa.strip()
+                if not frasa:
+                    continue
+                akhir_baris = i == len(frasa_list) - 1
+
+                hz = NADA_NYANYI[urutan % len(NADA_NYANYI)]
+                if akhir_baris:
+                    # Ujung baris: nada turun dan ditahan lebih lama
+                    hz -= TURUN_AKHIR_BARIS
+                    kecepatan = KECEPATAN_NYANYI_AKHIR
+                    if frasa[-1] not in ",.!?":
+                        frasa += ","  # jeda tipis, seperti napas penyanyi
+                else:
+                    kecepatan = KECEPATAN_NYANYI
+
+                b = _deteksi_bahasa(frasa, paksa)
+                segmen.append(
+                    Segmen(
+                        frasa,
+                        SUARA_BAHASA.get(b, SUARA),
+                        kecepatan,
+                        _fmt_nada(hz),
+                    )
                 )
-            )
-            urutan += 1
+                urutan += 1
     return segmen
 
 
