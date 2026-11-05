@@ -45,9 +45,9 @@ NADA_NYANYI = ["+24Hz", "+32Hz", "+20Hz", "+36Hz"]
 # Batas per permintaan (frontend mengirim teks panjang per potongan)
 MAKS_KARAKTER = 5000
 
-# Potongan pertama dibuat pendek supaya suara cepat mulai,
+# Potongan pertama dibuat sangat pendek supaya suara langsung mulai,
 # sisanya disintesis paralel di belakang layar.
-SEGMEN_PERTAMA_MAKS = 90
+SEGMEN_PERTAMA_MAKS = 60
 SEGMEN_MAKS = 240
 PARALEL = 3
 
@@ -240,6 +240,12 @@ def _segmen_bicara(teks: str, paksa: Optional[str]) -> list:
                 continue
         gabungan.append([b, k])
 
+    # Segmen pertama dipaksa pendek supaya suara langsung mulai berbunyi
+    if gabungan and len(gabungan[0][1]) > SEGMEN_PERTAMA_MAKS:
+        bahasa_awal = gabungan[0][0]
+        pecahan = _pecah_panjang(gabungan[0][1], SEGMEN_PERTAMA_MAKS)
+        gabungan = [[bahasa_awal, p] for p in pecahan] + gabungan[1:]
+
     return [
         Segmen(t, SUARA_BAHASA.get(b, SUARA), KECEPATAN, NADA)
         for b, t in gabungan
@@ -328,46 +334,65 @@ def _buat_segmen(teks_mentah: str, mode: str, lang: Optional[str]) -> list:
 # Sintesis suara
 # ---------------------------------------------------------------------------
 
-async def _sintesis(segmen: Segmen) -> bytes:
-    # Coba ulang otomatis kalau koneksi ke layanan suara sempat putus,
-    # supaya tidak ada potongan yang hilang / terbata-bata.
-    for percobaan in range(3):
-        try:
-            komunikasi = edge_tts.Communicate(
-                segmen.teks,
-                segmen.suara,
-                rate=segmen.kecepatan,
-                pitch=segmen.nada,
-            )
-            buf = bytearray()
-            async for potongan in komunikasi.stream():
-                if potongan["type"] == "audio":
-                    buf.extend(potongan["data"])
-            if buf:
-                return bytes(buf)
-        except Exception:
-            pass
-        await asyncio.sleep(0.2 * (percobaan + 1))
-    return b""
+# Penanda akhir aliran satu segmen
+_SELESAI = object()
+_GAGAL = object()
+
+
+async def _produksi(segmen: Segmen, antrean: asyncio.Queue, batas: asyncio.Semaphore):
+    # Potongan audio langsung dimasukkan ke antrean begitu datang dari layanan
+    # suara (tidak menunggu satu segmen selesai), jadi suara bisa mulai
+    # terdengar secepat mungkin. Coba ulang otomatis hanya jika belum ada
+    # audio yang terkirim, supaya tidak ada potongan ganda / terbata-bata.
+    terkirim = False
+    berhasil = False
+    try:
+        async with batas:
+            for percobaan in range(3):
+                try:
+                    komunikasi = edge_tts.Communicate(
+                        segmen.teks,
+                        segmen.suara,
+                        rate=segmen.kecepatan,
+                        pitch=segmen.nada,
+                    )
+                    async for potongan in komunikasi.stream():
+                        if potongan["type"] == "audio" and potongan["data"]:
+                            terkirim = True
+                            await antrean.put(potongan["data"])
+                    if terkirim:
+                        berhasil = True
+                        break
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    if terkirim:
+                        break  # sudah ada audio terkirim, tidak bisa diulang
+                await asyncio.sleep(0.15 * (percobaan + 1))
+    finally:
+        await antrean.put(_SELESAI if berhasil else _GAGAL)
 
 
 async def _aliran_audio(segmen_list: list, status: dict):
     # Semua segmen disintesis paralel (maks PARALEL sekaligus),
-    # tapi dikirim berurutan. Segmen pertama pendek, jadi suara cepat mulai.
+    # tapi dikirim berurutan. Segmen pertama pendek dan dialirkan langsung,
+    # jadi suara cepat mulai.
     batas = asyncio.Semaphore(PARALEL)
-
-    async def kerja(s: Segmen) -> bytes:
-        async with batas:
-            return await _sintesis(s)
-
-    tugas = [asyncio.create_task(kerja(s)) for s in segmen_list]
+    antrean_list = [asyncio.Queue() for _ in segmen_list]
+    tugas = [
+        asyncio.create_task(_produksi(s, q, batas))
+        for s, q in zip(segmen_list, antrean_list)
+    ]
     try:
-        for t in tugas:
-            data = await t
-            if data:
-                yield data
-            else:
-                status["lengkap"] = False
+        for q in antrean_list:
+            while True:
+                item = await q.get()
+                if item is _SELESAI:
+                    break
+                if item is _GAGAL:
+                    status["lengkap"] = False
+                    break
+                yield item
     finally:
         for t in tugas:
             if not t.done():
