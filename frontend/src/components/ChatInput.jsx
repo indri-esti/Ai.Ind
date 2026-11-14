@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Form } from "react-bootstrap";
 import { FaArrowUp } from "react-icons/fa";
-import { FiPlus, FiMic, FiImage } from "react-icons/fi";
+import { FiPlus, FiMic, FiImage, FiCamera, FiVideo } from "react-icons/fi";
 
 // Tinggi maksimal textarea sebelum mulai scroll di dalamnya
 const MAX_TEXTAREA_HEIGHT = 200;
@@ -515,10 +515,13 @@ function ChatInput({
 
           .ci-plus-menu {
             position: absolute;
-            left: 0;
+            right: 0;
+            left: auto;
             bottom: calc(100% + 12px);
-            z-index: 20;
-            width: min(245px, calc(100vw - 48px));
+            z-index: 1000;
+            box-sizing: border-box;
+            width: min(280px, calc(100vw - 24px));
+            max-width: calc(100vw - 24px);
             padding: 7px;
             border: 1px solid rgba(116, 180, 211, 0.22);
             border-radius: 16px;
@@ -565,6 +568,8 @@ function ChatInput({
             flex-direction: column;
             gap: 2px;
             min-width: 0;
+            flex: 1;
+            overflow-wrap: anywhere;
           }
 
           .ci-plus-menu-copy strong {
@@ -918,7 +923,7 @@ function ChatInput({
                       document.getElementById("home-camera-input")?.click();
                     }}
                   >
-                    <span className="ci-plus-menu-icon"><FiImage size={19} /></span>
+                    <span className="ci-plus-menu-icon"><FiCamera size={19} /></span>
                     <span className="ci-plus-menu-copy">
                       <strong>Kamera AI</strong>
                       <small>Ambil foto untuk dianalisis AI</small>
@@ -940,7 +945,7 @@ function ChatInput({
                       }
                     }}
                   >
-                    <span className="ci-plus-menu-icon"><FiImage size={19} /></span>
+                    <span className="ci-plus-menu-icon"><FiVideo size={19} /></span>
                     <span className="ci-plus-menu-copy">
                       <strong>Buat Video AI</strong>
                       <small>Buat video dari teks atau gambar</small>
