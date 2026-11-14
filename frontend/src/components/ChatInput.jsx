@@ -35,6 +35,7 @@ function ChatInput({
   fileInputRef,
   pilihGambar,
   imagePreview,
+  onBuatVideo,
 }) {
   const textareaRef = useRef(null);
 
@@ -71,6 +72,7 @@ function ChatInput({
   // Status tampilan: fokus (untuk petunjuk keyboard) & drag-drop gambar
   const [focused, setFocused] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [menuPlusTerbuka, setMenuPlusTerbuka] = useState(false);
 
   // =========================================================
   // VOICE NOTE (SUARA -> TEKS)
@@ -500,6 +502,88 @@ function ChatInput({
             outline-offset: 2px;
           }
 
+          /* ---------- Menu tombol + ---------- */
+          .ci-plus-wrap {
+            position: relative;
+            flex: 0 0 40px;
+            width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .ci-plus-menu {
+            position: absolute;
+            left: 0;
+            bottom: calc(100% + 12px);
+            z-index: 20;
+            width: min(245px, calc(100vw - 48px));
+            padding: 7px;
+            border: 1px solid rgba(116, 180, 211, 0.22);
+            border-radius: 16px;
+            background: linear-gradient(180deg, #173449, #0d2231);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
+            animation: ciDropIn 0.16s ease;
+          }
+
+          .ci-plus-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            width: 100%;
+            padding: 11px 10px;
+            border: 0;
+            border-radius: 11px;
+            background: transparent;
+            color: #eaf8ff;
+            text-align: left;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+          }
+
+          .ci-plus-menu-item:hover,
+          .ci-plus-menu-item:focus-visible {
+            outline: none;
+            background: rgba(0, 194, 255, 0.12);
+          }
+
+          .ci-plus-menu-icon {
+            display: inline-flex;
+            flex: 0 0 36px;
+            width: 36px;
+            height: 36px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: rgba(0, 194, 255, 0.12);
+            color: #55d2ff;
+          }
+
+          .ci-plus-menu-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+          }
+
+          .ci-plus-menu-copy strong {
+            font-size: 13px;
+            font-weight: 600;
+          }
+
+          .ci-plus-menu-copy small {
+            color: #9bb5c5;
+            font-size: 11px;
+            line-height: 1.35;
+          }
+
+          .ci-plus-menu-divider {
+            height: 1px;
+            margin: 4px 5px;
+            background: rgba(255, 255, 255, 0.09);
+          }
+
           /* ---------- Textarea ---------- */
           .ci-root .ci-textarea.form-control,
           .ci-root .ci-textarea.form-control:focus {
@@ -730,6 +814,7 @@ function ChatInput({
       <Form
         onSubmit={(e) => {
           e.preventDefault();
+          setMenuPlusTerbuka(false);
           handleKirim();
         }}
       >
@@ -780,49 +865,126 @@ function ChatInput({
             />
 
             {/* ==================================================
-                TOMBOL PLUS / UPLOAD (di kanan, sebelum mic)
-                Pakai <label htmlFor> yang terhubung langsung ke
-                <input type="file">, jadi browser sendiri yang
-                membuka pemilih gambar. Klik di tengah maupun
-                pinggir tombol sama-sama bekerja.
+                TOMBOL PLUS
+                Posisi tombol + dipertahankan persis di tempat semula.
+                Klik + hanya membuka menu; upload gambar tetap memakai
+                input file yang sama dan kamera memakai input capture.
             ================================================== */}
-            <input
-              ref={setInputGambarRef}
-              id="home-image-input"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={pilihGambar}
-              onClick={(e) => {
-                // supaya memilih gambar yang sama 2x tetap terdeteksi
-                e.target.value = "";
-              }}
-              disabled={loading}
-              className="ci-file-input"
-              tabIndex={-1}
-              aria-hidden="true"
-            />
+            <div className="ci-plus-wrap">
+              <input
+                ref={setInputGambarRef}
+                id="home-image-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  setMenuPlusTerbuka(false);
+                  pilihGambar(e);
+                }}
+                onClick={(e) => {
+                  e.target.value = "";
+                }}
+                disabled={loading}
+                className="ci-file-input"
+                tabIndex={-1}
+                aria-hidden="true"
+              />
 
-            <label
-              htmlFor="home-image-input"
-              className={`ci-plus ${imagePreview ? "has-image" : ""} ${
-                loading ? "is-disabled" : ""
-              }`}
-              role="button"
-              tabIndex={loading ? -1 : 0}
-              aria-label="Tambah gambar"
-              aria-disabled={loading}
-              title="Tambah gambar"
-              onKeyDown={bukaPilihGambarKeyboard}
-              onClick={(e) => {
-                if (loading) e.preventDefault();
-              }}
-              draggable={false}
-            >
-              <span className="ci-plus-bg" aria-hidden="true" />
-              <span className="ci-plus-icon" aria-hidden="true">
-                <FiPlus size={22} strokeWidth={1.75} />
-              </span>
-            </label>
+              <input
+                id="home-camera-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  setMenuPlusTerbuka(false);
+                  pilihGambar(e);
+                }}
+                onClick={(e) => {
+                  e.target.value = "";
+                }}
+                disabled={loading}
+                className="ci-file-input"
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+
+              {menuPlusTerbuka && !loading && (
+                <div className="ci-plus-menu" role="menu" aria-label="Menu tambah">
+                  <button
+                    type="button"
+                    className="ci-plus-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuPlusTerbuka(false);
+                      document.getElementById("home-camera-input")?.click();
+                    }}
+                  >
+                    <span className="ci-plus-menu-icon"><FiImage size={19} /></span>
+                    <span className="ci-plus-menu-copy">
+                      <strong>Kamera AI</strong>
+                      <small>Ambil foto untuk dianalisis AI</small>
+                    </span>
+                  </button>
+
+                  <div className="ci-plus-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="ci-plus-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuPlusTerbuka(false);
+                      if (typeof onBuatVideo === "function") {
+                        onBuatVideo();
+                      } else {
+                        alert("Fitur Buat Video AI belum dihubungkan ke layanan video.");
+                      }
+                    }}
+                  >
+                    <span className="ci-plus-menu-icon"><FiImage size={19} /></span>
+                    <span className="ci-plus-menu-copy">
+                      <strong>Buat Video AI</strong>
+                      <small>Buat video dari teks atau gambar</small>
+                    </span>
+                  </button>
+
+                  <div className="ci-plus-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="ci-plus-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuPlusTerbuka(false);
+                      document.getElementById("home-image-input")?.click();
+                    }}
+                  >
+                    <span className="ci-plus-menu-icon"><FiImage size={19} /></span>
+                    <span className="ci-plus-menu-copy">
+                      <strong>Tambah Gambar</strong>
+                      <small>Upload gambar dari galeri HP</small>
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className={`ci-plus ${imagePreview ? "has-image" : ""} ${
+                  loading ? "is-disabled" : ""
+                }`}
+                disabled={loading}
+                aria-label="Buka menu tambahan"
+                aria-expanded={menuPlusTerbuka}
+                aria-haspopup="menu"
+                title="Tambah fitur"
+                onClick={() => setMenuPlusTerbuka((terbuka) => !terbuka)}
+              >
+                <span className="ci-plus-bg" aria-hidden="true" />
+                <span className="ci-plus-icon" aria-hidden="true">
+                  <FiPlus size={22} strokeWidth={1.75} />
+                </span>
+              </button>
+            </div>
 
             {/* ==================================================
                 MIC (VOICE NOTE)
