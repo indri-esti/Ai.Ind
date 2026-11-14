@@ -21,6 +21,7 @@ import Typing from "../components/Typing";
 import Sidebar from "../components/Sidebar";
 
 import Welcome from "../components/Welcome";
+import VideoGenerator from "../components/VideoGenerator";
 
 // ==========================================
 // ADMOB
@@ -71,6 +72,7 @@ function Home() {
   // STATE
   // ==========================================
   const [message, setMessage] = useState("");
+  const [videoGeneratorTerbuka, setVideoGeneratorTerbuka] = useState(false);
   const [messages, setMessages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -1794,6 +1796,7 @@ function Home() {
                   pilihGambar={pilihGambar}
                   imagePreview={imagePreview}
                   hapusGambar={hapusGambar}
+                  onBuatVideo={() => setVideoGeneratorTerbuka(true)}
                 />
               </div>
 
@@ -1806,6 +1809,11 @@ function Home() {
           </div>
         </main>
       </div>
+
+      <VideoGenerator
+        show={videoGeneratorTerbuka}
+        onClose={() => setVideoGeneratorTerbuka(false)}
+      />
     </>
   );
 }

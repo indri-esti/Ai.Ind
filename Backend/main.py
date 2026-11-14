@@ -229,6 +229,22 @@ def terlalu_besar(e):
 
 app = FastAPI(title="AI.Ind")
 
+# CORS untuk endpoint FastAPI (termasuk AI Video).
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+# AI Video: endpoint /video/generate dan /api/video/generate.
+# Router didaftarkan sebelum Flask di-mount agar tidak tertangkap Flask.
+from video import router as video_router
+app.include_router(video_router)
+app.include_router(video_router, prefix="/api")
+
 # Suara AI (teks -> suara). Tersedia di /tts dan /api/tts.
 # Harus didaftarkan SEBELUM app.mount("/") di bawah.
 from voice import router as voice_router
