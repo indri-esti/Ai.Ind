@@ -1,9 +1,14 @@
 import os
 from io import BytesIO
 
+from dotenv import load_dotenv
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
+
+# Pastikan Backend/.env selalu terbaca di file ini, tanpa bergantung
+# pada urutan import file lain.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 router = APIRouter(tags=["AI Video"])
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
