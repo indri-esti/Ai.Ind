@@ -148,29 +148,42 @@ function VideoGeneratorInner({ show, onClose }) {
 
     setLoading(true);
     try {
-      const response = await axios.post("/video/generate", formData, {
-        responseType: "blob",
-        timeout: 600000,
-      });
-      const contentType = response.headers?.["content-type"] || "video/mp4";
-      if (!contentType.includes("video")) {
-        const text = await response.data.text();
-        let message = "Gagal membuat video.";
+      // Pakai fetch supaya FormData selalu terkirim sebagai multipart
+      // (di axios, body bisa terkirim kosong sehingga backend balas
+      // "Field required" untuk mode & prompt).
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 600000);
+      let res;
+      try {
+        res = await fetch(`${axios.defaults.baseURL}/video/generate`, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || !contentType.includes("video")) {
+        const text = await res.text();
+        let message = `Gagal membuat video (kode ${res.status}).`;
         try {
           message = jadiTeks(JSON.parse(text).detail, message);
         } catch (_) {}
         throw new Error(message);
       }
-      setVideoUrl(URL.createObjectURL(response.data));
+
+      const blob = await res.blob();
+      setVideoUrl(URL.createObjectURL(blob));
     } catch (err) {
-      let message = jadiTeks(err.response?.data?.detail, err.message);
-      if (err.response?.data instanceof Blob) {
-        try {
-          const body = JSON.parse(await err.response.data.text());
-          message = jadiTeks(body.detail, message);
-        } catch (_) {}
-      }
-      setError(jadiTeks(message));
+      setError(
+        jadiTeks(
+          err.name === "AbortError"
+            ? "Waktu habis. Pembuatan video terlalu lama, coba lagi."
+            : err.message
+        )
+      );
     } finally {
       setLoading(false);
     }
