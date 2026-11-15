@@ -1,11 +1,89 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import axios from "../api";
 import { FiX, FiVideo, FiImage, FiUpload, FiDownload, FiLoader } from "react-icons/fi";
 
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-export default function VideoGenerator({ show, onClose }) {
+// Ubah detail error apa pun (string / array / object) jadi string.
+// FastAPI mengirim `detail` berupa array of object saat error 422,
+// dan merender object di JSX membuat seluruh React crash (layar kosong).
+function jadiTeks(detail, fallback = "Terjadi kesalahan saat membuat video.") {
+  if (!detail) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const gabung = detail
+      .map((d) => (typeof d === "string" ? d : d?.msg || JSON.stringify(d)))
+      .join("; ");
+    return gabung || fallback;
+  }
+  try {
+    return JSON.stringify(detail);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+// Jaring pengaman: kalau ada error saat render, tampilkan pesannya
+// di layar, bukan layar kosong.
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 3000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            background: "rgba(1,9,16,.9)",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 520,
+              width: "100%",
+              padding: 18,
+              borderRadius: 16,
+              background: "#102b3e",
+              color: "#ffb7b7",
+              fontSize: 13,
+              overflowWrap: "anywhere",
+            }}
+          >
+            <b>Terjadi error pada AI Video Generator:</b>
+            <pre style={{ whiteSpace: "pre-wrap", marginTop: 10 }}>
+              {String(this.state.error?.message || this.state.error)}
+            </pre>
+            <button
+              type="button"
+              style={{ marginTop: 12, padding: "10px 16px", borderRadius: 10, border: 0 }}
+              onClick={() => {
+                this.setState({ error: null });
+                this.props.onClose?.();
+              }}
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function VideoGeneratorInner({ show, onClose }) {
   const [mode, setMode] = useState("text");
   const [prompt, setPrompt] = useState("");
   const [image, setImage] = useState(null);
@@ -15,12 +93,18 @@ export default function VideoGenerator({ show, onClose }) {
   const [videoUrl, setVideoUrl] = useState("");
   const fileRef = useRef(null);
 
+  // Dipisah supaya preview gambar tidak ikut di-revoke saat videoUrl berubah.
   useEffect(() => {
     return () => {
       if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  useEffect(() => {
+    return () => {
       if (videoUrl) URL.revokeObjectURL(videoUrl);
     };
-  }, [imagePreview, videoUrl]);
+  }, [videoUrl]);
 
   useEffect(() => {
     if (!show) return;
@@ -40,7 +124,6 @@ export default function VideoGenerator({ show, onClose }) {
       setError("Ukuran gambar maksimal 8 MB.");
       return;
     }
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImage(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -73,20 +156,21 @@ export default function VideoGenerator({ show, onClose }) {
       if (!contentType.includes("video")) {
         const text = await response.data.text();
         let message = "Gagal membuat video.";
-        try { message = JSON.parse(text).detail || message; } catch (_) {}
+        try {
+          message = jadiTeks(JSON.parse(text).detail, message);
+        } catch (_) {}
         throw new Error(message);
       }
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
       setVideoUrl(URL.createObjectURL(response.data));
     } catch (err) {
-      let message = err.response?.data?.detail || err.message || "Terjadi kesalahan saat membuat video.";
+      let message = jadiTeks(err.response?.data?.detail, err.message);
       if (err.response?.data instanceof Blob) {
         try {
           const body = JSON.parse(await err.response.data.text());
-          message = body.detail || message;
+          message = jadiTeks(body.detail, message);
         } catch (_) {}
       }
-      setError(message);
+      setError(jadiTeks(message));
     } finally {
       setLoading(false);
     }
@@ -146,7 +230,7 @@ export default function VideoGenerator({ show, onClose }) {
             </>
           )}
 
-          {error && <div className="aiv-error" role="alert">{error}</div>}
+          {error && <div className="aiv-error" role="alert">{String(error)}</div>}
 
           <button className="aiv-generate" type="submit" disabled={loading}>
             {loading ? <><FiLoader className="aiv-spin" /> Sedang membuat video...</> : <><FiVideo /> Generate Video</>}
@@ -162,5 +246,13 @@ export default function VideoGenerator({ show, onClose }) {
         <p className="aiv-note">Pembuatan video memerlukan waktu dan kuota layanan AI. Jangan unggah gambar pribadi atau sensitif.</p>
       </div>
     </div>
+  );
+}
+
+export default function VideoGenerator(props) {
+  return (
+    <ErrorBoundary onClose={props.onClose}>
+      <VideoGeneratorInner {...props} />
+    </ErrorBoundary>
   );
 }
