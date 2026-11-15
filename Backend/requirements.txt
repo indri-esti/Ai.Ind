@@ -28,3 +28,4 @@ wheel==0.47.0
 a2wsgi
 edge-tts
 huggingface_hub>=1.0.0
+gradio_client
