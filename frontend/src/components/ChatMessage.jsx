@@ -171,6 +171,120 @@ const pecahTeks = (teks, maks = 180) => {
   });
 };
 
+// =========================================================
+// SALIN KE CLIPBOARD
+// Pakai Clipboard API, dengan cadangan untuk WebView/HP
+// yang tidak mendukungnya (misal di Capacitor).
+// Dipakai oleh tombol salin pesan dan tombol salin kode.
+// =========================================================
+const salinKeClipboard = async (teks) => {
+  if (!teks) return false;
+
+  let berhasil = false;
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(teks);
+      berhasil = true;
+    }
+  } catch (err) {
+    berhasil = false;
+  }
+
+  if (!berhasil) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = teks;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      berhasil = document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch (err) {
+      berhasil = false;
+    }
+  }
+
+  return berhasil;
+};
+
+// Pecah isi pesan jadi bagian teks biasa dan blok kode (```...```)
+const pecahBagian = (isi) => {
+  const hasil = [];
+
+  String(isi || "")
+    .split(/(```[\s\S]*?```)/g)
+    .forEach((bagian) => {
+      if (!bagian) return;
+
+      if (bagian.startsWith("```") && bagian.endsWith("```") && bagian.length >= 6) {
+        const m = bagian.match(/^```([^\n`]*)\n?([\s\S]*?)```$/);
+
+        if (m) {
+          hasil.push({
+            tipe: "kode",
+            bahasa: m[1].trim(),
+            isi: m[2].replace(/\n$/, ""),
+          });
+          return;
+        }
+      }
+
+      const teks = bagian.replace(/^\n+|\n+$/g, "");
+      if (teks.trim()) hasil.push({ tipe: "teks", isi: teks });
+    });
+
+  return hasil;
+};
+
+// Blok kode dengan tombol salin sendiri
+function BlokKode({ bahasa, isi }) {
+  const [tersalin, setTersalin] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const salinKode = async () => {
+    const ok = await salinKeClipboard(isi);
+
+    if (ok) {
+      setTersalin(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setTersalin(false), 1800);
+    }
+  };
+
+  return (
+    <div className="cm-code">
+      <div className="cm-code-head">
+        <span className="cm-code-lang">{bahasa || "kode"}</span>
+
+        <button
+          type="button"
+          className={`cm-code-copy ${tersalin ? "done" : ""}`}
+          onClick={salinKode}
+          aria-label={tersalin ? "Kode tersalin" : "Salin kode"}
+        >
+          {tersalin ? <FiCheck size={13} /> : <FiCopy size={13} />}
+          <span>{tersalin ? "Tersalin" : "Salin kode"}</span>
+        </button>
+      </div>
+
+      <pre className="cm-code-body">
+        <code>{isi}</code>
+      </pre>
+    </div>
+  );
+}
+
 function ChatMessage({ msg }) {
   const [copied, setCopied] = useState(false);
 
@@ -225,6 +339,10 @@ function ChatMessage({ msg }) {
   const hasImage =
     isUser && Boolean(msg.image) && !imageError;
 
+  // Bagian pesan: teks biasa dan blok kode
+  const bagianPesan = pecahBagian(content);
+  const adaKode = bagianPesan.some((b) => b.tipe === "kode");
+
   // Teks untuk dibacakan: tanpa blok kode, link, dan simbol yang aneh jika dibaca
   const teksSuara = content
     .replace(/```[\s\S]*?```/g, " ")
@@ -243,40 +361,11 @@ function ChatMessage({ msg }) {
 
   // =========================================================
   // SALIN TEKS
-  // Pakai Clipboard API, dengan cadangan untuk WebView/HP
-  // yang tidak mendukungnya (misal di Capacitor).
   // =========================================================
   const salinTeks = async () => {
     if (!content) return;
 
-    let berhasil = false;
-
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(content);
-        berhasil = true;
-      }
-    } catch (err) {
-      berhasil = false;
-    }
-
-    if (!berhasil) {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = content;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "fixed";
-        ta.style.top = "-1000px";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        ta.setSelectionRange(0, ta.value.length);
-        berhasil = document.execCommand("copy");
-        document.body.removeChild(ta);
-      } catch (err) {
-        berhasil = false;
-      }
-    }
+    const berhasil = await salinKeClipboard(content);
 
     if (berhasil) {
       setCopied(true);
@@ -526,10 +615,14 @@ function ChatMessage({ msg }) {
             100% { transform: scale(1); }
           }
 
+          @keyframes cmSpin {
+            to { transform: rotate(360deg); }
+          }
+
           .cm-row {
             display: flex;
             width: 100%;
-            margin-bottom: 14px;
+            margin-bottom: 18px;
             padding: 0 4px;
             box-sizing: border-box;
             animation: cmIn 0.28s ease both;
@@ -544,6 +637,9 @@ function ChatMessage({ msg }) {
             min-width: 0;
             max-width: 92%;
           }
+
+          /* pesan AI yang berisi kode dilebarkan supaya kode lega */
+          .cm-col.wide { width: 100%; max-width: 100%; }
 
           .cm-row.user .cm-col { align-items: flex-end; }
           .cm-row.ai .cm-col { align-items: flex-start; }
@@ -581,24 +677,32 @@ function ChatMessage({ msg }) {
             position: relative;
             box-sizing: border-box;
             overflow: hidden;
-            white-space: pre-wrap;
+            min-width: 0;
+            max-width: 100%;
             word-break: break-word;
-            line-height: 1.65;
+            line-height: 1.7;
             font-size: 15px;
+            letter-spacing: 0.1px;
           }
+
+          .cm-col.wide .cm-bubble { width: 100%; }
 
           .cm-bubble.ai {
             color: #e6eef5;
             padding: 14px 18px 14px 20px;
-            border-radius: 6px 20px 20px 20px;
+            border-radius: 6px 22px 22px 22px;
             background:
               linear-gradient(
                 160deg,
-                rgba(24, 48, 74, 0.95),
-                rgba(15, 32, 52, 0.95)
+                rgba(24, 48, 74, 0.92),
+                rgba(14, 30, 49, 0.92)
               );
             border: 1px solid rgba(0, 194, 255, 0.14);
-            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
+            box-shadow:
+              0 8px 26px rgba(0, 0, 0, 0.24),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
           }
 
           /* garis aksen cyan di kiri, ciri khas AI.Ind */
@@ -616,9 +720,9 @@ function ChatMessage({ msg }) {
           .cm-bubble.user {
             color: #04111a;
             padding: 12px 18px;
-            border-radius: 20px 20px 6px 20px;
-            background: linear-gradient(135deg, #1fd0ff, #00a8e8);
-            box-shadow: 0 6px 18px rgba(0, 194, 255, 0.22);
+            border-radius: 22px 22px 6px 22px;
+            background: linear-gradient(135deg, #2bd6ff, #00a8e8);
+            box-shadow: 0 8px 20px rgba(0, 194, 255, 0.24);
             font-weight: 500;
           }
 
@@ -629,7 +733,7 @@ function ChatMessage({ msg }) {
           }
 
           .cm-image-wrap {
-            border-radius: 15px;
+            border-radius: 16px;
             overflow: hidden;
             background: rgba(0, 0, 0, 0.08);
           }
@@ -640,7 +744,7 @@ function ChatMessage({ msg }) {
             max-width: 360px;
             max-height: 360px;
             object-fit: contain;
-            border-radius: 15px;
+            border-radius: 16px;
             background: rgba(0, 0, 0, 0.05);
           }
 
@@ -649,11 +753,130 @@ function ChatMessage({ msg }) {
             word-break: break-word;
           }
 
-          /* ---------- Tombol salin ---------- */
+          .cm-bubble.has-image .cm-text {
+            padding: 8px 10px 4px;
+          }
+
+          .cm-text + .cm-code,
+          .cm-code + .cm-text,
+          .cm-code + .cm-code {
+            margin-top: 12px;
+          }
+
+          .cm-text + .cm-code { margin-bottom: 2px; }
+          .cm-code + .cm-text { margin-top: 12px; }
+
+          /* ---------- Blok kode ---------- */
+          .cm-code {
+            border-radius: 14px;
+            overflow: hidden;
+            background: #08121d;
+            border: 1px solid rgba(0, 194, 255, 0.16);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            margin: 4px 0;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: left;
+          }
+
+          .cm-code-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 7px 8px 7px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid rgba(0, 194, 255, 0.12);
+          }
+
+          .cm-code-lang {
+            font-size: 12px;
+            font-weight: 600;
+            color: #7fdcff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            user-select: none;
+          }
+
+          .cm-code-copy {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: 28px;
+            padding: 0 11px;
+            border-radius: 999px;
+            border: 1px solid rgba(159, 180, 196, 0.22);
+            background: rgba(255, 255, 255, 0.05);
+            color: #b8cbd9;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
+            transition: background 0.2s ease, color 0.2s ease,
+              border-color 0.2s ease, transform 0.15s ease;
+          }
+
+          .cm-code-copy:hover {
+            background: rgba(0, 194, 255, 0.12);
+            border-color: rgba(0, 194, 255, 0.45);
+            color: #7fdcff;
+          }
+
+          .cm-code-copy:active { transform: scale(0.94); }
+
+          .cm-code-copy:focus-visible {
+            outline: 2px solid #00c2ff;
+            outline-offset: 2px;
+          }
+
+          .cm-code-copy.done {
+            background: rgba(0, 194, 255, 0.16);
+            border-color: rgba(0, 194, 255, 0.55);
+            color: #00c2ff;
+          }
+
+          .cm-code-copy.done svg { animation: cmPop 0.3s ease; }
+
+          .cm-code-copy svg { pointer-events: none; flex-shrink: 0; }
+
+          .cm-code-body {
+            margin: 0;
+            padding: 14px 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            font-family: "JetBrains Mono", "Fira Code", ui-monospace,
+              SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #d6e6f2;
+            white-space: pre;
+            word-break: normal;
+            tab-size: 2;
+          }
+
+          .cm-code-body code {
+            font-family: inherit;
+            background: none;
+            padding: 0;
+            white-space: inherit;
+          }
+
+          .cm-code-body::-webkit-scrollbar { height: 6px; }
+          .cm-code-body::-webkit-scrollbar-thumb {
+            background: rgba(0, 194, 255, 0.25);
+            border-radius: 3px;
+          }
+
+          /* ---------- Tombol aksi ---------- */
           .cm-actions {
             display: flex;
             gap: 8px;
-            margin-top: 6px;
+            margin-top: 7px;
             padding: 0 4px;
           }
 
@@ -669,6 +892,7 @@ function ChatMessage({ msg }) {
             color: #9fb4c4;
             font-size: 12px;
             font-weight: 500;
+            font-family: inherit;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
@@ -685,7 +909,18 @@ function ChatMessage({ msg }) {
 
           .cm-copy:active { transform: scale(0.94); }
 
+          .cm-copy:focus-visible {
+            outline: 2px solid #00c2ff;
+            outline-offset: 2px;
+          }
+
           .cm-copy.done {
+            background: rgba(0, 194, 255, 0.14);
+            border-color: rgba(0, 194, 255, 0.5);
+            color: #00c2ff;
+          }
+
+          .cm-copy.active {
             background: rgba(0, 194, 255, 0.14);
             border-color: rgba(0, 194, 255, 0.5);
             color: #00c2ff;
@@ -695,8 +930,10 @@ function ChatMessage({ msg }) {
 
           .cm-copy svg { pointer-events: none; flex-shrink: 0; }
 
+          .cm-spin { animation: cmSpin 0.9s linear infinite; }
+
           @media (prefers-reduced-motion: reduce) {
-            .cm-row, .cm-copy.done svg {
+            .cm-row, .cm-copy.done svg, .cm-code-copy.done svg {
               animation-duration: 0.01ms !important;
             }
           }
@@ -704,7 +941,7 @@ function ChatMessage({ msg }) {
       </style>
 
       <div className={`cm-row ${isUser ? "user" : "ai"}`}>
-        <div className="cm-col">
+        <div className={`cm-col ${!isUser && adaKode ? "wide" : ""}`}>
 
           {/* =========================
               LABEL AI.Ind
@@ -729,35 +966,39 @@ function ChatMessage({ msg }) {
             ========================== */}
 
             {hasImage && (
-              <div
-                className="cm-image-wrap"
-                style={{ marginBottom: content ? "8px" : "0" }}
-              >
+              <div className="cm-image-wrap">
                 <img
                   className="cm-image"
                   src={msg.image}
-                  alt="Gambar yang dikirim"
+                  alt="Gambar terkirim"
                   onError={() => setImageError(true)}
                 />
               </div>
             )}
 
             {/* =========================
-                TEKS PESAN
+                ISI PESAN
+                (teks biasa + blok kode
+                dengan tombol salin sendiri)
             ========================== */}
 
-            {content && (
-              <div
-                className="cm-text"
-                style={{ padding: hasImage ? "3px 7px 7px" : "0" }}
-              >
-                {content}
-              </div>
+            {bagianPesan.map((bagian, i) =>
+              bagian.tipe === "kode" ? (
+                <BlokKode
+                  key={i}
+                  bahasa={bagian.bahasa}
+                  isi={bagian.isi}
+                />
+              ) : (
+                <div className="cm-text" key={i}>
+                  {bagian.isi}
+                </div>
+              )
             )}
           </div>
 
           {/* =========================
-              TOMBOL SALIN + SUARA
+              TOMBOL AKSI
           ========================== */}
 
           {content && (
@@ -766,30 +1007,32 @@ function ChatMessage({ msg }) {
                 type="button"
                 className={`cm-copy ${copied ? "done" : ""}`}
                 onClick={salinTeks}
-                aria-label={copied ? "Tersalin" : "Salin pesan"}
-                title={copied ? "Tersalin" : "Salin pesan"}
+                aria-label={copied ? "Pesan tersalin" : "Salin pesan"}
               >
                 {copied ? <FiCheck size={14} /> : <FiCopy size={14} />}
                 <span>{copied ? "Tersalin" : "Salin"}</span>
               </button>
 
-              {/* Tombol suara: hanya untuk jawaban AI */}
               {!isUser && teksSuara && (
                 <button
                   type="button"
-                  className={`cm-copy ${speaking || memuat ? "done" : ""}`}
+                  className={`cm-copy ${speaking || memuat ? "active" : ""}`}
                   onClick={putarSuara}
                   aria-label={
-                    speaking || memuat ? "Hentikan suara" : "Putar suara"
+                    speaking || memuat ? "Hentikan suara" : "Bacakan pesan"
                   }
-                  title={speaking || memuat ? "Hentikan suara" : "Putar suara"}
                 >
                   {speaking || memuat ? (
-                    <FiSquare size={14} />
+                    <FiSquare
+                      size={14}
+                      className={memuat ? "cm-spin" : ""}
+                    />
                   ) : (
                     <FiVolume2 size={14} />
                   )}
-                  <span>{memuat ? "Memuat" : speaking ? "Stop" : "Suara"}</span>
+                  <span>
+                    {memuat ? "Memuat" : speaking ? "Berhenti" : "Dengar"}
+                  </span>
                 </button>
               )}
             </div>

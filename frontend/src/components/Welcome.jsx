@@ -25,8 +25,13 @@ function Welcome({
       <style>
         {`
           @keyframes wlRise {
-            from { opacity: 0; transform: translateY(12px); }
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+          }
+
+          @keyframes wlGlow {
+            0%, 100% { opacity: 0.75; }
+            50% { opacity: 1; }
           }
 
           .wl-root {
@@ -54,7 +59,7 @@ function Welcome({
             width: 72px;
             height: 72px;
             margin-bottom: 26px;
-            animation: wlRise 0.6s ease both;
+            animation: wlRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
           }
 
           .wl-logo::before {
@@ -65,6 +70,7 @@ function Welcome({
             background: rgba(0, 194, 255, 0.12);
             filter: blur(26px);
             pointer-events: none;
+            animation: wlGlow 5s ease-in-out infinite;
           }
 
           .wl-logo img {
@@ -85,7 +91,7 @@ function Welcome({
             font-size: 15px;
             font-weight: 500;
             letter-spacing: 0.2px;
-            animation: wlRise 0.6s ease 0.08s both;
+            animation: wlRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
           }
 
           .wl-title {
@@ -96,7 +102,7 @@ function Welcome({
             font-size: clamp(44px, 11vw, 60px);
             line-height: 1;
             letter-spacing: -2.5px;
-            animation: wlRise 0.6s ease 0.16s both;
+            animation: wlRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
           }
 
           .wl-ai {
@@ -124,7 +130,7 @@ function Welcome({
             color: #e3f1f7;
             font-size: 16px;
             font-weight: 600;
-            animation: wlRise 0.6s ease 0.24s both;
+            animation: wlRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
           }
 
           .wl-desc {
@@ -133,7 +139,7 @@ function Welcome({
             color: #a9bfcc;
             font-size: 15px;
             line-height: 1.7;
-            animation: wlRise 0.6s ease 0.32s both;
+            animation: wlRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
           }
 
           /* ---------- HP ---------- */
@@ -167,6 +173,7 @@ function Welcome({
 
           @media (prefers-reduced-motion: reduce) {
             .wl-logo,
+            .wl-logo::before,
             .wl-hello,
             .wl-title,
             .wl-sub,
