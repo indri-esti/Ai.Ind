@@ -3,36 +3,25 @@ function Header() {
     <>
       <style>
         {`
+          @keyframes hdIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          @keyframes hdInSide {
+            from { opacity: 0; transform: translateX(8px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+
           @keyframes hdStatusPulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 194, 255, 0.55); }
-            70% { box-shadow: 0 0 0 7px rgba(0, 194, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 194, 255, 0); }
-          }
-
-          @keyframes hdDotBreath {
-            0%, 100% {
-              box-shadow: 0 0 6px rgba(0, 194, 255, 0.6), 0 0 14px rgba(0, 194, 255, 0.35);
-              transform: scale(1);
-            }
-            50% {
-              box-shadow: 0 0 10px rgba(0, 194, 255, 0.95), 0 0 24px rgba(0, 194, 255, 0.55);
-              transform: scale(1.12);
-            }
-          }
-
-          @keyframes hdGlowFloat {
-            0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.85; }
-            50% { transform: translate3d(40px, 8px, 0); opacity: 1; }
+            0% { box-shadow: 0 0 8px rgba(46, 230, 255, 0.9), 0 0 0 0 rgba(46, 230, 255, 0.6); }
+            70% { box-shadow: 0 0 8px rgba(46, 230, 255, 0.9), 0 0 0 7px rgba(46, 230, 255, 0); }
+            100% { box-shadow: 0 0 8px rgba(46, 230, 255, 0.9), 0 0 0 0 rgba(46, 230, 255, 0); }
           }
 
           @keyframes hdLineSweep {
             0% { transform: translateX(-120%); }
-            100% { transform: translateX(420%); }
-          }
-
-          @keyframes hdIndShift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
+            70%, 100% { transform: translateX(520%); }
           }
 
           .hd-root {
@@ -50,35 +39,36 @@ function Header() {
             justify-content: space-between;
             gap: 16px;
             padding: calc(18px + env(safe-area-inset-top, 0px)) 36px 18px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            border-bottom: 1px solid rgba(0, 194, 255, 0.18);
             background:
               radial-gradient(
-                ellipse 60% 140% at 0% 0%,
-                rgba(0, 194, 255, 0.07),
+                ellipse 55% 160% at 0% 0%,
+                rgba(0, 194, 255, 0.11),
                 transparent 70%
               ),
               linear-gradient(
                 180deg,
-                rgba(8, 20, 32, 0.99),
-                rgba(8, 20, 32, 0.92)
+                rgba(9, 24, 38, 0.99),
+                rgba(7, 19, 31, 0.96)
               );
-            -webkit-backdrop-filter: blur(16px) saturate(140%);
-            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(18px) saturate(140%);
+            backdrop-filter: blur(18px) saturate(140%);
+            box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
           }
 
+          /* cahaya lembut di kiri, diam (tidak bergerak) */
           .hd-glow {
             position: absolute;
             top: -90px;
             left: 6%;
             width: 340px;
             height: 160px;
-            background: rgba(0, 194, 255, 0.11);
+            background: rgba(0, 194, 255, 0.14);
             filter: blur(60px);
             pointer-events: none;
-            animation: hdGlowFloat 9s ease-in-out infinite;
-            will-change: transform, opacity;
           }
 
+          /* garis bawah tipis, dengan satu kilau yang lewat pelan */
           .hd-line {
             position: absolute;
             left: 0;
@@ -88,8 +78,8 @@ function Header() {
             overflow: hidden;
             background: linear-gradient(
               90deg,
-              rgba(0, 194, 255, 0.55),
-              rgba(0, 194, 255, 0.12) 45%,
+              rgba(0, 194, 255, 0.7),
+              rgba(0, 194, 255, 0.18) 45%,
               transparent 85%
             );
             pointer-events: none;
@@ -100,16 +90,15 @@ function Header() {
             position: absolute;
             top: 0;
             left: 0;
-            width: 25%;
+            width: 20%;
             height: 100%;
             background: linear-gradient(
               90deg,
               transparent,
-              rgba(140, 225, 255, 0.95),
+              rgba(150, 230, 255, 0.95),
               transparent
             );
-            animation: hdLineSweep 5.5s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-            will-change: transform;
+            animation: hdLineSweep 4.2s cubic-bezier(0.45, 0, 0.25, 1) 0.6s infinite;
           }
 
           .hd-left {
@@ -119,6 +108,7 @@ function Header() {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
+            animation: hdIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
           }
 
           .hd-title {
@@ -135,7 +125,7 @@ function Header() {
           .hd-ai {
             font-weight: 800;
             color: #f1f7fb;
-            text-shadow: 0 0 18px rgba(0, 194, 255, 0.18);
+            text-shadow: 0 0 18px rgba(0, 194, 255, 0.22);
           }
 
           .hd-dot {
@@ -144,25 +134,19 @@ function Header() {
             margin: 0 3px 5px;
             border-radius: 50%;
             background: #00c2ff;
-            box-shadow: 0 0 10px rgba(0, 194, 255, 0.85);
+            box-shadow:
+              0 0 9px rgba(0, 194, 255, 0.9),
+              0 0 20px rgba(0, 194, 255, 0.4);
             flex-shrink: 0;
-            animation: hdDotBreath 3s ease-in-out infinite;
           }
 
           .hd-ind {
             font-weight: 300;
             color: #00c2ff;
-            background: linear-gradient(
-              90deg,
-              #00c2ff,
-              #7fe3ff,
-              #00c2ff
-            );
-            background-size: 200% 100%;
+            background: linear-gradient(90deg, #00c2ff, #55d9ff);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            animation: hdIndShift 6s ease-in-out infinite;
           }
 
           .hd-sub {
@@ -171,7 +155,7 @@ function Header() {
             font-weight: 400;
             line-height: 1.3;
             letter-spacing: 0.1px;
-            color: #8a9bb5;
+            color: #9fb4c4;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -190,27 +174,29 @@ function Header() {
             border-radius: 999px;
             font-size: 12.5px;
             font-weight: 500;
-            color: #bfeaff;
+            color: #cdeefb;
             background: linear-gradient(
               180deg,
-              rgba(0, 194, 255, 0.12),
+              rgba(0, 194, 255, 0.13),
               rgba(0, 194, 255, 0.05)
             );
-            border: 1px solid rgba(0, 194, 255, 0.24);
+            border: 1px solid rgba(0, 194, 255, 0.28);
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.06),
-              0 0 18px rgba(0, 194, 255, 0.08);
+              inset 0 1px 0 rgba(255, 255, 255, 0.07),
+              0 0 16px rgba(0, 194, 255, 0.1);
             -webkit-backdrop-filter: blur(8px);
             backdrop-filter: blur(8px);
             user-select: none;
+            animation: hdInSide 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
           }
 
           .hd-status-dot {
             width: 7px;
             height: 7px;
             border-radius: 50%;
-            background: #00c2ff;
-            animation: hdStatusPulse 2.2s ease-out infinite;
+            background: #2ee6ff;
+            box-shadow: 0 0 8px rgba(46, 230, 255, 0.9);
+            animation: hdStatusPulse 1.6s ease-out infinite;
           }
 
           /* ---------- HP ----------
@@ -239,9 +225,8 @@ function Header() {
           }
 
           @media (prefers-reduced-motion: reduce) {
-            .hd-glow,
-            .hd-dot,
-            .hd-ind,
+            .hd-left,
+            .hd-status,
             .hd-status-dot { animation: none; }
             .hd-line::after { animation: none; opacity: 0; }
           }

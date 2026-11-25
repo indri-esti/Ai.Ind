@@ -1,5 +1,14 @@
 import { useState, useRef, useEffect } from "react";
-import { FiCopy, FiCheck, FiVolume2, FiSquare } from "react-icons/fi";
+import { createPortal } from "react-dom";
+import {
+  FiCopy,
+  FiCheck,
+  FiVolume2,
+  FiSquare,
+  FiPlay,
+  FiX,
+  FiRefreshCw,
+} from "react-icons/fi";
 
 // =========================================================
 // ALAMAT ENDPOINT SUARA DI BACKEND (voice.py)
@@ -241,9 +250,365 @@ const pecahBagian = (isi) => {
   return hasil;
 };
 
+// =========================================================
+// HASIL KODE (HTML / SVG)
+// Kode yang bisa dijalankan punya tombol "Lihat hasil".
+// Hasilnya langsung terbuka di jendela pratinjau (iframe aman).
+// =========================================================
+const META_VIEWPORT =
+  '<meta name="viewport" content="width=device-width, initial-scale=1">';
+
+// Bahasa yang bisa dijalankan langsung di browser
+const BAHASA_ALIAS = {
+  html: "html",
+  htm: "html",
+  svg: "svg",
+  css: "css",
+  js: "js",
+  javascript: "js",
+  mjs: "js",
+  jsx: "jsx",
+  react: "jsx",
+  tsx: "tsx",
+  ts: "ts",
+  typescript: "ts",
+  py: "py",
+  python: "py",
+  python3: "py",
+};
+
+const normBahasa = (bahasa, kode) => {
+  const b = BAHASA_ALIAS[(bahasa || "").toLowerCase().trim()];
+  if (b) return b;
+  if (!bahasa && /^\s*(<!doctype html|<html)/i.test(kode || "")) return "html";
+  return null;
+};
+
+const amanScript = (t) => String(t).replace(/<\/script/gi, "<\\/script");
+
+const keJson = (t) =>
+  JSON.stringify(String(t))
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+
+// Tampilan konsol (untuk output console.log, print, dan error)
+const KONSOL_CSS = `html,body{margin:0;background:#0b1622}#__konsol{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#d6e6f2;padding:12px 14px;box-sizing:border-box}.k{white-space:pre-wrap;word-break:break-word;border-bottom:1px solid rgba(255,255,255,.06);padding:3px 0}.k.error{color:#ff8a8a}.k.warn{color:#ffd479}#__status{font:13px system-ui,sans-serif;color:#7fdcff;padding:12px 14px 0}`;
+
+const REACT_CSS = `body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}#__konsol{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;background:#0b1622;color:#d6e6f2;padding:12px 14px}#__konsol:empty{display:none}.k{white-space:pre-wrap;word-break:break-word;border-bottom:1px solid rgba(255,255,255,.06);padding:3px 0}.k.error{color:#ff8a8a}.k.warn{color:#ffd479}`;
+
+const KONSOL_JS = `(function(){var el=document.getElementById("__konsol");function fmt(a){try{if(a instanceof Error)return a.stack||String(a);if(typeof a==="object"&&a!==null)return JSON.stringify(a,null,2);return String(a);}catch(e){return String(a);}}function tulis(t,args){var d=document.createElement("div");d.className="k "+t;d.textContent=Array.prototype.map.call(args,fmt).join(" ");el.appendChild(d);}["log","info","warn","error","debug"].forEach(function(n){var asli=console[n];console[n]=function(){tulis(n==="debug"||n==="info"?"log":n,arguments);asli.apply(console,arguments);};});window.addEventListener("error",function(e){tulis("error",[e.message||String(e.error)]);});window.addEventListener("unhandledrejection",function(e){tulis("error",[e.reason]);});window.__tulis=tulis;})();`;
+
+const CEK_KOSONG = `if(!document.getElementById("__konsol").childNodes.length){window.__tulis("log",["Selesai. Tidak ada output."]);}`;
+
+const URL_BABEL = "https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js";
+const URL_REACT = "https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js";
+const URL_REACT_DOM = "https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js";
+const URL_PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js";
+
+// Gabungkan HTML dengan CSS dan JS dari blok kode lain di pesan yang sama
+const gabungHtml = (html, cssList, jsList) => {
+  let h = String(html);
+
+  const punyaStyle = /<style[\s>]/i.test(h);
+  const punyaJs = /<script(?![^>]*\bsrc\s*=)[^>]*>\s*\S/i.test(h);
+  const css = punyaStyle ? [] : cssList;
+  const js = punyaJs ? [] : jsList;
+
+  const styleTag = css.length ? "<style>" + css.join("\n") + "</style>" : "";
+  const scriptTag = js.length
+    ? "<script>" + js.map(amanScript).join("\n;\n") + "</script>"
+    : "";
+  const meta = /<meta[^>]+viewport/i.test(h) ? "" : META_VIEWPORT;
+  const kepala = meta + styleTag;
+
+  if (kepala) {
+    if (/<head[^>]*>/i.test(h)) {
+      h = h.replace(/<head[^>]*>/i, (m) => m + kepala);
+    } else if (/<html[^>]*>/i.test(h)) {
+      h = h.replace(/<html[^>]*>/i, (m) => m + "<head>" + kepala + "</head>");
+    } else {
+      h = kepala + h;
+    }
+  }
+
+  if (scriptTag) {
+    if (/<\/body>/i.test(h)) {
+      h = h.replace(/<\/body>/i, () => scriptTag + "</body>");
+    } else {
+      h += scriptTag;
+    }
+  }
+
+  return h;
+};
+
+const DEMO_CSS_HTML = `<main class="demo"><h1>Judul contoh</h1><p>Ini paragraf contoh untuk melihat gaya CSS kamu. <a href="#">Tautan</a></p><button>Tombol</button> <input placeholder="Kolom isian"><ul><li>Satu</li><li>Dua</li><li>Tiga</li></ul><div class="card box">Kotak</div></main>`;
+
+// Siapkan kode React: buang import/export, cari komponen utamanya
+const siapkanJsx = (kode) => {
+  let nama = null;
+
+  let k = String(kode)
+    .replace(/^\s*import\s+["'][^"']+["'];?[ \t]*$/gm, "")
+    .replace(/^\s*import\s[\s\S]*?\sfrom\s+["'][^"']+["'];?[ \t]*$/gm, "");
+
+  k = k.replace(
+    /export\s+default\s+(async\s+)?function\s+([A-Za-z_$][\w$]*)/,
+    (m, a, n) => {
+      nama = n;
+      return (a || "") + "function " + n;
+    }
+  );
+
+  k = k.replace(/export\s+default\s+class\s+([A-Za-z_$][\w$]*)/, (m, n) => {
+    nama = n;
+    return "class " + n;
+  });
+
+  k = k.replace(/^\s*export\s+default\s+([A-Za-z_$][\w$]*)\s*;?\s*$/m, (m, n) => {
+    if (!nama) nama = n;
+    return "";
+  });
+
+  k = k.replace(/export\s+default\s+/, () => {
+    if (!nama) nama = "__Default";
+    return "const __Default = ";
+  });
+
+  k = k
+    .replace(/^\s*export\s*\{[^}]*\};?/gm, "")
+    .replace(/^(\s*)export\s+(?=(?:const|let|var|function|class|async)\b)/gm, "$1");
+
+  if (!nama) {
+    if (/\b(?:function|const|let|var|class)\s+App\b/.test(k)) {
+      nama = "App";
+    } else {
+      const re = /(?:function|class|const)\s+([A-Z][\w$]*)/g;
+      let m;
+      let terakhir = null;
+      while ((m = re.exec(k))) terakhir = m[1];
+      nama = terakhir;
+    }
+  }
+
+  const awalan =
+    "const {useState,useEffect,useRef,useMemo,useCallback,useReducer,useContext,useLayoutEffect,createContext,Fragment,memo,forwardRef}=React;\n";
+
+  return { src: awalan + k, nama };
+};
+
+const halamanReact = (kode, ts) => {
+  const { src, nama } = siapkanJsx(kode);
+  const preset = ts
+    ? '["react",["typescript",{isTSX:true,allExtensions:true}]]'
+    : '["react"]';
+
+  return `<!doctype html><html><head><meta charset="utf-8">${META_VIEWPORT}<style>${REACT_CSS}</style></head><body><div id="root"></div><div id="__konsol"></div><script>${KONSOL_JS}</script><script src="${URL_REACT}"></script><script src="${URL_REACT_DOM}"></script><script src="${URL_BABEL}"></script><script>(function(){try{var src=${keJson(src)};var out=Babel.transform(src,{presets:${preset},filename:"app.${ts ? "tsx" : "jsx"}"}).code;var Komp=new Function("React","ReactDOM",out+"\\n;return "+${JSON.stringify(nama || "null")}+";")(React,ReactDOM);if(!Komp)throw new Error("Komponen tidak ditemukan. Pakai export default atau beri nama App.");ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Komp));}catch(e){window.__tulis("error",[e]);}})();</script></body></html>`;
+};
+
+const halamanPython = (kode) =>
+  `<!doctype html><html><head><meta charset="utf-8">${META_VIEWPORT}<style>${KONSOL_CSS}</style></head><body><div id="__status">Memuat Python...</div><div id="__konsol"></div><script>${KONSOL_JS}</script><script src="${URL_PYODIDE}"></script><script>(async function(){var st=document.getElementById("__status");try{var py=await loadPyodide();py.setStdout({batched:function(s){window.__tulis("log",[s]);}});py.setStderr({batched:function(s){window.__tulis("error",[s]);}});var kode=${keJson(kode)};st.textContent="Menjalankan...";await py.loadPackagesFromImports(kode);await py.runPythonAsync(kode);st.remove();${CEK_KOSONG}}catch(e){st.remove();window.__tulis("error",[e.message||e]);}})();</script></body></html>`;
+
+const halamanKonsol = (isiScript) =>
+  `<!doctype html><html><head><meta charset="utf-8">${META_VIEWPORT}<style>${KONSOL_CSS}</style></head><body><div id="__konsol"></div><script>${KONSOL_JS}</script>${isiScript}</body></html>`;
+
+const buatDokumen = (bahasa, kode, semua = []) => {
+  const b = normBahasa(bahasa, kode);
+  if (!b) return null;
+
+  const lain = (jenis) =>
+    semua
+      .filter((x) => normBahasa(x.bahasa, x.isi) === jenis)
+      .map((x) => x.isi);
+
+  if (b === "svg") {
+    return `<!doctype html><html><head><meta charset="utf-8">${META_VIEWPORT}<style>html,body{margin:0;height:100%}body{display:grid;place-items:center;background:#fff}svg{max-width:100%;max-height:100vh}</style></head><body>${kode}</body></html>`;
+  }
+
+  if (b === "html") {
+    return gabungHtml(kode, lain("css"), lain("js"));
+  }
+
+  if (b === "css") {
+    const htmls = lain("html");
+    if (htmls.length) return gabungHtml(htmls[0], [kode], lain("js"));
+
+    return `<!doctype html><html><head><meta charset="utf-8">${META_VIEWPORT}<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif}</style><style>${kode}</style></head><body>${DEMO_CSS_HTML}</body></html>`;
+  }
+
+  if (b === "js") {
+    const htmls = lain("html");
+    if (htmls.length) return gabungHtml(htmls[0], lain("css"), [kode]);
+
+    return halamanKonsol(
+      `<script>${amanScript(kode)}</script><script>${CEK_KOSONG}</script>`
+    );
+  }
+
+  if (b === "ts") {
+    return halamanKonsol(
+      `<script src="${URL_BABEL}"></script><script>(function(){try{var out=Babel.transform(${keJson(kode)},{presets:["typescript"],filename:"kode.ts"}).code;(0,eval)(out);}catch(e){window.__tulis("error",[e]);}${CEK_KOSONG}})();</script>`
+    );
+  }
+
+  if (b === "jsx" || b === "tsx") return halamanReact(kode, b === "tsx");
+
+  if (b === "py") return halamanPython(kode);
+
+  return null;
+};
+
+function HasilKode({ dokumen, onTutup }) {
+  const [versi, setVersi] = useState(0);
+
+  useEffect(() => {
+    const lama = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const esc = (e) => {
+      if (e.key === "Escape") onTutup();
+    };
+    window.addEventListener("keydown", esc);
+
+    return () => {
+      document.body.style.overflow = lama;
+      window.removeEventListener("keydown", esc);
+    };
+  }, [onTutup]);
+
+  return createPortal(
+    <div
+      className="hk-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Hasil kode"
+      onClick={(e) => {
+        e.stopPropagation();
+        onTutup();
+      }}
+    >
+      <div className="hk-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="hk-bar">
+          <span className="hk-title">Hasil</span>
+
+          <div className="hk-bar-act">
+            <button
+              type="button"
+              className="hk-btn"
+              onClick={() => setVersi((v) => v + 1)}
+              aria-label="Muat ulang hasil"
+            >
+              <FiRefreshCw size={16} />
+            </button>
+
+            <button
+              type="button"
+              className="hk-btn"
+              onClick={onTutup}
+              aria-label="Tutup hasil"
+            >
+              <FiX size={18} />
+            </button>
+          </div>
+        </div>
+
+        <iframe
+          key={versi}
+          className="hk-frame"
+          title="Hasil kode"
+          sandbox="allow-scripts allow-forms allow-modals allow-popups"
+          srcDoc={dokumen}
+        />
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// =========================================================
+// VIDEO
+// Link YouTube diputar langsung di dalam chat, begitu juga
+// link video langsung (.mp4, .webm, dst) dan msg.video.
+// =========================================================
+const REGEX_YOUTUBE =
+  /(?:youtube\.com\/(?:watch\?(?:[^\s]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/i;
+const REGEX_VIDEO_LANGSUNG = /\.(mp4|webm|ogg|mov|m4v)(\?[^\s]*)?$/i;
+
+const klasifikasiVideo = (url) => {
+  const yt = url.match(REGEX_YOUTUBE);
+  if (yt) return { jenis: "youtube", sumber: yt[1] };
+  if (REGEX_VIDEO_LANGSUNG.test(url)) return { jenis: "langsung", sumber: url };
+  return null;
+};
+
+const ambilVideo = (teks, videoPesan) => {
+  const hasil = [];
+  const sudah = new Set();
+
+  const tambah = (url) => {
+    const v = klasifikasiVideo(url);
+    if (!v) return;
+    const kunci = v.jenis + v.sumber;
+    if (sudah.has(kunci)) return;
+    sudah.add(kunci);
+    hasil.push(v);
+  };
+
+  if (typeof videoPesan === "string" && videoPesan) tambah(videoPesan);
+
+  (teks.match(/https?:\/\/[^\s)]+/g) || []).forEach((u) =>
+    tambah(u.replace(/[.,;!?]+$/, ""))
+  );
+
+  return hasil.slice(0, 3);
+};
+
+function PemutarVideo({ jenis, sumber }) {
+  const [gagal, setGagal] = useState(false);
+
+  if (jenis === "youtube") {
+    return (
+      <div className="cm-video cm-video-yt">
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${sumber}?rel=0&playsinline=1`}
+          title="Video YouTube"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="cm-video">
+      {gagal ? (
+        <div className="cm-video-err">Video tidak bisa diputar.</div>
+      ) : (
+        <video
+          src={sumber}
+          controls
+          playsInline
+          preload="metadata"
+          onError={() => setGagal(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 // Blok kode dengan tombol salin sendiri
-function BlokKode({ bahasa, isi }) {
+function BlokKode({ bahasa, isi, semua }) {
   const [tersalin, setTersalin] = useState(false);
+  const [buka, setBuka] = useState(false);
+  const dokumen = buatDokumen(bahasa, isi, semua);
+  const jenis = normBahasa(bahasa, isi);
+  const labelJalan =
+    jenis === "py" || jenis === "js" || jenis === "ts"
+      ? "Jalankan"
+      : "Lihat hasil";
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -252,7 +617,9 @@ function BlokKode({ bahasa, isi }) {
     };
   }, []);
 
-  const salinKode = async () => {
+  const salinKode = async (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+
     const ok = await salinKeClipboard(isi);
 
     if (ok) {
@@ -263,9 +630,40 @@ function BlokKode({ bahasa, isi }) {
   };
 
   return (
-    <div className="cm-code">
+    <div
+      className={`cm-code ${dokumen ? "klik" : ""}`}
+      onClick={dokumen ? () => setBuka(true) : undefined}
+      onKeyDown={
+        dokumen
+          ? (e) => {
+              if (e.key === "Enter" && e.target === e.currentTarget) {
+                setBuka(true);
+              }
+            }
+          : undefined
+      }
+      role={dokumen ? "button" : undefined}
+      tabIndex={dokumen ? 0 : undefined}
+      aria-label={dokumen ? "Ketuk untuk melihat hasil kode" : undefined}
+    >
       <div className="cm-code-head">
         <span className="cm-code-lang">{bahasa || "kode"}</span>
+
+        <div className="cm-code-acts">
+          {dokumen && (
+            <button
+              type="button"
+              className="cm-code-copy cm-code-run"
+              onClick={(e) => {
+                e.stopPropagation();
+                setBuka(true);
+              }}
+              aria-label="Lihat hasil kode"
+            >
+              <FiPlay size={13} />
+              <span>{labelJalan}</span>
+            </button>
+          )}
 
         <button
           type="button"
@@ -276,11 +674,27 @@ function BlokKode({ bahasa, isi }) {
           {tersalin ? <FiCheck size={13} /> : <FiCopy size={13} />}
           <span>{tersalin ? "Tersalin" : "Salin kode"}</span>
         </button>
+        </div>
       </div>
+
+      {buka && dokumen && (
+        <HasilKode dokumen={dokumen} onTutup={() => setBuka(false)} />
+      )}
 
       <pre className="cm-code-body">
         <code>{isi}</code>
       </pre>
+
+      {dokumen && (
+        <div className="cm-code-hint">
+          <FiPlay size={12} />
+          <span>
+            {labelJalan === "Jalankan"
+              ? "Ketuk kode untuk menjalankannya"
+              : "Ketuk kode untuk melihat hasilnya"}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -342,6 +756,16 @@ function ChatMessage({ msg }) {
   // Bagian pesan: teks biasa dan blok kode
   const bagianPesan = pecahBagian(content);
   const adaKode = bagianPesan.some((b) => b.tipe === "kode");
+  const semuaKode = bagianPesan.filter((b) => b.tipe === "kode");
+
+  // Video: dari msg.video atau link di teks biasa (bukan di dalam kode)
+  const daftarVideo = ambilVideo(
+    bagianPesan
+      .filter((b) => b.tipe === "teks")
+      .map((b) => b.isi)
+      .join("\n"),
+    msg.video
+  );
 
   // Teks untuk dibacakan: tanpa blok kode, link, dan simbol yang aneh jika dibaca
   const teksSuara = content
@@ -872,6 +1296,187 @@ function ChatMessage({ msg }) {
             border-radius: 3px;
           }
 
+          .cm-code-acts {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+          }
+
+          .cm-code.klik { cursor: pointer; }
+
+          .cm-code.klik:hover {
+            border-color: rgba(0, 194, 255, 0.4);
+          }
+
+          .cm-code.klik:focus-visible {
+            outline: 2px solid #00c2ff;
+            outline-offset: 2px;
+          }
+
+          .cm-code-hint {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            font-size: 12px;
+            color: #7fdcff;
+            background: rgba(0, 194, 255, 0.06);
+            border-top: 1px solid rgba(0, 194, 255, 0.12);
+            user-select: none;
+          }
+
+          .cm-code-hint svg { flex-shrink: 0; }
+
+          .cm-code-run {
+            background: rgba(0, 194, 255, 0.14);
+            border-color: rgba(0, 194, 255, 0.4);
+            color: #00c2ff;
+          }
+
+          /* ---------- Jendela hasil kode ---------- */
+          @keyframes hkFade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+
+          @keyframes hkUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          .hk-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(3, 10, 18, 0.72);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            animation: hkFade 0.2s ease both;
+          }
+
+          .hk-sheet {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: #0a1622;
+            overflow: hidden;
+            animation: hkUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .hk-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px 16px;
+            background: #0d1d2d;
+            border-bottom: 1px solid rgba(0, 194, 255, 0.16);
+          }
+
+          .hk-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e6eef5;
+          }
+
+          .hk-bar-act {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+
+          .hk-btn {
+            width: 36px;
+            height: 36px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            border: 1px solid rgba(159, 180, 196, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: #b8cbd9;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.2s ease, color 0.2s ease,
+              border-color 0.2s ease;
+          }
+
+          .hk-btn:hover {
+            background: rgba(0, 194, 255, 0.12);
+            border-color: rgba(0, 194, 255, 0.45);
+            color: #7fdcff;
+          }
+
+          .hk-btn:focus-visible {
+            outline: 2px solid #00c2ff;
+            outline-offset: 2px;
+          }
+
+          .hk-frame {
+            flex: 1;
+            width: 100%;
+            border: 0;
+            background: #fff;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+          }
+
+          @media (min-width: 768px) {
+            .hk-sheet {
+              width: min(960px, 94vw);
+              height: min(86vh, 800px);
+              border-radius: 18px;
+              border: 1px solid rgba(0, 194, 255, 0.2);
+              box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+            }
+
+            .hk-bar {
+              padding-top: 8px;
+            }
+          }
+
+          /* ---------- Video ---------- */
+          .cm-video {
+            width: min(480px, 78vw);
+            max-width: 100%;
+            margin-top: 12px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid rgba(0, 194, 255, 0.16);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+          }
+
+          .cm-video-yt { aspect-ratio: 16 / 9; }
+
+          .cm-video-yt iframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: 0;
+          }
+
+          .cm-video video {
+            display: block;
+            width: 100%;
+            max-height: 380px;
+            background: #000;
+          }
+
+          .cm-video-err {
+            padding: 12px 14px;
+            font-size: 13px;
+            color: #9fb4c4;
+            background: rgba(255, 255, 255, 0.04);
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .hk-overlay, .hk-sheet { animation-duration: 0.01ms !important; }
+          }
+
           /* ---------- Tombol aksi ---------- */
           .cm-actions {
             display: flex;
@@ -988,6 +1593,7 @@ function ChatMessage({ msg }) {
                   key={i}
                   bahasa={bagian.bahasa}
                   isi={bagian.isi}
+                  semua={semuaKode}
                 />
               ) : (
                 <div className="cm-text" key={i}>
@@ -995,6 +1601,18 @@ function ChatMessage({ msg }) {
                 </div>
               )
             )}
+
+            {/* =========================
+                PEMUTAR VIDEO
+            ========================== */}
+
+            {daftarVideo.map((v) => (
+              <PemutarVideo
+                key={v.jenis + v.sumber}
+                jenis={v.jenis}
+                sumber={v.sumber}
+              />
+            ))}
           </div>
 
           {/* =========================
