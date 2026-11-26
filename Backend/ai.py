@@ -33,7 +33,7 @@ except Exception:
 
 # Penanda versi: kalau tulisan ini tidak muncul di log hosting,
 # berarti server masih menjalankan ai.py yang lama.
-VERSI = "2026-11-26-v8"
+VERSI = "2026-11-26-v9"
 print(f"[AI.Ind] ai.py {VERSI} dimuat")
 
 
@@ -688,6 +688,113 @@ def ambil_jawaban_dan_alasan(response):
     return jawaban, alasan
 
 
+# ==================================================
+# 413: PERMINTAAN MELEBIHI BATAS TOKEN PER MENIT
+# Groq menghitung prompt + gambar (2048 token) + jatah jawaban
+# (max_completion_tokens). Kalau jumlahnya melewati batas, hasilnya 413.
+# Daripada langsung menyerah, kecilkan permintaan lalu coba lagi.
+# ==================================================
+
+TOKEN_PER_GAMBAR = 2048
+
+
+def taksir_token(messages):
+    total = 0
+
+    for m in messages:
+        content = m.get("content")
+
+        if isinstance(content, str):
+            total += len(content) // 3 + 4
+
+        elif isinstance(content, list):
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+
+                if part.get("type") == "text":
+                    total += len(str(part.get("text") or "")) // 3 + 4
+
+                elif part.get("type") == "image_url":
+                    total += TOKEN_PER_GAMBAR
+
+    return total
+
+
+def ulangi_lebih_kecil(headers, data, pesan_error):
+    """Return jawaban (string) atau "" kalau tetap gagal."""
+
+    cocok = re.search(
+        r"Limit\s+(\d+)\D+?Requested\s+(\d+)",
+        pesan_error or "",
+        flags=re.IGNORECASE,
+    )
+
+    batas = int(cocok.group(1)) if cocok else None
+    diminta = int(cocok.group(2)) if cocok else None
+
+    maks_lama = int(data.get("max_completion_tokens") or MAX_OUTPUT_TOKENS)
+    pesan_asli = data["messages"]
+    terakhir = pesan_asli[-1]
+
+    rencana = []
+
+    # 1. Pesan sama, jatah jawaban dikecilkan sesuai batas dari Groq.
+    if batas and diminta:
+        sisa = batas - max(diminta - maks_lama, 0) - 150
+
+        if sisa >= 500:
+            rencana.append((pesan_asli, min(sisa, maks_lama)))
+
+    # 2. Tanpa riwayat percakapan.
+    tanpa_riwayat = [pesan_asli[0], terakhir]
+
+    # 3. Prompt sistem ringkas (tanpa aturan tambahan dan memory).
+    ringkas = [{"role": "system", "content": str(SYSTEM_PROMPT).strip()}, terakhir]
+
+    for varian in (tanpa_riwayat, ringkas):
+        if varian == pesan_asli:
+            continue
+
+        if batas:
+            maks = min(maks_lama, batas - taksir_token(varian) - 150)
+        else:
+            maks = 1200
+
+        if maks >= 400:
+            rencana.append((varian, maks))
+
+    for pesan, maks in rencana:
+        percobaan = dict(data)
+        percobaan["messages"] = pesan
+        percobaan["max_completion_tokens"] = maks
+
+        print(
+            f"[Groq] 413 -> ulangi dengan jatah jawaban {maks} token "
+            f"({len(pesan)} pesan)"
+        )
+
+        response = request_groq(headers, percobaan)
+
+        if response is None:
+            continue
+
+        if response.status_code != 200:
+            print(
+                f"[Groq] Ulang 413 -> {response.status_code}: "
+                f"{ambil_error_api(response)[:200]}"
+            )
+            continue
+
+        jawaban, _ = ambil_jawaban_dan_alasan(response)
+
+        if jawaban:
+            print("[Groq] OK setelah permintaan dikecilkan")
+            return jawaban
+
+    return ""
+
+
 # Penyebab gagal yang informatif tidak boleh ditimpa oleh error
 # umum dari model cadangan (mis. 404 model sudah mati).
 ERROR_PENTING = ("empty", "too_long", "rate_limit")
@@ -803,6 +910,12 @@ def panggil_model(messages, models):
 
         if status == 413:
             kode_error = "too_large"
+
+            jawaban = ulangi_lebih_kecil(headers, data, pesan_error)
+
+            if jawaban:
+                return jawaban, None
+
             continue
 
         if status in (400, 404, 422):
@@ -831,6 +944,12 @@ def pesan_error_pengguna(kode, ada_gambar):
         return "Koneksi ke server AI terputus. Coba kirim lagi sebentar lagi."
 
     if kode == "too_large":
+        if ada_gambar:
+            return (
+                "Gambar dan percakapan ini melebihi batas pemakaian AI per menit. "
+                "Tunggu sekitar 1 menit lalu kirim ulang, atau mulai chat baru."
+            )
+
         return (
             "Pesan atau percakapan ini terlalu panjang untuk diproses. "
             "Coba mulai chat baru atau kirim pesan yang lebih pendek."
