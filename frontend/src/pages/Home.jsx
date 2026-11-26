@@ -80,7 +80,8 @@ function Home() {
   const fileInputRef = useRef(null);
 
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Percakapan yang sedang menunggu jawaban AI (bisa lebih dari satu)
+  const [pendingIds, setPendingIds] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [currentChatId, setCurrentChatId] = useState(null);
 
@@ -91,6 +92,17 @@ function Home() {
   const historyLoadedRef = useRef(false);
   const historySaveTimeoutRef = useRef(null);
   const chatEndRef = useRef(null);
+  const historyRef = useRef([]);
+  const resumeJalanRef = useRef(false);
+
+  // Riwayat terbaru, dipakai untuk menyimpan saat aplikasi ditinggalkan
+  historyRef.current = history;
+
+  // "loading" hanya berlaku untuk percakapan yang sedang dibuka,
+  // jadi pindah ke chat baru tidak ikut menunggu jawaban chat lama.
+  const loading = pendingIds.includes(
+    String(activeHistoryIdRef.current)
+  );
 
   // ==========================================
   // USER KEY
@@ -970,6 +982,470 @@ function Home() {
   };
 
   // ==========================================
+  // PERMINTAAN KE AI (PER PERCAKAPAN)
+  // - Jawaban selalu masuk ke percakapan asalnya,
+  //   bukan ke percakapan yang sedang dibuka.
+  // - Kalau aplikasi ditinggalkan saat AI menjawab,
+  //   permintaan dikirim ulang begitu aplikasi aktif lagi.
+  // - Kalau aplikasi benar-benar tertutup, permintaan
+  //   yang belum terjawab dilanjutkan saat dibuka lagi.
+  // ==========================================
+  const tambahPending = (historyId) => {
+    const id = String(historyId);
+
+    setPendingIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+  };
+
+  const hapusPending = (historyId) => {
+    const id = String(historyId);
+
+    setPendingIds((prev) =>
+      prev.filter((item) => item !== id)
+    );
+  };
+
+  // Daftar permintaan yang belum terjawab, disimpan di perangkat
+  const kunciPendingDisk = () => {
+    try {
+      const savedUser = localStorage.getItem("user");
+
+      if (!savedUser) return null;
+
+      const userKey = getUserKey(JSON.parse(savedUser));
+
+      return userKey ? `${userKey}_pending` : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const bacaPendingDisk = () => {
+    const kunci = kunciPendingDisk();
+
+    if (!kunci) return [];
+
+    try {
+      const data = JSON.parse(
+        localStorage.getItem(kunci) || "[]"
+      );
+
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const tulisPendingDisk = (daftar) => {
+    const kunci = kunciPendingDisk();
+
+    if (!kunci) return;
+
+    try {
+      if (daftar.length > 0) {
+        localStorage.setItem(
+          kunci,
+          JSON.stringify(daftar)
+        );
+      } else {
+        localStorage.removeItem(kunci);
+      }
+    } catch (error) {
+      console.error(
+        "Gagal menyimpan permintaan tertunda:",
+        error
+      );
+    }
+  };
+
+  const simpanPendingDisk = (item) => {
+    tulisPendingDisk([
+      ...bacaPendingDisk().filter(
+        (x) =>
+          String(x?.historyId) !==
+          String(item.historyId)
+      ),
+      item,
+    ]);
+  };
+
+  const hapusPendingDisk = (historyId) => {
+    tulisPendingDisk(
+      bacaPendingDisk().filter(
+        (x) =>
+          String(x?.historyId) !==
+          String(historyId)
+      )
+    );
+  };
+
+  // Simpan riwayat ke perangkat saat itu juga
+  const simpanHistoryKeDisk = (list) => {
+    try {
+      const savedUser = localStorage.getItem("user");
+
+      if (!savedUser) return;
+
+      const userKey = getUserKey(JSON.parse(savedUser));
+
+      if (!userKey) return;
+
+      const siap = siapkanHistoryUntukDisimpan(
+        cleanHistory(list)
+      );
+
+      try {
+        localStorage.setItem(
+          userKey,
+          JSON.stringify(siap)
+        );
+      } catch {
+        try {
+          localStorage.setItem(
+            userKey,
+            JSON.stringify(
+              siapkanHistoryUntukDisimpan(siap, true)
+            )
+          );
+        } catch (error2) {
+          console.error(
+            "Gagal menyimpan history:",
+            error2
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Simpan history error:", error);
+    }
+  };
+
+  // Tunggu sampai aplikasi aktif lagi dan ada internet
+  const tungguAplikasiAktif = () =>
+    new Promise((resolve) => {
+      const siap = () =>
+        document.visibilityState === "visible" &&
+        navigator.onLine !== false;
+
+      if (siap()) {
+        setTimeout(resolve, 1500);
+        return;
+      }
+
+      const bersih = () => {
+        document.removeEventListener(
+          "visibilitychange",
+          cek
+        );
+        document.removeEventListener("resume", cek);
+        window.removeEventListener("online", cek);
+        window.removeEventListener("focus", cek);
+      };
+
+      const cek = () => {
+        if (!siap()) return;
+
+        bersih();
+        setTimeout(resolve, 800);
+      };
+
+      document.addEventListener(
+        "visibilitychange",
+        cek
+      );
+      document.addEventListener("resume", cek);
+      window.addEventListener("online", cek);
+      window.addEventListener("focus", cek);
+    });
+
+  // Kirim ke backend. Kalau gagal karena aplikasi sempat
+  // ditinggalkan atau internet putus, coba lagi otomatis.
+  const kirimKeBackend = async (payload) => {
+    let pernahTersembunyi =
+      document.visibilityState === "hidden";
+
+    const tandai = () => {
+      if (document.visibilityState === "hidden") {
+        pernahTersembunyi = true;
+      }
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      tandai
+    );
+
+    try {
+      let percobaan = 0;
+
+      while (true) {
+        try {
+          return await axios.post("/chat", payload);
+        } catch (err) {
+          const gagalJaringan =
+            !err.response &&
+            (err.request ||
+              err.code === "ERR_NETWORK" ||
+              /network/i.test(err.message || ""));
+
+          const bolehUlang =
+            gagalJaringan &&
+            (pernahTersembunyi ||
+              navigator.onLine === false);
+
+          if (bolehUlang && percobaan < 3) {
+            percobaan += 1;
+            await tungguAplikasiAktif();
+            continue;
+          }
+
+          throw err;
+        }
+      }
+    } finally {
+      document.removeEventListener(
+        "visibilitychange",
+        tandai
+      );
+    }
+  };
+
+  // Taruh pesan ke percakapan asalnya
+  const taruhPesan = (
+    historyId,
+    pesan,
+    chatIdBaru
+  ) => {
+    const punyaChatId =
+      chatIdBaru !== undefined &&
+      chatIdBaru !== null;
+
+    const masihDibuka =
+      String(activeHistoryIdRef.current) ===
+      String(historyId);
+
+    if (masihDibuka) {
+      if (punyaChatId) {
+        setCurrentChatId(Number(chatIdBaru));
+      }
+
+      setMessages((prev) => [...prev, pesan]);
+
+      requestAnimationFrame(() => {
+        chatEndRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      });
+
+      return;
+    }
+
+    // Percakapan sudah ditinggalkan (misal pindah ke chat baru):
+    // jawaban dimasukkan ke riwayat percakapan itu saja.
+    setHistory((prev) => {
+      const daftar = cleanHistory(prev);
+
+      const index = daftar.findIndex(
+        (chat) =>
+          String(chat.id) === String(historyId)
+      );
+
+      // Percakapan sudah dihapus pengguna
+      if (index < 0) return prev;
+
+      const lama = daftar[index];
+
+      const baru = {
+        ...lama,
+
+        chatId: punyaChatId
+          ? Number(chatIdBaru)
+          : lama.chatId,
+
+        messages: [...lama.messages, pesan],
+
+        updatedAt: Date.now(),
+      };
+
+      const salinan = [...daftar];
+
+      salinan[index] = baru;
+
+      return cleanHistory(salinan);
+    });
+  };
+
+  const buatIdPesan = (awalan) =>
+    `${awalan}_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
+  const jalankanPermintaan = async (
+    historyId,
+    payload
+  ) => {
+    tambahPending(historyId);
+
+    try {
+      const res = await kirimKeBackend(payload);
+
+      const jawabanAI = bersihkanJawabanAI(
+        res.data?.reply
+      );
+
+      taruhPesan(
+        historyId,
+        {
+          id: buatIdPesan("assistant"),
+          role: "assistant",
+          content:
+            jawabanAI ||
+            "AI tidak memberikan jawaban.",
+        },
+        res.data?.chat_id
+      );
+    } catch (err) {
+      console.error("Kirim pesan error:", err);
+
+      let errorMessage =
+        "Terjadi kesalahan saat menghubungi AI.";
+
+      if (err.response) {
+        const backendError =
+          err.response?.data?.error ||
+          err.response?.data?.message;
+
+        errorMessage =
+          backendError ||
+          `Backend mengembalikan error ${err.response.status}.`;
+      } else if (err.request) {
+        errorMessage =
+          "Backend tidak dapat dihubungi. Periksa koneksi internet atau status server.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      taruhPesan(
+        historyId,
+        {
+          id: buatIdPesan("error"),
+          role: "assistant",
+          content: errorMessage,
+        },
+        null
+      );
+    } finally {
+      hapusPendingDisk(historyId);
+      hapusPending(historyId);
+    }
+  };
+
+  // ==========================================
+  // SIMPAN SAAT APLIKASI DITINGGALKAN
+  // ==========================================
+  useEffect(() => {
+    const simpanSekarang = () => {
+      if (!historyLoadedRef.current) return;
+
+      simpanHistoryKeDisk(historyRef.current);
+    };
+
+    const saatBerubah = () => {
+      if (document.visibilityState === "hidden") {
+        simpanSekarang();
+      }
+    };
+
+    document.addEventListener(
+      "visibilitychange",
+      saatBerubah
+    );
+    document.addEventListener("pause", simpanSekarang);
+    window.addEventListener("pagehide", simpanSekarang);
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        saatBerubah
+      );
+      document.removeEventListener(
+        "pause",
+        simpanSekarang
+      );
+      window.removeEventListener(
+        "pagehide",
+        simpanSekarang
+      );
+    };
+  }, []);
+
+  // ==========================================
+  // LANJUTKAN PERMINTAAN YANG BELUM TERJAWAB
+  // (misal aplikasi sempat tertutup saat AI menjawab)
+  // ==========================================
+  useEffect(() => {
+    if (resumeJalanRef.current) return;
+
+    resumeJalanRef.current = true;
+
+    const daftar = bacaPendingDisk();
+
+    if (daftar.length === 0) return;
+
+    let riwayat = [];
+
+    try {
+      const savedUser = localStorage.getItem("user");
+      const userKey = savedUser
+        ? getUserKey(JSON.parse(savedUser))
+        : null;
+
+      if (userKey) {
+        riwayat = cleanHistory(
+          JSON.parse(
+            localStorage.getItem(userKey) || "[]"
+          )
+        );
+      }
+    } catch {
+      riwayat = [];
+    }
+
+    const lanjut = daftar.filter((item) => {
+      if (!item || !item.payload) return false;
+
+      const umur =
+        Date.now() - Number(item.startedAt || 0);
+
+      if (umur > 10 * 60 * 1000) return false;
+
+      const chat = riwayat.find(
+        (c) =>
+          String(c.id) === String(item.historyId)
+      );
+
+      if (!chat) return false;
+
+      const terakhir =
+        chat.messages[chat.messages.length - 1];
+
+      // Kalau pesan terakhir bukan dari pengguna,
+      // berarti sudah terjawab.
+      return terakhir?.role === "user";
+    });
+
+    tulisPendingDisk(lanjut);
+
+    lanjut.forEach((item) => {
+      jalankanPermintaan(
+        item.historyId,
+        item.payload
+      );
+    });
+  }, []);
+
+  // ==========================================
   // KIRIM PESAN
   // ==========================================
   const kirimPesan = async () => {
@@ -1037,8 +1513,20 @@ function Home() {
           .slice(2, 8)}`;
     }
 
+    // Percakapan tempat pesan ini dikirim. Jawaban AI
+    // akan kembali ke percakapan ini, apa pun yang
+    // dibuka pengguna selagi menunggu.
+    const historyId =
+      activeHistoryIdRef.current;
+
+    const chatIdAwal = currentChatId
+      ? Number(currentChatId)
+      : null;
+
+    let payload;
+
     try {
-      setLoading(true);
+      tambahPending(historyId);
 
       // Kompres dulu SEBELUM pesan ditampilkan.
       // thumbnail = untuk tampilan & riwayat
@@ -1085,95 +1573,51 @@ function Home() {
         hapusGambar();
       }
 
-      const res = await axios.post(
-        "/chat",
-        {
-          message: pesanText,
-          user_id: userId,
+      payload = {
+        message: pesanText,
+        user_id: userId,
+        chat_id: chatIdAwal,
+        image: imageBase64,
+      };
 
-          chat_id:
-            currentChatId
-              ? Number(currentChatId)
+      // Catat permintaan ini di perangkat supaya bisa
+      // dilanjutkan kalau aplikasi tertutup sebelum
+      // jawaban datang.
+      simpanPendingDisk({
+        historyId: String(historyId),
+        startedAt: Date.now(),
+        payload: {
+          ...payload,
+          image:
+            imageBase64 &&
+            imageBase64.length <= 700000
+              ? imageBase64
               : null,
-
-          image: imageBase64,
-        }
-      );
-
-      if (
-        res.data?.chat_id !== undefined &&
-        res.data?.chat_id !== null
-      ) {
-        setCurrentChatId(
-          Number(res.data.chat_id)
-        );
-      }
-
-      const jawabanAI =
-        bersihkanJawabanAI(
-          res.data?.reply
-        );
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant_${Date.now()}_${Math.random()
-            .toString(36)
-            .slice(2, 8)}`,
-
-          role: "assistant",
-
-          content:
-            jawabanAI ||
-            "AI tidak memberikan jawaban.",
         },
-      ]);
-
-      requestAnimationFrame(() => {
-        chatEndRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "end",
-        });
       });
     } catch (err) {
       console.error(
-        "Kirim pesan error:",
+        "Siapkan pesan error:",
         err
       );
 
-      let errorMessage =
-        "Terjadi kesalahan saat menghubungi AI.";
-
-      if (err.response) {
-        const backendError =
-          err.response?.data?.error ||
-          err.response?.data?.message;
-
-        errorMessage =
-          backendError ||
-          `Backend mengembalikan error ${err.response.status}.`;
-      } else if (err.request) {
-        errorMessage =
-          "Backend tidak dapat dihubungi. Periksa koneksi internet atau status server.";
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
+      hapusPending(historyId);
 
       setMessages((prev) => [
         ...prev,
         {
-          id: `error_${Date.now()}_${Math.random()
-            .toString(36)
-            .slice(2, 8)}`,
-
+          id: buatIdPesan("error"),
           role: "assistant",
-
-          content: errorMessage,
+          content:
+            err?.message ||
+            "Gagal menyiapkan pesan.",
         },
       ]);
-    } finally {
-      setLoading(false);
+
+      return;
     }
+
+    await jalankanPermintaan(historyId, payload);
   };
 
   // ==========================================

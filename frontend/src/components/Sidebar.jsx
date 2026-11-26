@@ -1260,58 +1260,159 @@ function Sidebar({
   // =====================================================
 
   const handleAbout = () => {
+    const chip = (teks) => `
+      <span style="
+        display:inline-block;
+        padding:6px 11px;
+        margin:3px;
+        border-radius:999px;
+        font-size:11.5px;
+        font-weight:600;
+        color:#BFEAFF;
+        background:rgba(0,194,255,.09);
+        border:1px solid rgba(0,194,255,.22);
+      ">${teks}</span>
+    `;
+
+    const baris = (label, nilai, garis) => `
+      <div style="
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        padding:12px 14px;
+        ${garis ? "border-bottom:1px solid rgba(255,255,255,.06);" : ""}
+      ">
+        <span style="
+          color:#6F8CA0;
+          font-size:12px;
+        ">${label}</span>
+
+        <span style="
+          color:#E1EEF5;
+          font-size:12.5px;
+          font-weight:700;
+        ">${nilai}</span>
+      </div>
+    `;
+
     Swal.fire({
-      title: "AI.Ind",
-
-      html: `
-        <div style="
-          line-height:1.8;
-          color:#A9C4D3;
-        ">
-
-          <strong style="
-            color:#00C2FF;
-            font-size:17px;
-          ">
-            AI.Ind
-          </strong>
-
-          <br>
-
-          Asisten AI buatan Indonesia
-
-          <br><br>
-
-          <span style="
-            color:#71899A;
-            font-size:13px;
-          ">
-            Teman cerdas untuk membantu
-            belajar, mencari ide,
-            pemrograman, dan berbagai
-            aktivitas lainnya.
-          </span>
-
-          <br><br>
-
-          <small style="
-            color:#536B7D;
-          ">
-            Versi 1.0.0
-          </small>
-
-        </div>
-      `,
-
-      icon: "info",
+      title: "",
+      width: 380,
 
       background: "#0B1D2A",
       color: "#fff",
 
-      confirmButtonColor:
-        "#00C2FF",
+      confirmButtonText: "Tutup",
+      confirmButtonColor: "#00C2FF",
 
-      reverseButtons: true,
+      html: `
+        <div style="
+          text-align:center;
+          padding:2px 2px 0;
+        ">
+
+          <div style="
+            position:relative;
+            width:76px;
+            height:76px;
+            margin:4px auto 18px;
+          ">
+            <div style="
+              position:absolute;
+              inset:-18px;
+              border-radius:50%;
+              background:rgba(0,194,255,.16);
+              filter:blur(22px);
+            "></div>
+
+            <img
+              src="/logo.svg"
+              alt="AI.Ind"
+              onerror="this.style.display='none'"
+              style="
+                position:relative;
+                width:100%;
+                height:100%;
+                object-fit:cover;
+                border-radius:23px;
+                border:1px solid rgba(0,194,255,.28);
+                box-shadow:0 14px 36px rgba(0,194,255,.2);
+              "
+            />
+          </div>
+
+          <div style="
+            display:flex;
+            align-items:flex-end;
+            justify-content:center;
+            font-size:34px;
+            line-height:1.1;
+            letter-spacing:-1.2px;
+          ">
+            <span style="font-weight:800;color:#F1F7FB;">AI</span>
+            <span style="
+              width:6px;
+              height:6px;
+              margin:0 3px 6px;
+              border-radius:50%;
+              background:#00C2FF;
+              box-shadow:0 0 10px rgba(0,194,255,.85);
+            "></span>
+            <span style="font-weight:300;color:#00C2FF;">Ind</span>
+          </div>
+
+          <div style="
+            margin-top:8px;
+            color:#CDE4ED;
+            font-size:14.5px;
+            font-weight:600;
+          ">
+            Asisten AI buatan Indonesia
+          </div>
+
+          <p style="
+            margin:10px 6px 0;
+            color:#8AA3B4;
+            font-size:13px;
+            line-height:1.7;
+          ">
+            Teman cerdas untuk membantu belajar, mencari ide,
+            pemrograman, dan berbagai aktivitas lainnya.
+          </p>
+
+          <div style="margin:16px 0 4px;">
+            ${chip("Belajar")}
+            ${chip("Cari ide")}
+            ${chip("Coding")}
+            ${chip("Analisis gambar")}
+            ${chip("Terjemahkan")}
+            ${chip("Buat video")}
+          </div>
+
+          <div style="
+            margin-top:16px;
+            text-align:left;
+            background:rgba(255,255,255,.035);
+            border:1px solid rgba(255,255,255,.07);
+            border-radius:15px;
+            overflow:hidden;
+          ">
+            ${baris("Versi", "1.0.0", true)}
+            ${baris("Bahasa", "Indonesia", false)}
+          </div>
+
+          <div style="
+            margin-top:14px;
+            color:#536B7D;
+            font-size:10.5px;
+            line-height:1.6;
+          ">
+            AI.Ind dapat membuat kesalahan.
+            Periksa kembali informasi penting.
+          </div>
+
+        </div>
+      `,
     });
   };
 
@@ -2135,6 +2236,204 @@ function Sidebar({
             none;
         }
 
+
+        /* ==================================================
+           TAMPILAN MODERN SIDEBAR
+        ================================================== */
+
+        @keyframes aiItemIn {
+          from { opacity: 0; transform: translateX(-6px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+
+        .ai-sidebar {
+          background:
+            radial-gradient(
+              ellipse 120% 38% at 0% 0%,
+              rgba(0,194,255,.11),
+              transparent 70%
+            ),
+            linear-gradient(
+              180deg,
+              #0A1B28 0%,
+              #07131D 100%
+            );
+          border-right: 1px solid rgba(0,194,255,.1);
+        }
+
+        .ai-brand-logo {
+          border: 1px solid rgba(0,194,255,.24);
+          box-shadow: 0 8px 26px rgba(0,194,255,.2);
+        }
+
+        .ai-brand-name span {
+          font-weight: 300;
+        }
+
+        .ai-brand-sub {
+          color: #8AA3B4;
+        }
+
+        .ai-new-chat {
+          border: 1px solid rgba(0,194,255,.35);
+          border-radius: 15px;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(0,194,255,.28),
+              rgba(0,143,232,.14)
+            );
+          color: #E8FAFF;
+          box-shadow:
+            0 8px 22px rgba(0,194,255,.14),
+            inset 0 1px 0 rgba(255,255,255,.08);
+        }
+
+        .ai-new-chat:hover {
+          background:
+            linear-gradient(
+              135deg,
+              rgba(0,194,255,.38),
+              rgba(0,143,232,.2)
+            );
+          border-color: rgba(0,194,255,.55);
+          box-shadow:
+            0 10px 26px rgba(0,194,255,.2),
+            inset 0 1px 0 rgba(255,255,255,.1);
+        }
+
+        .ai-new-chat-icon {
+          border-radius: 10px;
+          background: linear-gradient(135deg, #2BD6FF, #00A8E8);
+          box-shadow: 0 4px 12px rgba(0,194,255,.4);
+        }
+
+        .ai-history-title {
+          color: #7D97A9;
+        }
+
+        .ai-history-count {
+          background: rgba(0,194,255,.1);
+          color: #7FDCFF;
+        }
+
+        .ai-empty-icon {
+          background: rgba(0,194,255,.1);
+          border: 1px solid rgba(0,194,255,.16);
+          box-shadow: 0 6px 20px rgba(0,194,255,.1);
+        }
+
+        .ai-empty p {
+          color: #8AA3B4;
+        }
+
+        .ai-empty small {
+          color: #5D7B8E;
+        }
+
+        .ai-history-item {
+          border-radius: 14px;
+          background: rgba(255,255,255,.02);
+          animation: aiItemIn .3s ease both;
+        }
+
+        .ai-history-item:hover {
+          background: rgba(0,194,255,.07);
+          border-color: rgba(0,194,255,.2);
+        }
+
+        .ai-history-icon {
+          border-radius: 10px;
+          background: rgba(0,194,255,.09);
+          color: #00C2FF;
+        }
+
+        .ai-history-name {
+          color: #E1EEF5;
+          font-weight: 600;
+        }
+
+        .ai-history-meta {
+          color: #6D889A;
+        }
+
+        .ai-delete:hover {
+          background: rgba(255,90,90,.14);
+          color: #FF7B7B;
+        }
+
+        .ai-sidebar-bottom {
+          border-top: 1px solid rgba(0,194,255,.1);
+          background:
+            linear-gradient(
+              180deg,
+              rgba(255,255,255,.015),
+              rgba(0,0,0,.14)
+            );
+        }
+
+        .ai-user-card {
+          border: 1px solid rgba(0,194,255,.18);
+          border-radius: 16px;
+          background:
+            linear-gradient(
+              135deg,
+              rgba(0,194,255,.1),
+              rgba(255,255,255,.03)
+            );
+        }
+
+        .ai-user-card:hover {
+          border-color: rgba(0,194,255,.4);
+          background:
+            linear-gradient(
+              135deg,
+              rgba(0,194,255,.16),
+              rgba(255,255,255,.04)
+            );
+        }
+
+        .ai-user-icon {
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+          padding: 9px;
+          border-radius: 50%;
+          color: #00C2FF;
+          background: rgba(0,194,255,.12);
+          border: 1px solid rgba(0,194,255,.25);
+        }
+
+        .ai-user-name {
+          color: #F1FAFF;
+        }
+
+        .ai-user-email {
+          color: #8AA3B4;
+        }
+
+        .ai-profile-hint {
+          color: #5F8EA5;
+        }
+
+        .ai-menu {
+          border-radius: 12px;
+          color: #A9C4D3;
+        }
+
+        .ai-menu:hover {
+          background: rgba(0,194,255,.08);
+          color: #DFF7FF;
+        }
+
+        .ai-submenu-item:hover {
+          background: rgba(0,194,255,.08);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ai-history-item { animation: none; }
+        }
+
         @media (max-width: 767px) {
 
           .ai-sidebar {
@@ -2427,6 +2726,28 @@ function Sidebar({
 
         .ai-pw-eye:hover {
           color: #00C2FF;
+        }
+
+        /* ---------- Modern: cari riwayat & grup ---------- */
+        .ai-search-input {
+          height: 38px;
+          border-radius: 12px;
+          border: 1px solid rgba(0,194,255,.14);
+          background: rgba(255,255,255,.04);
+        }
+
+        .ai-search-input:focus {
+          border-color: rgba(0,194,255,.5);
+          background: rgba(0,194,255,.06);
+          box-shadow: 0 0 0 3px rgba(0,194,255,.1);
+        }
+
+        .ai-history-group-label {
+          color: #6F8CA0;
+        }
+
+        .ai-history-clear {
+          color: #FF8A8A;
         }
       `}</style>
 
