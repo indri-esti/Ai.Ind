@@ -699,10 +699,62 @@ function BlokKode({ bahasa, isi, semua }) {
   );
 }
 
+// Pratinjau gambar layar penuh (ketuk gambar di chat untuk membukanya)
+function PratinjauGambar({ src, onTutup }) {
+  useEffect(() => {
+    const lama = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const esc = (e) => {
+      if (e.key === "Escape") onTutup();
+    };
+    window.addEventListener("keydown", esc);
+
+    return () => {
+      document.body.style.overflow = lama;
+      window.removeEventListener("keydown", esc);
+    };
+  }, [onTutup]);
+
+  return createPortal(
+    <div
+      className="gp-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gambar"
+      onClick={(e) => {
+        e.stopPropagation();
+        onTutup();
+      }}
+    >
+      <button
+        type="button"
+        className="gp-close"
+        onClick={(e) => {
+          e.stopPropagation();
+          onTutup();
+        }}
+        aria-label="Tutup gambar"
+      >
+        <FiX size={20} />
+      </button>
+
+      <img
+        className="gp-img"
+        src={src}
+        alt="Gambar"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>,
+    document.body
+  );
+}
+
 function ChatMessage({ msg }) {
   const [copied, setCopied] = useState(false);
 
   const [imageError, setImageError] = useState(false);
+  const [gambarTerbuka, setGambarTerbuka] = useState(false);
 
   const [speaking, setSpeaking] = useState(false);
   const [memuat, setMemuat] = useState(false);
@@ -1477,6 +1529,73 @@ function ChatMessage({ msg }) {
             .hk-overlay, .hk-sheet { animation-duration: 0.01ms !important; }
           }
 
+          .cm-image-wrap.klik { cursor: zoom-in; }
+
+          .cm-image-wrap.klik:focus-visible {
+            outline: 2px solid #04111a;
+            outline-offset: 2px;
+          }
+
+          /* ---------- Pratinjau gambar ---------- */
+          @keyframes gpIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+
+          @keyframes gpZoom {
+            from { opacity: 0; transform: scale(0.94); }
+            to { opacity: 1; transform: scale(1); }
+          }
+
+          .gp-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(3, 10, 18, 0.88);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            cursor: zoom-out;
+            animation: gpIn 0.2s ease both;
+          }
+
+          .gp-img {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+            cursor: default;
+            animation: gpZoom 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .gp-close {
+            position: absolute;
+            top: calc(env(safe-area-inset-top, 0px) + 14px);
+            right: 14px;
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+          }
+
+          .gp-close:hover { background: rgba(255, 255, 255, 0.18); }
+
+          @media (prefers-reduced-motion: reduce) {
+            .gp-overlay, .gp-img { animation-duration: 0.01ms !important; }
+          }
+
           /* ---------- Tombol aksi ---------- */
           .cm-actions {
             display: flex;
@@ -1571,7 +1690,19 @@ function ChatMessage({ msg }) {
             ========================== */}
 
             {hasImage && (
-              <div className="cm-image-wrap">
+              <div
+                className="cm-image-wrap klik"
+                role="button"
+                tabIndex={0}
+                aria-label="Buka gambar"
+                onClick={() => setGambarTerbuka(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setGambarTerbuka(true);
+                  }
+                }}
+              >
                 <img
                   className="cm-image"
                   src={msg.image}
@@ -1579,6 +1710,13 @@ function ChatMessage({ msg }) {
                   onError={() => setImageError(true)}
                 />
               </div>
+            )}
+
+            {gambarTerbuka && hasImage && (
+              <PratinjauGambar
+                src={msg.image}
+                onTutup={() => setGambarTerbuka(false)}
+              />
             )}
 
             {/* =========================

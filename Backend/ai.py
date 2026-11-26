@@ -33,7 +33,7 @@ except Exception:
 
 # Penanda versi: kalau tulisan ini tidak muncul di log hosting,
 # berarti server masih menjalankan ai.py yang lama.
-VERSI = "2026-11-02-v7"
+VERSI = "2026-11-26-v8"
 print(f"[AI.Ind] ai.py {VERSI} dimuat")
 
 
@@ -73,9 +73,10 @@ FALLBACK_TEXT_MODELS = [
 # Catatan: llama-4-scout (17 Jul 2026), llama-4-maverick (9 Mar 2026) dan
 # qwen3.6-27b (14 Sep 2026) sudah dimatikan Groq untuk akun gratis.
 # Model vision yang masih aktif: qwen/qwen3.8-27b.
+# qwen3.6-27b dibuang dari daftar ini: model yang sudah mati selalu gagal
+# (404) dan error-nya menimpa penyebab gagal yang sebenarnya.
 FALLBACK_VISION_MODELS = [
     "qwen/qwen3.8-27b",
-    "qwen/qwen3.6-27b",
 ]
 
 WIB = timezone(timedelta(hours=7))
@@ -660,6 +661,46 @@ def daftar_model(utama, cadangan):
 
 
 # ==================================================
+# BACA JAWABAN + ALASAN BERHENTI
+# ==================================================
+
+def ambil_jawaban_dan_alasan(response):
+    """Return (jawaban_bersih, finish_reason)."""
+    try:
+        isi = response.json()
+    except Exception as e:
+        print("[Groq] Parse error:", repr(e))
+        return "", None
+
+    try:
+        jawaban = bersihkan_jawaban(ekstrak_jawaban_groq(isi))
+    except Exception as e:
+        print("[Groq] Parse error:", repr(e))
+        jawaban = ""
+
+    alasan = None
+
+    try:
+        alasan = isi["choices"][0].get("finish_reason")
+    except Exception:
+        alasan = None
+
+    return jawaban, alasan
+
+
+# Penyebab gagal yang informatif tidak boleh ditimpa oleh error
+# umum dari model cadangan (mis. 404 model sudah mati).
+ERROR_PENTING = ("empty", "too_long", "rate_limit")
+
+
+def pilih_error(lama, baru):
+    if lama in ERROR_PENTING and baru in ("bad_request", "server", "network"):
+        return lama
+
+    return baru
+
+
+# ==================================================
 # PANGGIL MODEL (DENGAN FALLBACK)
 # ==================================================
 
@@ -695,7 +736,7 @@ def panggil_model(messages, models):
         response = request_groq(headers, data)
 
         if response is None:
-            kode_error = "network"
+            kode_error = pilih_error(kode_error, "network")
             continue
 
         status = response.status_code
@@ -709,24 +750,43 @@ def panggil_model(messages, models):
             response = request_groq(headers, data)
 
             if response is None:
-                kode_error = "network"
+                kode_error = pilih_error(kode_error, "network")
                 continue
 
             status = response.status_code
 
         if status == 200:
-            try:
-                jawaban = bersihkan_jawaban(ekstrak_jawaban_groq(response.json()))
-            except Exception as e:
-                print("[Groq] Parse error:", repr(e))
-                jawaban = ""
+            jawaban, alasan = ambil_jawaban_dan_alasan(response)
+
+            # Jawaban kosong karena proses berpikir menghabiskan semua token:
+            # ulangi sekali dengan usaha berpikir "low" supaya masih ada
+            # token tersisa untuk jawaban.
+            if (
+                not jawaban
+                and alasan == "length"
+                and data.get("reasoning_effort") not in (None, "low")
+            ):
+                print(
+                    f"[Groq] {model} kehabisan token saat berpikir, "
+                    "ulangi dengan reasoning low"
+                )
+
+                data["reasoning_effort"] = "low"
+
+                ulang = request_groq(headers, data)
+
+                if ulang is not None and ulang.status_code == 200:
+                    jawaban, alasan = ambil_jawaban_dan_alasan(ulang)
 
             if jawaban:
                 print(f"[Groq] OK dengan {model}")
                 return jawaban, None
 
-            print(f"[Groq] Jawaban kosong dari {model}, coba model lain")
-            kode_error = "empty"
+            print(
+                f"[Groq] Jawaban kosong dari {model} "
+                f"(finish_reason={alasan}), coba model lain"
+            )
+            kode_error = "too_long" if alasan == "length" else "empty"
             continue
 
         pesan_error = ambil_error_api(response)
@@ -746,10 +806,10 @@ def panggil_model(messages, models):
             continue
 
         if status in (400, 404, 422):
-            kode_error = "bad_request"
+            kode_error = pilih_error(kode_error, "bad_request")
             continue
 
-        kode_error = "server"
+        kode_error = pilih_error(kode_error, "server")
 
     return "", kode_error
 
@@ -774,6 +834,13 @@ def pesan_error_pengguna(kode, ada_gambar):
         return (
             "Pesan atau percakapan ini terlalu panjang untuk diproses. "
             "Coba mulai chat baru atau kirim pesan yang lebih pendek."
+        )
+
+    if kode == "too_long":
+        return (
+            "Jawabannya terlalu panjang untuk diselesaikan sekaligus. Coba minta "
+            "lebih ringkas atau per bagian, misalnya HTML-nya dulu, lalu CSS dan "
+            "JS-nya."
         )
 
     if ada_gambar and kode in ("bad_request", "empty"):
