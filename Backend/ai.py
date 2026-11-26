@@ -33,7 +33,7 @@ except Exception:
 
 # Penanda versi: kalau tulisan ini tidak muncul di log hosting,
 # berarti server masih menjalankan ai.py yang lama.
-VERSI = "2026-11-26-v9"
+VERSI = "2026-11-26-v10"
 print(f"[AI.Ind] ai.py {VERSI} dimuat")
 
 
@@ -50,6 +50,17 @@ MAX_RETRIES = 2
 MAX_RETRY_WAIT = 12
 REQUEST_TIMEOUT = 90
 MAX_MEMORY_CONTEXT_CHARS = 3000
+
+# Jawaban yang terpotong karena batas token (finish_reason == "length")
+# otomatis disambung lagi, maksimal sebanyak ini.
+MAX_LANJUTAN = 3
+# Bagian akhir jawaban yang dikirim ulang sebagai konteks saat menyambung.
+MAX_KONTEKS_LANJUT_CHARS = 6000
+# Saat menyambung, kuota token per menit biasanya baru terpakai oleh
+# request pertama, jadi boleh menunggu lebih lama dari biasanya.
+MAX_TUNGGU_LANJUT = 30
+# Perkiraan batas token per menit (prompt + jatah jawaban).
+BATAS_TOKEN_PERKIRAAN = 8000
 
 # Batas Groq untuk gambar base64 = 4MB. Sisakan margin.
 MAX_IMAGE_B64_CHARS = 3_900_000
@@ -153,7 +164,9 @@ def hapus_markdown_ringan(teks):
     return "".join(hasil)
 
 
-def bersihkan_jawaban(teks):
+def bersihkan_jawaban(teks, rapi=True):
+    """rapi=False dipakai untuk sambungan jawaban: spasi di awal baris
+    (indentasi kode) dipertahankan."""
     if teks is None:
         return ""
 
@@ -185,6 +198,9 @@ def bersihkan_jawaban(teks):
         teks = hapus_markdown_ringan(teks)
 
     teks = re.sub(r"\n{3,}", "\n\n", teks)
+
+    if not rapi:
+        return teks.strip("\n")
 
     return teks.strip()
 
@@ -491,7 +507,7 @@ def ambil_waktu_retry(response):
 # REQUEST GROQ
 # ==================================================
 
-def request_groq(headers, data):
+def request_groq(headers, data, maks_tunggu=MAX_RETRY_WAIT):
     last_response = None
 
     for attempt in range(MAX_RETRIES):
@@ -517,7 +533,7 @@ def request_groq(headers, data):
                 tunggu = ambil_waktu_retry(response)
 
                 # Tunggu lama (mis. limit harian) -> langsung ganti model.
-                if tunggu > MAX_RETRY_WAIT:
+                if tunggu > maks_tunggu:
                     return response
 
                 time.sleep(max(tunggu, 2))
@@ -664,7 +680,7 @@ def daftar_model(utama, cadangan):
 # BACA JAWABAN + ALASAN BERHENTI
 # ==================================================
 
-def ambil_jawaban_dan_alasan(response):
+def ambil_jawaban_dan_alasan(response, rapi=True):
     """Return (jawaban_bersih, finish_reason)."""
     try:
         isi = response.json()
@@ -673,7 +689,7 @@ def ambil_jawaban_dan_alasan(response):
         return "", None
 
     try:
-        jawaban = bersihkan_jawaban(ekstrak_jawaban_groq(isi))
+        jawaban = bersihkan_jawaban(ekstrak_jawaban_groq(isi), rapi=rapi)
     except Exception as e:
         print("[Groq] Parse error:", repr(e))
         jawaban = ""
@@ -686,6 +702,130 @@ def ambil_jawaban_dan_alasan(response):
         alasan = None
 
     return jawaban, alasan
+
+
+# ==================================================
+# SAMBUNG JAWABAN YANG TERPOTONG
+# Kalau model berhenti karena kehabisan token (finish_reason "length"),
+# jawaban (terutama kode) berhenti di tengah baris. Di sini jawaban
+# disambung otomatis sampai selesai, lalu blok kode ditutup rapi.
+# ==================================================
+
+INSTRUKSI_LANJUT = (
+    "Jawabanmu di atas terpotong karena batas panjang. Lanjutkan LANGSUNG "
+    "dari baris berikutnya, persis di titik berhenti. Jangan mengulang "
+    "bagian yang sudah ditulis, jangan memberi pembuka, penutup, atau "
+    "penjelasan baru. Kalau terpotong di dalam blok kode, teruskan kodenya "
+    "TANPA membuka blok ``` baru dan tetap pakai indentasi yang sama. "
+    "Tutup blok kode dengan ``` hanya setelah kodenya benar-benar selesai."
+)
+
+CATATAN_TERPOTONG = (
+    "\n\n(Jawaban masih terpotong karena batas panjang. "
+    "Ketik \"lanjut\" untuk meneruskan.)"
+)
+
+FENCE_RE = re.compile(r"^[ \t]*```", re.MULTILINE)
+FENCE_BUKA_RE = re.compile(r"^[ \t]*```[\w+#.-]*[ \t]*$")
+
+
+def di_dalam_blok_kode(teks):
+    return len(FENCE_RE.findall(teks)) % 2 == 1
+
+
+def potong_ke_baris_utuh(teks):
+    """Buang baris terakhir yang kemungkinan setengah jadi."""
+    i = teks.rfind("\n")
+
+    if i < 0:
+        return teks
+
+    return teks[: i + 1]
+
+
+def gabung_sambungan(awal, lanjutan):
+    # Model kadang membuka blok ```bahasa baru padahal kodenya masih berjalan.
+    if di_dalam_blok_kode(awal):
+        baris = lanjutan.split("\n", 1)
+
+        if FENCE_BUKA_RE.match(baris[0]):
+            lanjutan = baris[1] if len(baris) > 1 else ""
+
+    if awal and not awal.endswith("\n"):
+        awal += "\n"
+
+    return awal + lanjutan
+
+
+def tutup_potongan(teks):
+    """Pastikan blok kode tidak menggantung dan beri tahu pengguna."""
+    teks = teks.rstrip()
+
+    if di_dalam_blok_kode(teks):
+        teks += "\n```"
+
+    return teks + CATATAN_TERPOTONG
+
+
+def lengkapi_jawaban(headers, data, jawaban, alasan):
+    """Kalau jawaban terpotong (alasan == "length"), sambung sampai selesai."""
+    if alasan != "length" or not jawaban:
+        return jawaban
+
+    pesan_sistem = data["messages"][0]
+    pertanyaan = ekstrak_teks_content(data["messages"][-1].get("content"))
+
+    hasil = jawaban
+
+    for ke in range(1, MAX_LANJUTAN + 1):
+        hasil = potong_ke_baris_utuh(hasil)
+
+        konteks = hasil
+        if len(konteks) > MAX_KONTEKS_LANJUT_CHARS:
+            konteks = konteks[-MAX_KONTEKS_LANJUT_CHARS:]
+
+        pesan = [
+            pesan_sistem,
+            {"role": "user", "content": pertanyaan},
+            {"role": "assistant", "content": konteks},
+            {"role": "user", "content": INSTRUKSI_LANJUT},
+        ]
+
+        maks = min(MAX_OUTPUT_TOKENS, BATAS_TOKEN_PERKIRAAN - taksir_token(pesan) - 300)
+
+        if maks < 500:
+            print("[Groq] Sambung dibatalkan: sisa kuota token terlalu kecil")
+            break
+
+        percobaan = dict(data)
+        percobaan["messages"] = pesan
+        percobaan["max_completion_tokens"] = maks
+
+        if "reasoning_effort" in percobaan:
+            percobaan["reasoning_effort"] = "low"
+
+        print(f"[Groq] Jawaban terpotong, sambung {ke}/{MAX_LANJUTAN} ({maks} token)")
+
+        response = request_groq(headers, percobaan, maks_tunggu=MAX_TUNGGU_LANJUT)
+
+        if response is None or response.status_code != 200:
+            kode = "tanpa respon" if response is None else response.status_code
+            print(f"[Groq] Sambung gagal ({kode})")
+            break
+
+        lanjutan, alasan_baru = ambil_jawaban_dan_alasan(response, rapi=False)
+
+        if not lanjutan:
+            print("[Groq] Sambung kosong")
+            break
+
+        hasil = gabung_sambungan(hasil, lanjutan)
+
+        if alasan_baru != "length":
+            print("[Groq] Jawaban selesai setelah disambung")
+            return hasil.strip()
+
+    return tutup_potongan(hasil)
 
 
 # ==================================================
@@ -786,11 +926,11 @@ def ulangi_lebih_kecil(headers, data, pesan_error):
             )
             continue
 
-        jawaban, _ = ambil_jawaban_dan_alasan(response)
+        jawaban, alasan = ambil_jawaban_dan_alasan(response)
 
         if jawaban:
             print("[Groq] OK setelah permintaan dikecilkan")
-            return jawaban
+            return lengkapi_jawaban(headers, percobaan, jawaban, alasan)
 
     return ""
 
@@ -886,7 +1026,8 @@ def panggil_model(messages, models):
                     jawaban, alasan = ambil_jawaban_dan_alasan(ulang)
 
             if jawaban:
-                print(f"[Groq] OK dengan {model}")
+                print(f"[Groq] OK dengan {model} (finish_reason={alasan})")
+                jawaban = lengkapi_jawaban(headers, data, jawaban, alasan)
                 return jawaban, None
 
             print(
