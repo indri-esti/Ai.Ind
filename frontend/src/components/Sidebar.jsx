@@ -874,6 +874,21 @@ function Sidebar({
             Ubah Password di bawah.
           </div>
 
+          <div
+            id="ai-forgot-link"
+            style="
+              margin-top:10px;
+              text-align:center;
+              color:#00C2FF;
+              font-size:11px;
+              font-weight:700;
+              cursor:pointer;
+              text-decoration:underline;
+            "
+          >
+            Lupa password lama? Reset lewat email
+          </div>
+
         </div>
       `,
 
@@ -902,6 +917,17 @@ function Sidebar({
               <rect x="4" y="10" width="16" height="11" rx="2"></rect>
               <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
             </svg>`;
+        }
+
+        const forgotLink = document.getElementById(
+          "ai-forgot-link"
+        );
+
+        if (forgotLink) {
+          forgotLink.addEventListener("click", () => {
+            Swal.close();
+            handleForgotPassword();
+          });
         }
       },
     }).then((result) => {
@@ -1132,6 +1158,288 @@ function Sidebar({
         Swal.fire({
           icon: "success",
           title: "Password berhasil diubah",
+          text: "Gunakan password baru saat login berikutnya.",
+
+          background: "#0B1D2A",
+          color: "#fff",
+
+          confirmButtonText: "OK",
+          confirmButtonColor: "#00C2FF",
+        });
+      }
+    });
+  };
+
+  // =====================================================
+  // LUPA PASSWORD (reset tanpa password lama, pakai kode
+  // yang dikirim ke email) — Langkah 1: minta kode
+  // =====================================================
+
+  const handleForgotPassword = () => {
+    if (!user?.id) {
+      navigate("/login");
+      return;
+    }
+
+    const email = user.email || "";
+
+    const esc = (text) =>
+      String(text)
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    Swal.fire({
+      title: "Lupa Password",
+      text:
+        `Kode reset akan dikirim ke ${email}. ` +
+        "Masukkan kode itu di langkah berikutnya untuk membuat password baru.",
+
+      background: "#0B1D2A",
+      color: "#fff",
+      width: 380,
+
+      showCancelButton: true,
+      confirmButtonText: "Kirim Kode",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#00C2FF",
+      cancelButtonColor: "#334155",
+      reverseButtons: true,
+
+      allowOutsideClick: () => !Swal.isLoading(),
+      showLoaderOnConfirm: true,
+
+      preConfirm: async () => {
+        try {
+          const res = await axios.post(
+            "/forgot-password",
+            { email }
+          );
+
+          if (res.data?.success === false) {
+            Swal.showValidationMessage(
+              esc(
+                res.data?.message ||
+                  "Gagal mengirim kode."
+              )
+            );
+            return false;
+          }
+
+          return true;
+        } catch (err) {
+          const message =
+            err?.response?.data?.message ||
+            (err?.request
+              ? "Server tidak dapat dihubungi. Periksa koneksi internet."
+              : "Gagal mengirim kode. Coba lagi.");
+
+          Swal.showValidationMessage(esc(message));
+          return false;
+        }
+      },
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        handleResetPasswordDenganKode(email);
+      }
+    });
+  };
+
+  // =====================================================
+  // LUPA PASSWORD — Langkah 2: masukkan kode + password baru
+  // =====================================================
+
+  const handleResetPasswordDenganKode = (email) => {
+    const EYE =
+      `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+
+    const EYE_OFF =
+      `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+
+    const esc = (text) =>
+      String(text)
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    const fieldPw = (id, label, placeholder, autocomplete) => `
+      <label class="ai-pw-label" for="${id}">
+        ${label}
+      </label>
+
+      <div class="ai-pw-wrap">
+        <input
+          id="${id}"
+          type="password"
+          class="ai-pw-input"
+          placeholder="${placeholder}"
+          autocomplete="${autocomplete}"
+        />
+
+        <button
+          type="button"
+          class="ai-pw-eye"
+          data-target="${id}"
+          aria-label="Tampilkan password"
+        >
+          ${EYE_OFF}
+        </button>
+      </div>
+    `;
+
+    Swal.fire({
+      title: "Masukkan Kode",
+
+      background: "#0B1D2A",
+      color: "#fff",
+      width: 380,
+
+      html: `
+        <div class="ai-pw-form">
+          <label class="ai-pw-label" for="ai-reset-code">
+            Kode dari email
+          </label>
+
+          <input
+            id="ai-reset-code"
+            type="text"
+            inputmode="numeric"
+            maxlength="6"
+            class="ai-pw-input"
+            placeholder="6 digit kode"
+            autocomplete="one-time-code"
+            style="letter-spacing:4px;text-align:center;"
+          />
+
+          ${fieldPw(
+            "ai-reset-new",
+            "Password baru",
+            "Minimal 6 karakter",
+            "new-password"
+          )}
+
+          ${fieldPw(
+            "ai-reset-confirm",
+            "Ulangi password baru",
+            "Ketik ulang password baru",
+            "new-password"
+          )}
+        </div>
+      `,
+
+      focusConfirm: false,
+
+      showCancelButton: true,
+      confirmButtonText: "Reset Password",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#00C2FF",
+      cancelButtonColor: "#334155",
+      reverseButtons: true,
+
+      allowOutsideClick: () => !Swal.isLoading(),
+
+      didOpen: () => {
+        document
+          .querySelectorAll(".ai-pw-eye")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const input = document.getElementById(
+                button.dataset.target
+              );
+
+              if (!input) return;
+
+              const show = input.type === "password";
+
+              input.type = show ? "text" : "password";
+
+              button.innerHTML = show ? EYE : EYE_OFF;
+
+              button.setAttribute(
+                "aria-label",
+                show
+                  ? "Sembunyikan password"
+                  : "Tampilkan password"
+              );
+            });
+          });
+
+        const first = document.getElementById(
+          "ai-reset-code"
+        );
+
+        if (first) first.focus();
+      },
+
+      preConfirm: async () => {
+        const code =
+          document.getElementById("ai-reset-code")
+            ?.value || "";
+
+        const newPw =
+          document.getElementById("ai-reset-new")
+            ?.value || "";
+
+        const confirmPw =
+          document.getElementById("ai-reset-confirm")
+            ?.value || "";
+
+        if (!code || !newPw || !confirmPw) {
+          Swal.showValidationMessage(
+            "Semua kolom wajib diisi."
+          );
+          return false;
+        }
+
+        if (newPw.length < 6) {
+          Swal.showValidationMessage(
+            "Password baru minimal 6 karakter."
+          );
+          return false;
+        }
+
+        if (newPw !== confirmPw) {
+          Swal.showValidationMessage(
+            "Konfirmasi password tidak sama."
+          );
+          return false;
+        }
+
+        try {
+          const res = await axios.post(
+            "/reset-password",
+            {
+              email,
+              code,
+              new_password: newPw,
+            }
+          );
+
+          if (res.data?.success === false) {
+            Swal.showValidationMessage(
+              esc(
+                res.data?.message ||
+                  "Gagal mereset password."
+              )
+            );
+            return false;
+          }
+
+          return true;
+        } catch (err) {
+          const message =
+            err?.response?.data?.message ||
+            (err?.request
+              ? "Server tidak dapat dihubungi. Periksa koneksi internet."
+              : "Gagal mereset password. Coba lagi.");
+
+          Swal.showValidationMessage(esc(message));
+          return false;
+        }
+      },
+    }).then((result) => {
+      if (result.isConfirmed && result.value) {
+        Swal.fire({
+          icon: "success",
+          title: "Password berhasil direset",
           text: "Gunakan password baru saat login berikutnya.",
 
           background: "#0B1D2A",

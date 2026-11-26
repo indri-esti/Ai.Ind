@@ -1,9 +1,31 @@
+import os
+import random
+import smtplib
+import ssl
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import get_connection
 
 auth = Blueprint("auth", __name__)
+
+
+# ==================================================
+# KONFIGURASI EMAIL (untuk fitur lupa password)
+# Isi EMAIL_ADDRESS & EMAIL_APP_PASSWORD di Environment
+# Variables hosting atau file .env. EMAIL_APP_PASSWORD
+# BUKAN password Gmail biasa, tapi App Password 16 digit
+# (perlu aktifkan 2-Step Verification dulu di akun Gmail,
+# lalu buat App Password di myaccount.google.com/apppasswords).
+# ==================================================
+
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS", "")
+EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD", "")
+
+KODE_RESET_MENIT_BERLAKU = 10
 
 
 # ==================================================
@@ -306,6 +328,206 @@ def change_password():
     return jsonify({
         "success": True,
         "message": "Password berhasil diubah."
+    })
+
+
+# ==================================================
+# LUPA PASSWORD (reset tanpa perlu password lama)
+# ==================================================
+
+def _siapkan_tabel_reset(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reset_codes (
+            email TEXT PRIMARY KEY,
+            code TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+def _kirim_kode_email(email, kode):
+    """Return True kalau terkirim, False kalau gagal (lihat log server)."""
+
+    if not EMAIL_ADDRESS or not EMAIL_APP_PASSWORD:
+        print(
+            "[AI.Ind] EMAIL_ADDRESS/EMAIL_APP_PASSWORD belum diisi "
+            "di Environment Variables."
+        )
+        return False
+
+    pesan = MIMEText(
+        f"Kode reset password AI.Ind kamu: {kode}\n\n"
+        f"Kode ini berlaku {KODE_RESET_MENIT_BERLAKU} menit. "
+        "Jangan bagikan kode ini ke siapa pun.\n\n"
+        "Kalau kamu tidak merasa meminta reset password, abaikan email ini."
+    )
+
+    pesan["Subject"] = "Kode Reset Password - AI.Ind"
+    pesan["From"] = EMAIL_ADDRESS
+    pesan["To"] = email
+
+    try:
+        konteks = ssl.create_default_context()
+
+        with smtplib.SMTP_SSL(
+            "smtp.gmail.com", 465, context=konteks
+        ) as server:
+            server.login(EMAIL_ADDRESS, EMAIL_APP_PASSWORD)
+            server.sendmail(EMAIL_ADDRESS, email, pesan.as_string())
+
+        return True
+
+    except Exception as e:
+        print("[AI.Ind] Gagal kirim email reset:", repr(e))
+        return False
+
+
+@auth.route("/forgot-password", methods=["POST"])
+def forgot_password():
+
+    data = request.get_json() or {}
+    email = data.get("email", "").strip().lower()
+
+    if not email:
+        return jsonify({
+            "success": False,
+            "message": "Email wajib diisi."
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id FROM users WHERE email=?",
+        (email,)
+    )
+
+    user = cursor.fetchone()
+
+    # Pesan dibuat sama baik email terdaftar atau tidak, supaya orang
+    # lain tidak bisa memakai form ini untuk menebak-nebak email mana
+    # yang punya akun di sistem ini.
+    pesan_umum = (
+        "Kalau email ini terdaftar, kode reset sudah dikirim. "
+        "Cek inbox atau folder spam."
+    )
+
+    if not user:
+        conn.close()
+        return jsonify({"success": True, "message": pesan_umum})
+
+    kode = str(random.randint(0, 999999)).zfill(6)
+    kedaluwarsa = (
+        datetime.now() + timedelta(minutes=KODE_RESET_MENIT_BERLAKU)
+    ).isoformat()
+
+    _siapkan_tabel_reset(cursor)
+
+    cursor.execute(
+        """
+        INSERT INTO reset_codes(email, code, expires_at)
+        VALUES(?,?,?)
+        ON CONFLICT(email) DO UPDATE SET
+            code=excluded.code,
+            expires_at=excluded.expires_at
+        """,
+        (email, kode, kedaluwarsa)
+    )
+
+    conn.commit()
+    conn.close()
+
+    terkirim = _kirim_kode_email(email, kode)
+
+    if not terkirim:
+        return jsonify({
+            "success": False,
+            "message": (
+                "Gagal mengirim email kode. Coba lagi beberapa saat lagi."
+            )
+        }), 500
+
+    return jsonify({"success": True, "message": pesan_umum})
+
+
+@auth.route("/reset-password", methods=["POST"])
+def reset_password():
+
+    data = request.get_json() or {}
+
+    email = data.get("email", "").strip().lower()
+    code = str(data.get("code", "")).strip()
+    new_password = data.get("new_password", "")
+
+    if not email or not code or not new_password:
+        return jsonify({
+            "success": False,
+            "message": "Semua field wajib diisi."
+        }), 400
+
+    if len(new_password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "Password baru minimal 6 karakter."
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    _siapkan_tabel_reset(cursor)
+
+    cursor.execute(
+        "SELECT code, expires_at FROM reset_codes WHERE email=?",
+        (email,)
+    )
+
+    simpanan = cursor.fetchone()
+
+    if not simpanan:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "Kode tidak ditemukan. Minta kode baru."
+        }), 400
+
+    kedaluwarsa = datetime.fromisoformat(simpanan["expires_at"])
+
+    if datetime.now() > kedaluwarsa:
+        cursor.execute(
+            "DELETE FROM reset_codes WHERE email=?", (email,)
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            "success": False,
+            "message": "Kode sudah kedaluwarsa. Minta kode baru."
+        }), 400
+
+    if simpanan["code"] != code:
+        conn.close()
+        return jsonify({
+            "success": False,
+            "message": "Kode salah."
+        }), 400
+
+    cursor.execute(
+        "UPDATE users SET password=? WHERE email=?",
+        (generate_password_hash(new_password), email)
+    )
+
+    cursor.execute(
+        "DELETE FROM reset_codes WHERE email=?", (email,)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "Password berhasil direset. Silakan login dengan password baru."
     })
 
 
