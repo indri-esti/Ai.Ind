@@ -47,9 +47,36 @@ const buatUrlSuara = (teks, mode) => {
 // Siapkan audio potongan berikutnya di belakang layar (dipakai kalau
 // sudah selesai diunduh saat gilirannya tiba, supaya tidak ada jeda)
 const ambilAudio = async (teks, mode, signal) => {
-  const res = await fetch(buatUrlSuara(teks, mode), { signal });
+  let res;
 
-  if (!res.ok) throw new Error("TTS gagal");
+  try {
+    res = await fetch(buatUrlSuara(teks, mode), { signal });
+  } catch (err) {
+    if (err && err.name === "AbortError") throw err;
+    throw new Error(
+      "Tidak bisa terhubung ke server suara. Cek ALAMAT_BACKEND di ChatMessage.jsx"
+    );
+  }
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j && j.detail ? String(j.detail) : "";
+    } catch (e) {
+      // bukan JSON (mis. halaman 404)
+    }
+    throw new Error(
+      `Server suara error ${res.status}${detail ? ": " + detail : ""}`
+    );
+  }
+
+  const tipe = res.headers.get("content-type") || "";
+  if (!tipe.includes("audio")) {
+    throw new Error(
+      "Alamat suara salah: server tidak mengirim audio (cek ALAMAT_BACKEND / router /api/tts)"
+    );
+  }
 
   return res.blob();
 };
@@ -766,6 +793,8 @@ function ChatMessage({ msg }) {
 
   const [speaking, setSpeaking] = useState(false);
   const [memuat, setMemuat] = useState(false);
+  const [galatSuara, setGalatSuara] = useState("");
+  const galatTimerRef = useRef(null);
   const tokenSuaraRef = useRef(0);
   const audioRef = useRef(null);
   const urlRef = useRef(null);
@@ -876,6 +905,13 @@ function ChatMessage({ msg }) {
       URL.revokeObjectURL(urlRef.current);
       urlRef.current = null;
     }
+  };
+
+  const tampilGalat = (pesan) => {
+    console.error("[Suara]", pesan);
+    setGalatSuara(pesan || "Suara gagal diputar");
+    if (galatTimerRef.current) clearTimeout(galatTimerRef.current);
+    galatTimerRef.current = setTimeout(() => setGalatSuara(""), 8000);
   };
 
   const hentikanSemua = () => {
@@ -999,6 +1035,8 @@ function ChatMessage({ msg }) {
       return;
     }
 
+    setGalatSuara("");
+
     // Hentikan suara dari pesan lain
     if (penghentiAktif) penghentiAktif();
     penghentiAktif = hentikanSemua;
@@ -1116,6 +1154,7 @@ function ChatMessage({ msg }) {
         // Sudah dicoba ulang tapi tetap gagal: berhenti (tanpa suara Google)
         if (!PAKAI_SUARA_BROWSER) {
           hentikanSemua();
+          tampilGalat(err && err.message);
           return;
         }
 
@@ -1130,6 +1169,7 @@ function ChatMessage({ msg }) {
   // Hentikan suara kalau pesan hilang dari layar (misal ganti chat)
   useEffect(() => {
     return () => {
+      if (galatTimerRef.current) clearTimeout(galatTimerRef.current);
       if (tokenSuaraRef.current > 0) {
         tokenSuaraRef.current += 1;
         try {
@@ -1674,8 +1714,17 @@ function ChatMessage({ msg }) {
           }
 
           /* ---------- Tombol aksi ---------- */
+          .cm-err {
+            font-size: 12px;
+            line-height: 1.4;
+            color: #ff9a9a;
+            align-self: center;
+            max-width: 100%;
+          }
+
           .cm-actions {
             display: flex;
+            flex-wrap: wrap;
             gap: 8px;
             margin-top: 7px;
             padding: 0 4px;
@@ -1867,6 +1916,12 @@ function ChatMessage({ msg }) {
                     {memuat ? "Memuat" : speaking ? "Berhenti" : "Dengar"}
                   </span>
                 </button>
+              )}
+
+              {galatSuara && (
+                <span className="cm-err" role="alert">
+                  {galatSuara}
+                </span>
               )}
             </div>
           )}

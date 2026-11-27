@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import re
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 router = APIRouter()
+log = logging.getLogger("voice")
 
 # Suara perempuan Indonesia (Microsoft Neural, bukan Google).
 # Suara dibuat di server, jadi di PC / HP / tablet hasilnya sama persis.
@@ -396,7 +398,12 @@ _SELESAI = object()
 _GAGAL = object()
 
 
-async def _produksi(segmen: Segmen, antrean: asyncio.Queue, batas: asyncio.Semaphore):
+async def _produksi(
+    segmen: Segmen,
+    antrean: asyncio.Queue,
+    batas: asyncio.Semaphore,
+    status: dict,
+):
     # Potongan audio langsung dimasukkan ke antrean begitu datang dari layanan
     # suara (tidak menunggu satu segmen selesai), jadi suara bisa mulai
     # terdengar secepat mungkin. Coba ulang otomatis hanya jika belum ada
@@ -422,7 +429,9 @@ async def _produksi(segmen: Segmen, antrean: asyncio.Queue, batas: asyncio.Semap
                         break
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as e:
+                    status["error"] = f"{type(e).__name__}: {e}"
+                    log.warning("edge-tts gagal (percobaan %s): %s", percobaan + 1, status["error"])
                     if terkirim:
                         break  # sudah ada audio terkirim, tidak bisa diulang
                 await asyncio.sleep(0.15 * (percobaan + 1))
@@ -437,7 +446,7 @@ async def _aliran_audio(segmen_list: list, status: dict):
     batas = asyncio.Semaphore(PARALEL)
     antrean_list = [asyncio.Queue() for _ in segmen_list]
     tugas = [
-        asyncio.create_task(_produksi(s, q, batas))
+        asyncio.create_task(_produksi(s, q, batas, status))
         for s, q in zip(segmen_list, antrean_list)
     ]
     try:
@@ -495,9 +504,12 @@ async def _siapkan_stream(segmen_list: list):
     try:
         pertama = await gen.__anext__()
     except StopAsyncIteration:
-        raise HTTPException(status_code=502, detail="Suara kosong")
-    except Exception:
-        raise HTTPException(status_code=502, detail="Gagal membuat suara")
+        raise HTTPException(
+            status_code=502,
+            detail="Suara kosong: " + status.get("error", "edge-tts tidak mengirim audio"),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gagal membuat suara: {e}")
 
     async def lanjut():
         kumpul = bytearray(pertama)
@@ -536,3 +548,19 @@ async def tts_get(
 ):
     segmen = _buat_segmen(text, mode, lang)
     return await _siapkan_stream(segmen)
+
+
+# Cek cepat dari browser: buka /api/tts/cek untuk tahu apakah edge-tts jalan
+@router.get("/tts/cek")
+async def tts_cek():
+    status = {"lengkap": True}
+    seg = [Segmen("Halo, tes suara.", SUARA, KECEPATAN, NADA)]
+    ukuran = 0
+    async for data in _aliran_audio(seg, status):
+        ukuran += len(data)
+    return {
+        "ok": ukuran > 0,
+        "byte_audio": ukuran,
+        "error": status.get("error"),
+        "versi_edge_tts": getattr(edge_tts, "__version__", "?"),
+    }
