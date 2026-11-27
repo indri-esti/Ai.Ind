@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import re
+import threading
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -33,7 +34,7 @@ except Exception:
 
 # Penanda versi: kalau tulisan ini tidak muncul di log hosting,
 # berarti server masih menjalankan ai.py yang lama.
-VERSI = "2026-11-26-v10"
+VERSI = "2026-11-27-v11"
 print(f"[AI.Ind] ai.py {VERSI} dimuat")
 
 
@@ -757,11 +758,18 @@ def gabung_sambungan(awal, lanjutan):
     return awal + lanjutan
 
 
+# Status per thread: apakah jawaban terakhir terpotong di dalam blok kode.
+_STATUS = threading.local()
+
+
 def tutup_potongan(teks):
     """Pastikan blok kode tidak menggantung dan beri tahu pengguna."""
     teks = teks.rstrip()
 
-    if di_dalam_blok_kode(teks):
+    dalam_kode = di_dalam_blok_kode(teks)
+    _STATUS.dalam_kode = dalam_kode
+
+    if dalam_kode:
         teks += "\n```"
 
     return teks + CATATAN_TERPOTONG
@@ -773,7 +781,16 @@ def lengkapi_jawaban(headers, data, jawaban, alasan):
         return jawaban
 
     pesan_sistem = data["messages"][0]
-    pertanyaan = ekstrak_teks_content(data["messages"][-1].get("content"))
+
+    # Pertanyaan asli = pesan user terakhir yang bukan instruksi lanjut.
+    # Isinya (termasuk gambar) dipertahankan supaya sambungan tidak
+    # kehilangan soalnya.
+    pertanyaan_penuh = ""
+
+    for m in reversed(data["messages"]):
+        if m.get("role") == "user" and m.get("content") != INSTRUKSI_LANJUT:
+            pertanyaan_penuh = m.get("content")
+            break
 
     hasil = jawaban
 
@@ -784,14 +801,24 @@ def lengkapi_jawaban(headers, data, jawaban, alasan):
         if len(konteks) > MAX_KONTEKS_LANJUT_CHARS:
             konteks = konteks[-MAX_KONTEKS_LANJUT_CHARS:]
 
+        isi_tanya = pertanyaan_penuh
+
         pesan = [
             pesan_sistem,
-            {"role": "user", "content": pertanyaan},
+            {"role": "user", "content": isi_tanya},
             {"role": "assistant", "content": konteks},
             {"role": "user", "content": INSTRUKSI_LANJUT},
         ]
 
         maks = min(MAX_OUTPUT_TOKENS, BATAS_TOKEN_PERKIRAAN - taksir_token(pesan) - 300)
+
+        # Kuota token tidak cukup untuk gambar: sambung tanpa gambar.
+        if maks < 500 and isinstance(isi_tanya, list):
+            isi_tanya = ekstrak_teks_content(isi_tanya)
+            pesan[1] = {"role": "user", "content": isi_tanya}
+            maks = min(
+                MAX_OUTPUT_TOKENS, BATAS_TOKEN_PERKIRAAN - taksir_token(pesan) - 300
+            )
 
         if maks < 500:
             print("[Groq] Sambung dibatalkan: sisa kuota token terlalu kecil")
@@ -951,8 +978,10 @@ def pilih_error(lama, baru):
 # PANGGIL MODEL (DENGAN FALLBACK)
 # ==================================================
 
-def panggil_model(messages, models):
-    """Coba model satu per satu. Return (jawaban, kode_error)."""
+def panggil_model(messages, models, max_tokens=None, reasoning=None, suhu=None):
+    """Coba model satu per satu. Return (jawaban, kode_error).
+
+    max_tokens, reasoning, suhu opsional: bila kosong, memakai nilai bawaan."""
 
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -967,17 +996,17 @@ def panggil_model(messages, models):
         data = {
             "model": model,
             "messages": messages,
-            "temperature": 0.4 if ada_gambar else 0.85,
-            "max_completion_tokens": MAX_OUTPUT_TOKENS,
+            "temperature": suhu if suhu is not None else (0.4 if ada_gambar else 0.85),
+            "max_completion_tokens": max_tokens or MAX_OUTPUT_TOKENS,
         }
 
         if model.startswith("openai/gpt-oss"):
-            data["reasoning_effort"] = "medium"
+            data["reasoning_effort"] = reasoning or "medium"
 
         # Qwen 3.8: sembunyikan proses berpikir supaya content berisi
         # jawaban akhir, dan batasi usaha berpikir agar tidak menghabiskan token.
         if model.startswith("qwen/qwen3.8"):
-            data["reasoning_effort"] = "medium" if ada_gambar else "low"
+            data["reasoning_effort"] = reasoning or ("medium" if ada_gambar else "low")
             data["reasoning_format"] = "hidden"
 
         response = request_groq(headers, data)
@@ -1113,6 +1142,479 @@ def pesan_error_pengguna(kode, ada_gambar):
 
 
 # ==================================================
+# SESI PER PENGGUNA
+# Frontend tidak mengirim ulang foto saat pengguna mengetik "lanjut",
+# jadi foto, hasil bacaan soal, antrean nomor yang belum dikerjakan, dan
+# jawaban yang terpotong disimpan di server (per user_id, dibuang setelah
+# SESI_TTL detik). Tanpa user_id sesi tidak disimpan.
+# ==================================================
+
+SESI_TTL = 3 * 3600
+SESI_MAKS = 30
+
+_SESI = {}
+_SESI_LOCK = threading.RLock()
+
+# Batas waktu satu permintaan (detik). Banyak hosting gratis memutus
+# permintaan yang lebih lama dari ini. Isi AI_BATAS_DETIK di .env bila perlu.
+try:
+    BATAS_DETIK = float(os.getenv("AI_BATAS_DETIK") or 50)
+except ValueError:
+    BATAS_DETIK = 50.0
+
+# Kalau sisa waktu kurang dari ini, jangan mulai kelompok soal baru.
+ESTIMASI_BATCH = 25
+
+# Soal banyak dikerjakan per kelompok supaya tiap jawaban tidak terpotong.
+SOAL_PER_BATCH = 5
+CHAR_PER_BATCH = 1800
+MAX_TOKEN_BATCH = 1800
+MIN_SOAL_TAHAP = 2
+
+PERLU_TAHAP = re.compile(
+    r"jawab|kerja|selesai|soal|pertanyaan|nomor|tugas|\bpr\b|latihan|ujian|"
+    r"\bisi|periksa|koreksi|\bcek|benar|salah|hitung|jelaskan|tentukan",
+    re.IGNORECASE,
+)
+
+POLA_LANJUT = re.compile(
+    r"^\s*(?:ok(?:e|ay)?\s*,?\s*)?(?:tolong\s+)?"
+    r"(?:lanjut(?:kan|in)?|terus(?:kan)?|next|lagi|sisa(?:nya)?(?:\s+soal)?|"
+    r"selanjutnya|berikutnya|udah\s+itu|udah|sudah(?:\s+itu)?|itu\s+aja|"
+    r"dan\s+seterusnya|gas|yuk)"
+    r"(?:\s*(?:aja|dong|ya|yah|nih|kak|deh|sih))*\s*[.!?]*\s*$",
+    re.IGNORECASE,
+)
+
+KATA_FOTO = re.compile(
+    r"\b(gambar|foto|tulisan|buram|blur|salah\s+baca|baca\s+ulang|lihat)\b",
+    re.IGNORECASE,
+)
+
+POLA_NOMOR = re.compile(r"^\s*(\d{1,3})\s*[.)]\s*(.*)$")
+
+PROMPT_OCR = (
+    "Kamu mesin OCR. Salin SEMUA tulisan pada foto (cetak maupun tulisan "
+    "tangan) persis apa adanya, urut dari atas ke bawah. Tulis satu soal "
+    "per blok dengan nomornya di awal baris (contoh: \"1. ...\"). Jangan "
+    "menjawab, menjelaskan, memperbaiki, atau menambah apa pun. Bagian yang "
+    "tidak terbaca tulis [tidak terbaca], jangan menebak. Untuk gambar, "
+    "diagram, grafik, atau tabel, tulis deskripsi singkat dalam kurung siku, "
+    "mis. [gambar: segitiga siku-siku, sisi 3 dan 4]. Kalau tidak ada "
+    "tulisan sama sekali, tulis persis: TIDAK ADA TEKS"
+)
+
+PROMPT_KERJA = (
+    "Kamu AI.Ind, teman ngobrol dan asisten buatan Indonesia yang santai tapi teliti. "
+    "Kerjakan soal-soal di bawah satu per satu.\n"
+    "- Tulis nomor persis seperti di soal (\"1.\", \"2.\", dst), satu soal satu blok.\n"
+    "- Beri jawaban akhir yang jelas, lalu alasan singkat satu atau dua kalimat. "
+    "Untuk hitungan tulis langkah ringkas dan cek ulang hasilnya.\n"
+    "- Pilihan ganda: sebut huruf dan isinya. Isian: langsung isinya.\n"
+    "- Kalau soal hanya berupa kalimat tanpa perintah, ambil perintah yang paling "
+    "masuk akal dari petunjuk atau pola soal lain, dan sebut asumsinya sekali saja.\n"
+    "- Teks soal berasal dari pembacaan foto. Kalau ada [tidak terbaca] atau soalnya "
+    "tidak masuk akal, tulis \"nomor X kurang jelas, tolong foto ulang\" untuk nomor "
+    "itu. Jangan menebak angka atau tulisan.\n"
+    "- Kerjakan hanya nomor yang diberikan. Tanpa pembuka dan penutup. Bahasa Indonesia "
+    "santai, tanpa Markdown (tanpa **, #, tabel). Jangan menulis proses berpikir."
+)
+
+
+def kunci_sesi(user_id):
+    if user_id is None:
+        return None
+
+    k = str(user_id).strip()
+
+    return k[:100] or None
+
+
+def ambil_sesi(kunci):
+    """Return salinan sesi, atau None bila tidak ada / sudah kedaluwarsa."""
+    if not kunci:
+        return None
+
+    with _SESI_LOCK:
+        s = _SESI.get(kunci)
+
+        if not s:
+            return None
+
+        if time.time() - s.get("waktu", 0) > SESI_TTL:
+            _SESI.pop(kunci, None)
+            return None
+
+        return dict(s)
+
+
+def simpan_sesi(kunci, ganti=False, **isi):
+    """ganti=True: buang sesi lama (mis. ada foto baru)."""
+    if not kunci:
+        return
+
+    with _SESI_LOCK:
+        s = {} if ganti else (ambil_sesi(kunci) or {})
+        s.update(isi)
+        s["waktu"] = time.time()
+        _SESI[kunci] = s
+
+        while len(_SESI) > SESI_MAKS:
+            tertua = min(_SESI, key=lambda k: _SESI[k].get("waktu", 0))
+            _SESI.pop(tertua, None)
+
+
+def pesan_lanjut(teks):
+    teks = (teks or "").strip()
+    return len(teks) <= 40 and bool(POLA_LANJUT.match(teks))
+
+
+def nomor_terjawab(teks):
+    return {
+        int(m.group(1))
+        for m in re.finditer(r"^\s*(\d{1,3})\s*[.)]", teks or "", flags=re.MULTILINE)
+    }
+
+
+def pecah_soal(transkrip):
+    """Return (pembuka, [[nomor, teks], ...]). Nomor harus naik; baris
+    bernomor yang tidak naik dianggap bagian dari soal sebelumnya."""
+    pembuka = []
+    item = []
+
+    for baris in (transkrip or "").splitlines():
+        m = POLA_NOMOR.match(baris)
+
+        if m:
+            n = int(m.group(1))
+
+            if not item or 0 < n - item[-1][0] <= 5:
+                item.append([n, m.group(2).strip()])
+                continue
+
+        if item:
+            if baris.strip():
+                item[-1][1] = (item[-1][1] + "\n" + baris.strip()).strip()
+        elif baris.strip():
+            pembuka.append(baris.strip())
+
+    return "\n".join(pembuka), item
+
+
+def ambil_batch(antrean, soal):
+    batch = []
+    total = 0
+
+    for n in antrean:
+        panjang = len(soal.get(n, ""))
+
+        if batch and (len(batch) >= SOAL_PER_BATCH or total + panjang > CHAR_PER_BATCH):
+            break
+
+        batch.append(n)
+        total += panjang
+
+    return batch
+
+
+def baca_soal_dari_gambar(image):
+    """Salin teks di foto memakai model vision. Return string atau ""."""
+    pesan = [
+        {"role": "system", "content": PROMPT_OCR},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Salin semua tulisan pada foto ini."},
+                {"type": "image_url", "image_url": {"url": image}},
+            ],
+        },
+    ]
+
+    jawaban, kode = panggil_model(
+        pesan,
+        daftar_model(VISION_MODEL, FALLBACK_VISION_MODELS),
+        max_tokens=2500,
+        reasoning="low",
+        suhu=0.1,
+    )
+
+    if not jawaban:
+        print("[Tahap] OCR gagal:", kode)
+        return ""
+
+    jawaban = jawaban.replace(CATATAN_TERPOTONG.strip(), "").strip()
+
+    if "TIDAK ADA TEKS" in jawaban.upper() and len(jawaban) < 40:
+        return ""
+
+    return jawaban
+
+
+def kerjakan_antrean(sesi, kunci, mulai, awal=False):
+    """Kerjakan soal per kelompok sampai antrean habis atau waktu hampir
+    habis. Sisanya disimpan di sesi untuk "lanjut"."""
+    soal = {n: t for n, t in sesi.get("soal", [])}
+    antrean = list(sesi.get("antrean", []))
+    perintah = sesi.get("perintah") or ""
+    pembuka = sesi.get("pembuka") or ""
+
+    bagian = []
+    kode_gagal = None
+
+    while antrean:
+        # Tanpa user_id sisa soal tidak bisa dilanjutkan, jadi tidak ada batas waktu.
+        if bagian and kunci and time.time() - mulai > BATAS_DETIK - ESTIMASI_BATCH:
+            break
+
+        batch = ambil_batch(antrean, soal)
+        isi_soal = "\n".join(f"{n}. {soal.get(n, '')}" for n in batch)
+
+        teks_user = ""
+
+        if perintah:
+            teks_user += f"Perintah dari pengguna: {perintah}\n\n"
+
+        if pembuka:
+            teks_user += f"Petunjuk umum pada lembar soal:\n{pembuka}\n\n"
+
+        teks_user += f"Soal yang dikerjakan sekarang:\n{isi_soal}"
+
+        pesan = [
+            {"role": "system", "content": PROMPT_KERJA},
+            {"role": "user", "content": teks_user},
+        ]
+
+        jawaban, kode = panggil_model(
+            pesan,
+            daftar_model(MODEL, FALLBACK_TEXT_MODELS),
+            max_tokens=MAX_TOKEN_BATCH,
+            reasoning="low",
+        )
+
+        if not jawaban:
+            kode_gagal = kode or "unknown"
+            break
+
+        akhir = CATATAN_TERPOTONG.strip()
+        potong = jawaban.endswith(akhir)
+
+        if potong:
+            jawaban = jawaban[: -len(akhir)].rstrip()
+
+        selesai = nomor_terjawab(jawaban)
+
+        sisa_batch = []
+
+        if potong:
+            if selesai:
+                selesai.discard(max(selesai))  # yang terakhir mungkin setengah jadi
+
+            sisa_batch = [n for n in batch if n not in selesai]
+
+            if len(sisa_batch) == len(batch):
+                # Tidak ada kemajuan: lanjut ke soal berikutnya supaya tidak berputar.
+                jawaban += f"\n\n{batch[0]}. (belum sempat terjawab, tanyakan nomor ini lagi ya)"
+                sisa_batch = batch[1:]
+
+        antrean = sisa_batch + antrean[len(batch):]
+        bagian.append(jawaban)
+
+        sesi["antrean"] = antrean
+        sesi["jawaban_terkumpul"] = (
+            (sesi.get("jawaban_terkumpul") or "") + "\n\n" + jawaban
+        )[-3000:]
+
+        simpan_sesi(
+            kunci,
+            antrean=antrean,
+            jawaban_terkumpul=sesi["jawaban_terkumpul"],
+            terpotong=False,
+        )
+
+    if not bagian:
+        pesan_gagal = pesan_error_pengguna(kode_gagal or "unknown", False)
+
+        if antrean and kunci:
+            pesan_gagal += ' Soalnya sudah kubaca, jadi nanti tinggal ketik "lanjut".'
+
+        return pesan_gagal
+
+    teks = "\n\n".join(bagian)
+
+    if awal:
+        teks = f"Oke, aku kerjain {len(soal)} soalnya satu-satu ya.\n\n" + teks
+
+    if antrean:
+        terjawab = nomor_terjawab(teks)
+        terakhir = max(terjawab) if terjawab else batch[-1]
+        rentang = (
+            f"nomor {antrean[0]}"
+            if len(antrean) == 1
+            else f"nomor {antrean[0]} sampai {antrean[-1]}"
+        )
+
+        if kode_gagal:
+            teks += (
+                f"\n\nBaru sampai nomor {terakhir}, soalnya kena batas pemakaian AI. "
+                f'Tunggu sebentar lalu ketik "lanjut" buat {rentang}.'
+            )
+        else:
+            teks += f'\n\nBaru sampai nomor {terakhir}. Ketik "lanjut" buat {rentang} ya.'
+
+    return teks
+
+
+def tahap_gambar(pesan_text, image, kunci):
+    """Foto baru: baca soalnya dulu, lalu kerjakan per kelompok.
+    Return jawaban, atau None bila harus memakai jalur biasa (foto langsung)."""
+    mulai = time.time()
+
+    simpan_sesi(
+        kunci,
+        ganti=True,
+        image=image,
+        perintah=pesan_text,
+        soal_teks="",
+        soal=[],
+        pembuka="",
+        antrean=[],
+        jawaban_terkumpul="",
+        terpotong=False,
+    )
+
+    if not PERLU_TAHAP.search(pesan_text):
+        return None
+
+    transkrip = baca_soal_dari_gambar(image)
+
+    if not transkrip:
+        return None
+
+    pembuka, soal = pecah_soal(transkrip)
+
+    sesi = {
+        "perintah": pesan_text,
+        "soal_teks": transkrip,
+        "soal": soal,
+        "pembuka": pembuka,
+        "antrean": [n for n, _ in soal],
+        "jawaban_terkumpul": "",
+    }
+
+    simpan_sesi(kunci, **sesi)
+
+    print(f"[Tahap] {len(soal)} soal terbaca dari foto")
+
+    if len(soal) < MIN_SOAL_TAHAP:
+        return None
+
+    return kerjakan_antrean(sesi, kunci, mulai, awal=True)
+
+
+def lanjut_terpotong(sesi, kunci, user_id):
+    """Sambung jawaban biasa yang terpotong batas panjang di pesan sebelumnya."""
+    parsial = sesi.get("jawaban_parsial") or ""
+    pertanyaan = sesi.get("pertanyaan_parsial") or ""
+
+    if not parsial or not pertanyaan:
+        return None
+
+    dalam_kode = bool(sesi.get("dalam_kode"))
+
+    if sesi.get("soal_teks"):
+        pertanyaan += "\n\n[Isi foto yang dikirim pengguna]\n" + sesi["soal_teks"][:2500]
+
+    ekor = potong_ke_baris_utuh(parsial[-MAX_KONTEKS_LANJUT_CHARS:])
+
+    pesan = [
+        {"role": "system", "content": buat_system_prompt(user_id)},
+        {"role": "user", "content": pertanyaan},
+        {"role": "assistant", "content": ekor},
+        {"role": "user", "content": INSTRUKSI_LANJUT},
+    ]
+
+    _STATUS.dalam_kode = False
+
+    lanjutan, kode = panggil_model(pesan, daftar_model(MODEL, FALLBACK_TEXT_MODELS))
+
+    if not lanjutan:
+        return pesan_error_pengguna(kode or "unknown", False)
+
+    catat_jawaban(
+        kunci,
+        sesi.get("pertanyaan_parsial") or "",
+        lanjutan,
+        getattr(_STATUS, "dalam_kode", False),
+        awalan=parsial,
+    )
+
+    if dalam_kode:
+        baris = lanjutan.split("\n", 1)
+
+        if FENCE_BUKA_RE.match(baris[0]):
+            lanjutan = baris[1] if len(baris) > 1 else ""
+
+        lanjutan = "```\n" + lanjutan
+
+    return lanjutan
+
+
+def lanjutkan_sesi(sesi, kunci, user_id):
+    if sesi.get("antrean"):
+        return kerjakan_antrean(sesi, kunci, time.time(), awal=False)
+
+    if sesi.get("terpotong"):
+        return lanjut_terpotong(sesi, kunci, user_id)
+
+    return None
+
+
+def catat_jawaban(kunci, pesan_text, jawaban, dalam_kode, awalan=""):
+    """Simpan jawaban yang terpotong supaya "lanjut" bisa menyambungnya."""
+    if not kunci or not jawaban:
+        return
+
+    akhir = CATATAN_TERPOTONG.strip()
+
+    if not jawaban.endswith(akhir):
+        simpan_sesi(kunci, terpotong=False)
+        return
+
+    isi = jawaban[: -len(akhir)].rstrip()
+
+    if dalam_kode and isi.endswith("```"):
+        isi = isi[:-3].rstrip()  # buang penutup yang ditambah otomatis
+
+    simpan_sesi(
+        kunci,
+        terpotong=True,
+        jawaban_parsial=(awalan + "\n" + isi) if awalan else isi,
+        pertanyaan_parsial=pesan_text,
+        dalam_kode=dalam_kode,
+    )
+
+
+def konteks_sesi(sesi):
+    """Teks tambahan untuk system prompt: isi foto terakhir + jawaban sebelumnya."""
+    if not sesi or not sesi.get("soal_teks"):
+        return ""
+
+    if time.time() - sesi.get("waktu", 0) > 3600:
+        return ""
+
+    teks = (
+        "\n\nFOTO TERAKHIR YANG DIKIRIM PENGGUNA (hasil baca otomatis, bisa ada salah "
+        "baca). Kalau pengguna bertanya soal \"soal tadi\", \"nomor sekian\", atau "
+        "\"yang di foto\", rujuk ke sini:\n" + sesi["soal_teks"][:2500]
+    )
+
+    if sesi.get("jawaban_terkumpul"):
+        teks += "\n\nJAWABAN YANG SUDAH KAMU BERIKAN UNTUK SOAL ITU:\n" + sesi["jawaban_terkumpul"][-1500:]
+
+    return teks
+
+
+# ==================================================
 # BALAS AI
 # ==================================================
 
@@ -1146,8 +1648,12 @@ def _balas(pesan, history, image, user_id):
         print("[AI.Ind] Validasi gambar:", str(e))
         return str(e)
 
+    gambar_baru = image
+
     if image is None:
         image = ambil_gambar_history(history)
+
+    kunci = kunci_sesi(user_id)
 
     # ---------------- PESAN ----------------
     pesan_text = "" if pesan is None else str(pesan).strip()
@@ -1170,6 +1676,27 @@ def _balas(pesan, history, image, user_id):
     # Simpan dulu agar info di pesan ini (mis. nama) langsung terpakai.
     simpan_memory_dari_pesan(pesan_text, user_id)
 
+    # ---------------- SESI: FOTO BARU / "LANJUT" ----------------
+    sesi = None
+
+    if gambar_baru:
+        hasil = tahap_gambar(pesan_text, gambar_baru, kunci)
+
+        if hasil:
+            return hasil
+    else:
+        sesi = ambil_sesi(kunci)
+
+        if sesi and pesan_lanjut(pesan_text):
+            hasil = lanjutkan_sesi(sesi, kunci, user_id)
+
+            if hasil:
+                return hasil
+
+        # Pertanyaan tentang foto yang dikirim sebelumnya: pakai lagi fotonya.
+        if image is None and sesi and sesi.get("image") and KATA_FOTO.search(pesan_text):
+            image = sesi["image"]
+
     # ---------------- HISTORY ----------------
     hist = siapkan_history(history)
 
@@ -1177,7 +1704,9 @@ def _balas(pesan, history, image, user_id):
     if hist and hist[-1]["role"] == "user" and hist[-1]["content"].strip() == pesan_text:
         hist = hist[:-1]
 
-    messages = [{"role": "system", "content": buat_system_prompt(user_id)}]
+    messages = [
+        {"role": "system", "content": buat_system_prompt(user_id) + konteks_sesi(sesi)}
+    ]
     messages.extend(hist)
     messages.append({"role": "user", "content": buat_user_content(pesan_text, image)})
 
@@ -1187,9 +1716,12 @@ def _balas(pesan, history, image, user_id):
     else:
         models = daftar_model(MODEL, FALLBACK_TEXT_MODELS)
 
+    _STATUS.dalam_kode = False
+
     jawaban, kode_error = panggil_model(messages, models)
 
     if jawaban:
+        catat_jawaban(kunci, pesan_text, jawaban, getattr(_STATUS, "dalam_kode", False))
         return jawaban
 
     return pesan_error_pengguna(kode_error, bool(image))
