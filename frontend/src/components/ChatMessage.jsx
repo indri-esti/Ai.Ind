@@ -17,7 +17,7 @@ import {
 // Kalau dikosongkan, dicoba ambil dari VITE_API_URL, lalu dari
 // alamat situs yang sama.
 // =========================================================
-const ALAMAT_BACKEND = "";
+const ALAMAT_BACKEND = "https://aiind-bc6e94a5.fastapicloud.dev";
 
 const BASIS_BACKEND = (
   ALAMAT_BACKEND ||
