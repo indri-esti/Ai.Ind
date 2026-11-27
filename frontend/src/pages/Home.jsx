@@ -1543,8 +1543,8 @@ function Home() {
 
         imageBase64 = await kompresGambar(
           imageFile,
-          1280,
-          0.8
+          2000,
+          0.88
         );
       }
 

@@ -1442,7 +1442,12 @@ def kerjakan_antrean(sesi, kunci, mulai, awal=False):
     teks = "\n\n".join(bagian)
 
     if awal:
-        teks = f"Oke, aku kerjain {len(soal)} soalnya satu-satu ya.\n\n" + teks
+        terbaca = "\n".join(f"{n}. {t}" for n, t in sesi.get("soal", []))
+        teks = (
+            f"Oke, aku kerjain {len(soal)} soalnya satu-satu ya. Ini yang kubaca "
+            "dari fotonya (kalau ada yang salah baca, bilang nomornya):\n\n"
+            f"{terbaca}\n\nJawabannya:\n\n" + teks
+        )
 
     if antrean:
         terjawab = nomor_terjawab(teks)
