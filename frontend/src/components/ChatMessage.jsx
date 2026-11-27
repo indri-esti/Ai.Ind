@@ -108,6 +108,14 @@ const apakahLirik = (teks) => {
 const TTS_BROWSER =
   typeof window !== "undefined" && "speechSynthesis" in window;
 
+// false = jangan pernah pakai suara bawaan HP/browser (suara Google).
+// Kalau suara server gagal, coba ulang lalu berhenti. Ubah ke true kalau
+// suatu hari ingin suara cadangan itu dihidupkan lagi.
+const PAKAI_SUARA_BROWSER = false;
+
+// Batas menunggu suara mulai terdengar sebelum dianggap gagal (milidetik)
+const BATAS_MULAI_SUARA = 20000;
+
 // Penghenti suara yang sedang aktif, supaya hanya satu pesan bersuara
 let penghentiAktif = null;
 
@@ -928,11 +936,30 @@ function ChatMessage({ msg }) {
   // memakai elemen audio yang sama supaya tetap diizinkan di HP
   const putarSumber = (audio, sumber, token) =>
     new Promise((resolve, reject) => {
+      // Kalau suara tidak kunjung mulai, anggap gagal supaya bisa dicoba ulang
+      let pewaktu = setTimeout(() => {
+        pewaktu = null;
+        if (tokenSuaraRef.current !== token) {
+          resolve();
+          return;
+        }
+        reject(new Error("Suara terlalu lama dimulai"));
+      }, BATAS_MULAI_SUARA);
+
+      const hentikanPewaktu = () => {
+        if (pewaktu) {
+          clearTimeout(pewaktu);
+          pewaktu = null;
+        }
+      };
+
       audio.onended = () => {
+        hentikanPewaktu();
         resolve();
       };
 
       audio.onerror = () => {
+        hentikanPewaktu();
         if (tokenSuaraRef.current !== token) {
           resolve();
           return;
@@ -941,6 +968,7 @@ function ChatMessage({ msg }) {
       };
 
       audio.onplaying = () => {
+        hentikanPewaktu();
         if (tokenSuaraRef.current !== token) return;
         setMemuat(false);
         setSpeaking(true);
@@ -952,6 +980,7 @@ function ChatMessage({ msg }) {
 
       if (p && typeof p.catch === "function") {
         p.catch((err) => {
+          hentikanPewaktu();
           if (tokenSuaraRef.current !== token) {
             resolve();
             return;
@@ -1005,6 +1034,41 @@ function ChatMessage({ msg }) {
     audio.preload = "auto";
     audioRef.current = audio;
 
+    // Streaming gagal (server baru bangun, jaringan putus-putus, dll):
+    // coba lagi lewat unduhan penuh, sampai 3 kali, tanpa suara cadangan.
+    const putarUlang = async (teksPotongan) => {
+      let galat = null;
+
+      for (let percobaan = 0; percobaan < 3; percobaan++) {
+        if (tokenSuaraRef.current !== token) return;
+
+        try {
+          const blob = await ambilAudio(
+            teksPotongan,
+            modeSuara,
+            ctrl.signal
+          );
+
+          if (tokenSuaraRef.current !== token) return;
+
+          if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+
+          const alamat = URL.createObjectURL(blob);
+          urlRef.current = alamat;
+
+          await putarSumber(audio, alamat, token);
+          return;
+        } catch (err) {
+          if (err && err.name === "AbortError") throw err;
+          galat = err;
+
+          await new Promise((r) => setTimeout(r, 600 * (percobaan + 1)));
+        }
+      }
+
+      throw galat || new Error("Suara gagal dibuat");
+    };
+
     const jalankan = async () => {
       let idx = 0;
 
@@ -1027,7 +1091,15 @@ function ChatMessage({ msg }) {
           // Siapkan potongan berikutnya selagi yang ini diputar
           siapkan(idx + 1);
 
-          await putarSumber(audio, sumber, token);
+          try {
+            await putarSumber(audio, sumber, token);
+          } catch (err) {
+            if (err && err.name === "AbortError") return;
+            if (tokenSuaraRef.current !== token) return;
+
+            await putarUlang(potongan[idx]);
+          }
+
           if (tokenSuaraRef.current !== token) return;
 
           if (urlRef.current) {
@@ -1041,7 +1113,12 @@ function ChatMessage({ msg }) {
         if (err && err.name === "AbortError") return;
         if (tokenSuaraRef.current !== token) return;
 
-        // Kalau ada yang gagal, lanjutkan sisa teks dengan suara cadangan
+        // Sudah dicoba ulang tapi tetap gagal: berhenti (tanpa suara Google)
+        if (!PAKAI_SUARA_BROWSER) {
+          hentikanSemua();
+          return;
+        }
+
         bersihAudio();
         putarSuaraBrowser(token, potongan.slice(idx).join("\n"));
       }
