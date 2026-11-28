@@ -1,7 +1,8 @@
+
 import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { AdMob } from "@capgo/capacitor-admob";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -9,7 +10,6 @@ import Register from "./pages/Register";
 import About from "./pages/About";
 
 // Test Banner Ad Unit ID Google
-// Gunakan ini dulu untuk memastikan AdMob berjalan.
 const BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111";
 
 function App() {
@@ -65,8 +65,14 @@ function App() {
 
       <Route path="/register" element={<Register />} />
 
+      {/* Halaman About utama */}
       <Route path="/about" element={<About />} />
-      
+
+      {/* Alihkan alamat About yang salah */}
+      <Route
+        path="/about d"
+        element={<Navigate to="/about" replace />}
+      />
     </Routes>
   );
 }
