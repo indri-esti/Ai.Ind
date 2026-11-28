@@ -1,129 +1,76 @@
 
-import { Link } from "react-router-dom";
-import {
-  FiArrowLeft,
-  FiCpu,
-  FiCode,
-  FiUser,
-  FiMessageCircle,
-  FiGlobe,
-  FiZap,
-} from "react-icons/fi";
+import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
+import { AdMob } from "@capgo/capacitor-admob";
+import { Routes, Route, Navigate } from "react-router-dom";
 
-function About() {
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import About from "./pages/About";
+
+// Test Banner Ad Unit ID Google
+const BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111";
+
+function App() {
+  useEffect(() => {
+    const showBanner = async () => {
+      // Jangan jalankan AdMob ketika dibuka melalui browser/Vite
+      if (!Capacitor.isNativePlatform()) {
+        console.log("AdMob: bukan aplikasi Android/iOS");
+        return;
+      }
+
+      try {
+        console.log("AdMob: memulai...");
+
+        await AdMob.start();
+
+        console.log("AdMob: SDK berhasil dimulai");
+
+        await AdMob.adCreate({
+          adUnitId: BANNER_AD_UNIT_ID,
+        });
+
+        console.log("AdMob: banner berhasil dibuat");
+
+        await AdMob.adLoad({
+          id: 1,
+        });
+
+        console.log("AdMob: banner berhasil dimuat");
+
+        await AdMob.adShow({
+          id: 1,
+        });
+
+        console.log("AdMob: banner berhasil ditampilkan");
+      } catch (error) {
+        console.error("AdMob Error:", error);
+      }
+    };
+
+    showBanner();
+  }, []);
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#081420",
-        color: "#e8f1fa",
-        padding: "30px 20px",
-      }}
-    >
-      <div style={{ maxWidth: "850px", margin: "auto" }}>
-        <Link
-          to="/"
-          style={{
-            color: "#36cfff",
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "35px",
-          }}
-        >
-          <FiArrowLeft /> Kembali ke AI.Ind
-        </Link>
+    <Routes>
+      <Route path="/" element={<Home />} />
 
-        <div style={{ textAlign: "center", marginBottom: "45px" }}>
-          <h1 style={{ fontSize: "42px", fontWeight: "bold" }}>
-            AI<span style={{ color: "#00cfff" }}>.</span>Ind
-          </h1>
+      <Route path="/login" element={<Login />} />
 
-          <h2 style={{ fontSize: "24px" }}>
-            Tentang AI.Ind
-          </h2>
+      <Route path="/register" element={<Register />} />
 
-          <p style={{ color: "#a9b9c9", lineHeight: 1.8 }}>
-            Asisten Cerdas Indonesia
-          </p>
-        </div>
+      {/* Halaman About utama */}
+      <Route path="/about" element={<About />} />
 
-        <section style={cardStyle}>
-          <h3><FiCpu /> Apa itu AI.Ind?</h3>
-          <p>
-            AI.Ind adalah aplikasi asisten kecerdasan buatan
-            yang dikembangkan secara mandiri oleh Indri Esti,
-            seorang developer asal Indonesia.
-          </p>
-          <p>
-            AI.Ind dibuat untuk membantu pengguna memperoleh
-            informasi, menjawab pertanyaan, dan mendukung
-            aktivitas sehari-hari melalui teknologi AI.
-          </p>
-        </section>
-
-        <section style={cardStyle}>
-          <h3><FiUser /> Pengembang</h3>
-          <p>
-            AI.Ind merupakan proyek personal yang dikembangkan
-            secara mandiri oleh Indri Esti. Proyek ini menjadi
-            bagian dari eksplorasi dan pengembangan teknologi
-            kecerdasan buatan.
-          </p>
-        </section>
-
-        <section style={cardStyle}>
-          <h3><FiZap /> Tujuan Pembuatan</h3>
-          <p>
-            Mengembangkan asisten AI yang mudah digunakan,
-            membantu pengguna mencari informasi, dan menjadi
-            sarana untuk mengeksplorasi teknologi kecerdasan
-            buatan.
-          </p>
-        </section>
-
-        <section style={cardStyle}>
-          <h3><FiMessageCircle /> Fitur AI.Ind</h3>
-          <ul>
-            <li>Chat dengan asisten AI</li>
-            <li>Riwayat percakapan</li>
-            <li>Interaksi dengan gambar</li>
-            <li>Fitur generator video</li>
-            <li>Login dan registrasi pengguna</li>
-          </ul>
-        </section>
-
-        <section style={cardStyle}>
-          <h3><FiCode /> Teknologi</h3>
-          <p>
-            AI.Ind dikembangkan menggunakan React dan
-            teknologi web modern, dengan layanan backend
-            untuk mendukung fitur asisten AI.
-          </p>
-        </section>
-
-        <div style={{ textAlign: "center", marginTop: "40px" }}>
-          <FiGlobe size={22} color="#00cfff" />
-          <p style={{ color: "#8295a8", fontSize: "13px" }}>
-            AI.Ind — Personal AI Assistant
-          </p>
-          <p style={{ color: "#8295a8", fontSize: "12px" }}>
-            Dikembangkan secara mandiri oleh Indri Esti
-          </p>
-        </div>
-      </div>
-    </div>
+      {/* Alihkan alamat About yang salah */}
+      <Route
+        path="/about d"
+        element={<Navigate to="/about" replace />}
+      />
+    </Routes>
   );
 }
 
-const cardStyle = {
-  background: "#102235",
-  border: "1px solid #1e3a50",
-  borderRadius: "15px",
-  padding: "22px",
-  marginBottom: "18px",
-  lineHeight: 1.8,
-};
-
-export default About;
+export default App;
